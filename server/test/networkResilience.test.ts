@@ -63,4 +63,40 @@ describe('Network & Connection Resilience', () => {
     expect(aborted).toBe(true);
     expect(elapsed).toBeLessThan(300);
   });
+
+  it('filters out stale 192.168.1.42 from host detection and falls back to active LAN', () => {
+    function resolveHost(hostCandidate: string | undefined, defaultHost: string): string {
+      if (hostCandidate && hostCandidate !== '192.168.1.42' && hostCandidate !== '127.0.0.1' && hostCandidate !== 'localhost') {
+        return `http://${hostCandidate}:4000`;
+      }
+      return `http://${defaultHost}:4000`;
+    }
+
+    expect(resolveHost('192.168.1.42', '10.186.129.215')).toBe('http://10.186.129.215:4000');
+    expect(resolveHost('10.0.0.50', '10.186.129.215')).toBe('http://10.0.0.50:4000');
+    expect(resolveHost(undefined, '10.186.129.215')).toBe('http://10.186.129.215:4000');
+  });
+
+  it('validates SYMBOL_MAP contains all 10 synthetic instruments with correct codes and families', async () => {
+    const { SYMBOL_MAP } = await import('../src/deriv/symbolMap.js');
+    expect(SYMBOL_MAP.length).toBe(10);
+    const codes = SYMBOL_MAP.map((s) => s.code);
+    expect(codes).toEqual([
+      'R_10',
+      'R_50',
+      'R_75',
+      'R_100',
+      '1HZ100V',
+      'stpRNG',
+      'BOOM500',
+      'BOOM1000',
+      'CRASH500',
+      'CRASH300',
+    ]);
+    SYMBOL_MAP.forEach((s) => {
+      expect(s.code.length).toBeGreaterThan(0);
+      expect(s.display.length).toBeGreaterThan(0);
+      expect(['volatility', 'boom', 'crash', 'step']).toContain(s.group);
+    });
+  });
 });

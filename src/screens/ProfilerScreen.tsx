@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -8,7 +7,13 @@ import {
   Text,
   View,
 } from 'react-native';
-import { API_BASE_URL, getStrategySignals } from '../api';
+import {
+  DEFAULT_PROFILER_SNAPSHOT,
+  getApiBaseUrl,
+  getProfilerStatus,
+  getStrategySignals,
+  onApiBaseUrlChange,
+} from '../api';
 import { AppHeader } from '../components/AppHeader';
 import { SmcStructureModal } from '../components/SmcStructureModal';
 import type { ProfilerApiState, StrategyApiState, StrategySignal, SymbolProfile } from '../types';
@@ -199,28 +204,30 @@ function SignalCard({ signal }: { signal: StrategySignal }) {
 
 export function ProfilerScreen() {
   const [activeSegment, setActiveSegment] = useState<'profiles' | 'signals'>('profiles');
-  const [data, setData] = useState<ProfilerApiState | null>(null);
+  const [data, setData] = useState<ProfilerApiState>(DEFAULT_PROFILER_SNAPSHOT);
   const [signalsData, setSignalsData] = useState<StrategyApiState | null>(null);
   const [selectedSymbol, setSelectedSymbol] = useState<SymbolProfile | null>(null);
-  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [clock, setClock] = useState(Date.now());
+  const [apiUrl, setApiUrl] = useState(getApiBaseUrl());
   const mounted = useRef(true);
 
-  const fetchProfiler = useCallback(async (silent = false) => {
-    if (!silent) setLoading(true);
+  const fetchProfiler = useCallback(async () => {
     try {
       const [respP, respS] = await Promise.allSettled([
-        fetch(`${API_BASE_URL}/api/profiler/status`),
+        getProfilerStatus(),
         getStrategySignals(),
       ]);
 
-      if (respP.status === 'fulfilled' && respP.value.ok) {
-        const json = (await respP.value.json()) as ProfilerApiState;
+      if (respP.status === 'fulfilled' && respP.value) {
         if (mounted.current) {
-          setData(json);
+          setData(respP.value);
           setError(null);
+        }
+      } else if (respP.status === 'rejected') {
+        if (mounted.current) {
+          setError(respP.reason instanceof Error ? respP.reason.message : 'Could not reach profiler bridge');
         }
       }
 
@@ -233,7 +240,6 @@ export function ProfilerScreen() {
       }
     } finally {
       if (mounted.current) {
-        setLoading(false);
         setRefreshing(false);
       }
     }
@@ -242,12 +248,19 @@ export function ProfilerScreen() {
   useEffect(() => {
     mounted.current = true;
     void fetchProfiler();
+    const unsubUrl = onApiBaseUrlChange((newUrl) => {
+      if (mounted.current) {
+        setApiUrl(newUrl);
+        void fetchProfiler();
+      }
+    });
     const pollTimer = setInterval(() => {
-      void fetchProfiler(true);
+      void fetchProfiler();
     }, 4_000);
     const clockTimer = setInterval(() => setClock(Date.now()), 1_000);
     return () => {
       mounted.current = false;
+      unsubUrl();
       clearInterval(pollTimer);
       clearInterval(clockTimer);
     };
@@ -271,7 +284,7 @@ export function ProfilerScreen() {
             refreshing={refreshing}
             onRefresh={() => {
               setRefreshing(true);
-              void fetchProfiler(true);
+              void fetchProfiler();
             }}
           />
         }
@@ -348,15 +361,6 @@ export function ProfilerScreen() {
               </View>
             )}
 
-            {/* Loading state */}
-            {loading && !data && (
-              <View style={styles.centered}>
-                <ActivityIndicator size="large" color={C.orange} />
-                <Text style={styles.loadingText}>Connecting to Deriv API…</Text>
-                <Text style={styles.loadingHint}>{API_BASE_URL}/api/profiler/status</Text>
-              </View>
-            )}
-
             {/* Error banner */}
             {error && (
               <View style={styles.errorBanner}>
@@ -402,7 +406,7 @@ export function ProfilerScreen() {
             Continuous candle reconstruction &amp; market structure profiling.{'\n'}
             Dynamic ATR 1.5x stop losses strictly enforced with minimum 1:2.5 R:R.
           </Text>
-          <Text style={styles.footerApi}>{API_BASE_URL}</Text>
+          <Text style={styles.footerApi}>{apiUrl}</Text>
           <Text style={styles.footerClock}>{new Date(clock).toLocaleTimeString()}</Text>
         </View>
       </ScrollView>
