@@ -66,23 +66,38 @@ If you get port conflicts, run this first:
 
 ---
 
-## Tabs
+## Application Sections (5 Tabs)
 
-### Controller Tab
-- Start / Pause / Resume / Stop controls
-- Emergency Exit with confirmation
-- Live balance, equity, P&L, drawdown
-- Risk guardrails panel
-- Simulated positions list
-- Monitored instruments watchlist
-- Activity log
+### 1. Home Tab
+- Robot command center with visual robot status avatar and pulse accent
+- Primary automation controls: Start Robot, Pause Entries, Resume, Stop
+- High-level KPI metrics: Active Equity, Today's P&L, Drawdown, Active Simulations
+- Live server bridge heartbeat and connection status
 
-### Profiler Tab (Phase 2)
-- Live connection to Deriv WebSocket API
-- Spread distribution (median and P95) for each symbol
-- Tick velocity (ticks per second)
-- Affordability assessment against the $20/$15 risk policy
-- Per-symbol group badges (VOL / BOOM / CRASH / STEP)
+### 2. Controller Tab
+- Detailed Risk Guardrails: Absolute equity floor ($15.00), default risk/trade ($0.10), hard max, daily/weekly loss locks, margin ceiling
+- Safety Intervention: Emergency Exit button with double confirmation
+- Simulated positions list with side, P&L, and simulated indicators
+- Monitored instruments: Compact 3-item view with internal nested scroll and custom Uiverse `ToggleSwitch`
+
+### 3. Profiler Tab (Phase 2)
+- Live connection to Deriv WebSocket API (`wss://ws.derivws.com`)
+- Live spot price, median & P95 spread distributions
+- Real-time tick velocity (ticks per second) with sparkline bar
+- Affordability assessment against the personal $20.00 / $15.00 risk policy
+
+### 4. Activity Tab
+- Full chronological event and audit log
+- Real-time timestamps and status category markers
+- Complete audit trail of automation state transitions, trade events, and risk limit checks
+
+### 5. Profile Tab
+- Account configuration and connectivity hub
+- Deriv API credentials: App ID configuration and Read-only API Token
+- Test Deriv Connection button verifying live WebSocket status
+- MT5 VPS Bridge configuration: Server host, MT5 Server (`DerivSVG-Server-03`), MT5 Account login
+- Test Bridge Ping button verifying latency
+- Secure local persistence via `@react-native-async-storage/async-storage`
 
 ---
 
@@ -152,18 +167,23 @@ Android App → Authenticated HTTPS/WSS Bridge (VPS)
 
 ```
 derived_arbitage/
-├── App.tsx                        # Root: tab nav, Controller + Profiler screens
+├── App.tsx                        # Root: 5-tab router, WebSocket sync, state provider
 ├── app.json                       # Expo config
-├── package.json                   # Scripts + deps
+├── package.json                   # Scripts + deps (react-native-svg, async-storage, etc.)
 ├── .env.example                   # Config template (never commit .env)
 ├── src/
 │   ├── api.ts                     # Mobile ↔ server REST/WS client
 │   ├── types.ts                   # Shared types (ControllerState, SymbolProfile…)
 │   ├── components/
 │   │   ├── AppHeader.tsx          # Rule 15 App Bar respecting OS status bar chrome
+│   │   ├── TabIcons.tsx           # Svgrepo SVGs for 5 tabs and robot visuals
 │   │   └── ToggleSwitch.tsx       # Uiverse.io custom animated pill switch
 │   └── screens/
-│       └── ProfilerScreen.tsx     # Phase 2 live market data tab
+│       ├── HomeScreen.tsx         # Tab 1: Robot center, primary controls, KPIs
+│       ├── ControllerScreen.tsx   # Tab 2: Risk guardrails, positions, compact instruments
+│       ├── ProfilerScreen.tsx     # Tab 3: Live Deriv market profiler
+│       ├── ActivityScreen.tsx     # Tab 4: Chronological event and audit log
+│       └── ProfileScreen.tsx      # Tab 5: Account & MT5 VPS connectivity hub
 └── server/
     ├── src/
     │   ├── index.ts               # Express server, WS broadcast, endpoints

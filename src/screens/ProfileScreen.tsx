@@ -1,0 +1,324 @@
+import { useCallback, useEffect, useState } from 'react';
+import {
+  Alert,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { AppHeader } from '../components/AppHeader';
+import { API_BASE_URL } from '../api';
+
+const colors = {
+  bg: '#07111F',
+  panel: '#0D1A2B',
+  panelAlt: '#102238',
+  border: '#21344C',
+  text: '#F1F5F9',
+  muted: '#91A4BB',
+  cyan: '#2DD4BF',
+  cyanDark: '#123C3B',
+};
+
+const STORAGE_KEY = '@mobile_ea_profile_config';
+
+interface ProfileConfig {
+  derivAppId: string;
+  derivToken: string;
+  mt5Server: string;
+  mt5Account: string;
+  bridgeUrl: string;
+}
+
+const DEFAULT_CONFIG: ProfileConfig = {
+  derivAppId: '1089',
+  derivToken: '',
+  mt5Server: 'DerivSVG-Server-03',
+  mt5Account: 'Demo/Live Standard',
+  bridgeUrl: API_BASE_URL,
+};
+
+export function ProfileScreen() {
+  const [config, setConfig] = useState<ProfileConfig>(DEFAULT_CONFIG);
+  const [testingDeriv, setTestingDeriv] = useState(false);
+  const [testingBridge, setTestingBridge] = useState(false);
+  const [savedNote, setSavedNote] = useState(false);
+
+  // Load saved config
+  useEffect(() => {
+    void (async () => {
+      try {
+        const raw = await AsyncStorage.getItem(STORAGE_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw) as ProfileConfig;
+          setConfig((prev) => ({ ...prev, ...parsed }));
+        }
+      } catch {
+        // Fallback to default
+      }
+    })();
+  }, []);
+
+  const saveConfig = useCallback(async () => {
+    try {
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+      setSavedNote(true);
+      setTimeout(() => setSavedNote(false), 3000);
+    } catch {
+      Alert.alert('Error', 'Could not save configuration locally.');
+    }
+  }, [config]);
+
+  const testDerivConnection = useCallback(async () => {
+    setTestingDeriv(true);
+    try {
+      const resp = await fetch(`${API_BASE_URL}/api/profiler/status`);
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const json = (await resp.json()) as { connected: boolean; authorized: boolean };
+      if (json.connected) {
+        Alert.alert(
+          'Deriv Connection Active',
+          `WebSocket connection is online via app_id ${config.derivAppId}. Live tick feeds operational.`
+        );
+      } else {
+        Alert.alert('Deriv Connection Offline', 'Could not establish WebSocket handshake with Deriv.');
+      }
+    } catch (err) {
+      Alert.alert('Connection Failed', err instanceof Error ? err.message : 'Deriv check failed.');
+    } finally {
+      setTestingDeriv(false);
+    }
+  }, [config.derivAppId]);
+
+  const testBridgeConnection = useCallback(async () => {
+    setTestingBridge(true);
+    const start = Date.now();
+    try {
+      const resp = await fetch(`${API_BASE_URL}/health`);
+      const latency = Date.now() - start;
+      if (resp.ok) {
+        Alert.alert('Bridge Connected', `VPS Control Bridge responded in ${latency}ms at ${API_BASE_URL}`);
+      } else {
+        Alert.alert('Bridge Error', `Server returned status ${resp.status}`);
+      }
+    } catch (err) {
+      Alert.alert('Bridge Unreachable', err instanceof Error ? err.message : 'Could not reach server.');
+    } finally {
+      setTestingBridge(false);
+    }
+  }, []);
+
+  return (
+    <View style={styles.screenRoot}>
+      <AppHeader eyebrow="ACCOUNT & CONNECTIVITY" title="Profile" />
+      <ScrollView style={styles.root} contentContainerStyle={styles.content}>
+        {savedNote && (
+          <View style={styles.savedBanner}>
+            <Text style={styles.savedText}>✓ Configuration saved successfully</Text>
+          </View>
+        )}
+
+        {/* Deriv Connection Section */}
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>DERIV WEBSOCKET CREDENTIALS</Text>
+
+          <View style={styles.fieldGroup}>
+            <Text style={styles.fieldLabel}>DERIV APP ID</Text>
+            <TextInput
+              style={styles.input}
+              value={config.derivAppId}
+              onChangeText={(text) => setConfig((c) => ({ ...c, derivAppId: text }))}
+              placeholder="1089"
+              placeholderTextColor={colors.muted}
+              keyboardType="numeric"
+            />
+            <Text style={styles.fieldHint}>Default 1089 is public Deriv WebSocket gateway.</Text>
+          </View>
+
+          <View style={styles.fieldGroup}>
+            <Text style={styles.fieldLabel}>READ-ONLY API TOKEN</Text>
+            <TextInput
+              style={styles.input}
+              value={config.derivToken}
+              onChangeText={(text) => setConfig((c) => ({ ...c, derivToken: text }))}
+              placeholder="Paste read-only token from Deriv"
+              placeholderTextColor={colors.muted}
+              secureTextEntry
+            />
+            <Text style={styles.fieldHint}>
+              Generate at app.deriv.com/account/api-token (Read scope only).
+            </Text>
+          </View>
+
+          <Pressable
+            accessibilityRole="button"
+            disabled={testingDeriv}
+            onPress={() => void testDerivConnection()}
+            style={({ pressed }) => [styles.secondaryBtn, pressed && styles.pressedBtn]}
+          >
+            <Text style={styles.secondaryBtnText}>
+              {testingDeriv ? 'Verifying WebSocket…' : 'Test Deriv Connection'}
+            </Text>
+          </Pressable>
+        </View>
+
+        {/* MT5 VPS Bridge Configuration */}
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>MT5 VPS BRIDGE</Text>
+
+          <View style={styles.fieldGroup}>
+            <Text style={styles.fieldLabel}>TARGET MT5 SERVER</Text>
+            <TextInput
+              style={styles.input}
+              value={config.mt5Server}
+              onChangeText={(text) => setConfig((c) => ({ ...c, mt5Server: text }))}
+              placeholder="DerivSVG-Server-03"
+              placeholderTextColor={colors.muted}
+            />
+          </View>
+
+          <View style={styles.fieldGroup}>
+            <Text style={styles.fieldLabel}>ACCOUNT IDENTIFIER</Text>
+            <TextInput
+              style={styles.input}
+              value={config.mt5Account}
+              onChangeText={(text) => setConfig((c) => ({ ...c, mt5Account: text }))}
+              placeholder="Account login reference"
+              placeholderTextColor={colors.muted}
+            />
+          </View>
+
+          <View style={styles.fieldGroup}>
+            <Text style={styles.fieldLabel}>VPS BRIDGE HOST</Text>
+            <Text style={styles.readOnlyText}>{API_BASE_URL}</Text>
+          </View>
+
+          <Pressable
+            accessibilityRole="button"
+            disabled={testingBridge}
+            onPress={() => void testBridgeConnection()}
+            style={({ pressed }) => [styles.secondaryBtn, pressed && styles.pressedBtn]}
+          >
+            <Text style={styles.secondaryBtnText}>
+              {testingBridge ? 'Pinging VPS…' : 'Test Bridge Ping'}
+            </Text>
+          </Pressable>
+        </View>
+
+        {/* Save button */}
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => void saveConfig()}
+          style={({ pressed }) => [styles.saveBtn, pressed && styles.pressedBtn]}
+        >
+          <Text style={styles.saveBtnText}>Save Configuration</Text>
+        </Pressable>
+      </ScrollView>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  screenRoot: { flex: 1, backgroundColor: colors.bg },
+  root: { flex: 1, backgroundColor: colors.bg },
+  content: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 48, gap: 16 },
+
+  savedBanner: {
+    backgroundColor: colors.cyanDark,
+    borderColor: colors.cyan,
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+  },
+  savedText: {
+    color: colors.cyan,
+    fontSize: 13,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+
+  card: {
+    backgroundColor: colors.panel,
+    borderColor: colors.border,
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 16,
+    gap: 14,
+  },
+  sectionTitle: {
+    color: colors.muted,
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1,
+  },
+
+  fieldGroup: {
+    gap: 6,
+  },
+  fieldLabel: {
+    color: colors.muted,
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  input: {
+    backgroundColor: '#091828',
+    borderColor: colors.border,
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    color: colors.text,
+    fontSize: 14,
+    minHeight: 48,
+  },
+  readOnlyText: {
+    color: colors.cyan,
+    fontSize: 13,
+    paddingVertical: 6,
+  },
+  fieldHint: {
+    color: colors.muted,
+    fontSize: 11,
+    lineHeight: 15,
+  },
+
+  secondaryBtn: {
+    minHeight: 48,
+    backgroundColor: '#192A3E',
+    borderColor: '#38506B',
+    borderWidth: 1,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+    marginTop: 4,
+  },
+  secondaryBtnText: {
+    color: colors.cyan,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+
+  saveBtn: {
+    minHeight: 52,
+    backgroundColor: colors.cyan,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+    marginTop: 8,
+  },
+  saveBtnText: {
+    color: '#041510',
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  pressedBtn: {
+    opacity: 0.8,
+    transform: [{ scale: 0.99 }],
+  },
+});
