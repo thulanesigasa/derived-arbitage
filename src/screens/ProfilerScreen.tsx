@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  Animated,
   Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import {
@@ -203,6 +205,10 @@ function SignalCard({ signal }: { signal: StrategySignal }) {
 // ─── Main screen ─────────────────────────────────────────────────────────────
 
 export function ProfilerScreen() {
+  const { width: windowWidth } = useWindowDimensions();
+  const [viewportWidth, setViewportWidth] = useState(windowWidth > 32 ? windowWidth - 32 : 360);
+  const [segmentPillWidth, setSegmentPillWidth] = useState(0);
+
   const [activeSegment, setActiveSegment] = useState<'profiles' | 'signals'>('profiles');
   const [data, setData] = useState<ProfilerApiState>(DEFAULT_PROFILER_SNAPSHOT);
   const [signalsData, setSignalsData] = useState<StrategyApiState | null>(null);
@@ -212,6 +218,53 @@ export function ProfilerScreen() {
   const [clock, setClock] = useState(Date.now());
   const [apiUrl, setApiUrl] = useState(getApiBaseUrl());
   const mounted = useRef(true);
+
+  // Animated values for sliding transitions
+  const slideAnim = useRef(new Animated.Value(0)).current;
+
+  // Adaptive height measurement for sliding content container
+  const [profilesHeight, setProfilesHeight] = useState<number | null>(null);
+  const [signalsHeight, setSignalsHeight] = useState<number | null>(null);
+  const heightAnim = useRef(new Animated.Value(1200)).current;
+
+  useEffect(() => {
+    const toValue = activeSegment === 'profiles' ? 0 : 1;
+    Animated.spring(slideAnim, {
+      toValue,
+      useNativeDriver: true,
+      friction: 8,
+      tension: 65,
+    }).start();
+  }, [activeSegment, slideAnim]);
+
+  useEffect(() => {
+    const targetH = activeSegment === 'profiles' ? profilesHeight : signalsHeight;
+    if (targetH && targetH > 0) {
+      Animated.spring(heightAnim, {
+        toValue: targetH,
+        useNativeDriver: false,
+        friction: 9,
+        tension: 65,
+      }).start();
+    }
+  }, [activeSegment, profilesHeight, signalsHeight, heightAnim]);
+
+  const translateX = slideAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, -viewportWidth],
+  });
+
+  const profilesOpacity = slideAnim.interpolate({
+    inputRange: [0, 0.7, 1],
+    outputRange: [1, 0.4, 0],
+  });
+
+  const signalsOpacity = slideAnim.interpolate({
+    inputRange: [0, 0.3, 1],
+    outputRange: [0, 0.4, 1],
+  });
+
+  const activeHeight = activeSegment === 'profiles' ? profilesHeight : signalsHeight;
 
   const fetchProfiler = useCallback(async () => {
     try {
@@ -290,16 +343,38 @@ export function ProfilerScreen() {
         }
       >
         {/* Top Segmented Control */}
-        <View style={styles.segmentContainer}>
+        <View
+          onLayout={(e) => {
+            const w = e.nativeEvent.layout.width;
+            if (w > 0) setSegmentPillWidth((w - 8) / 2);
+          }}
+          style={styles.segmentContainer}
+        >
+          {segmentPillWidth > 0 && (
+            <Animated.View
+              style={[
+                styles.segmentSlider,
+                {
+                  width: segmentPillWidth,
+                  transform: [
+                    {
+                      translateX: slideAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [0, segmentPillWidth],
+                      }),
+                    },
+                  ],
+                },
+              ]}
+            />
+          )}
+
           <Pressable
             accessibilityRole="tab"
             accessibilityLabel="Instrument Profiles"
             accessibilityState={{ selected: activeSegment === 'profiles' }}
             onPress={() => setActiveSegment('profiles')}
-            style={[
-              styles.segmentBtn,
-              activeSegment === 'profiles' && styles.segmentBtnActive,
-            ]}
+            style={styles.segmentBtn}
           >
             <Text
               style={[
@@ -316,10 +391,7 @@ export function ProfilerScreen() {
             accessibilityLabel="Falcon FX and SMC Signals"
             accessibilityState={{ selected: activeSegment === 'signals' }}
             onPress={() => setActiveSegment('signals')}
-            style={[
-              styles.segmentBtn,
-              activeSegment === 'signals' && styles.segmentBtnActive,
-            ]}
+            style={styles.segmentBtn}
           >
             <Text
               style={[
@@ -332,72 +404,129 @@ export function ProfilerScreen() {
           </Pressable>
         </View>
 
-        {activeSegment === 'profiles' ? (
-          <>
-            {/* Summary bar */}
-            {data && (
-              <View style={styles.summaryRow}>
-                <View style={styles.summaryCell}>
-                  <Text style={[styles.summaryValue, { color: C.orange }]}>{affordable}</Text>
-                  <Text style={styles.summaryLabel}>Affordable</Text>
+        {/* Animated Sliding Viewport between Profiles and SMC Signals */}
+        <Animated.View
+          onLayout={(e) => {
+            const w = e.nativeEvent.layout.width;
+            if (w > 0 && Math.abs(w - viewportWidth) > 1) {
+              setViewportWidth(w);
+            }
+          }}
+          style={[
+            styles.viewportWrapper,
+            activeHeight !== null
+              ? { height: heightAnim, overflow: 'hidden' }
+              : { overflow: 'hidden' },
+          ]}
+        >
+          <Animated.View
+            style={[
+              styles.slidingTrack,
+              {
+                width: viewportWidth * 2,
+                transform: [{ translateX }],
+              },
+            ]}
+          >
+            {/* Pane 1: Instrument Profiles */}
+            <Animated.View
+              pointerEvents={activeSegment === 'profiles' ? 'auto' : 'none'}
+              style={[
+                styles.paneContainer,
+                { width: viewportWidth, opacity: profilesOpacity },
+              ]}
+              onLayout={(e) => {
+                const h = e.nativeEvent.layout.height;
+                if (h > 0 && h !== profilesHeight) {
+                  setProfilesHeight(h);
+                  if (activeSegment === 'profiles' && profilesHeight === null) {
+                    heightAnim.setValue(h);
+                  }
+                }
+              }}
+            >
+              {/* Summary bar */}
+              {data && (
+                <View style={styles.summaryRow}>
+                  <View style={styles.summaryCell}>
+                    <Text style={[styles.summaryValue, { color: C.orange }]}>{affordable}</Text>
+                    <Text style={styles.summaryLabel}>Affordable</Text>
+                  </View>
+                  <View style={styles.sumDivider} />
+                  <View style={styles.summaryCell}>
+                    <Text style={[styles.summaryValue, { color: C.text }]}>{available}</Text>
+                    <Text style={styles.summaryLabel}>Available</Text>
+                  </View>
+                  <View style={styles.sumDivider} />
+                  <View style={styles.summaryCell}>
+                    <Text style={[styles.summaryValue, { color: C.text }]}>{total}</Text>
+                    <Text style={styles.summaryLabel}>Total</Text>
+                  </View>
+                  <View style={styles.sumDivider} />
+                  <View style={styles.summaryCell}>
+                    <Text style={[styles.summaryValue, { color: C.muted }]}>
+                      {data.lastRefreshedAt ? relativeTime(data.lastRefreshedAt) : '—'}
+                    </Text>
+                    <Text style={styles.summaryLabel}>Refreshed</Text>
+                  </View>
                 </View>
-                <View style={styles.sumDivider} />
-                <View style={styles.summaryCell}>
-                  <Text style={[styles.summaryValue, { color: C.text }]}>{available}</Text>
-                  <Text style={styles.summaryLabel}>Available</Text>
-                </View>
-                <View style={styles.sumDivider} />
-                <View style={styles.summaryCell}>
-                  <Text style={[styles.summaryValue, { color: C.text }]}>{total}</Text>
-                  <Text style={styles.summaryLabel}>Total</Text>
-                </View>
-                <View style={styles.sumDivider} />
-                <View style={styles.summaryCell}>
-                  <Text style={[styles.summaryValue, { color: C.muted }]}>
-                    {data.lastRefreshedAt ? relativeTime(data.lastRefreshedAt) : '—'}
-                  </Text>
-                  <Text style={styles.summaryLabel}>Refreshed</Text>
-                </View>
-              </View>
-            )}
+              )}
 
-            {/* Error banner */}
-            {error && (
-              <View style={styles.errorBanner}>
-                <Text style={styles.errorText}>{error}</Text>
-                <Pressable onPress={() => void fetchProfiler()} style={styles.retryBtn}>
-                  <Text style={styles.retryText}>Retry</Text>
-                </Pressable>
-              </View>
-            )}
+              {/* Error banner */}
+              {error && (
+                <View style={styles.errorBanner}>
+                  <Text style={styles.errorText}>{error}</Text>
+                  <Pressable onPress={() => void fetchProfiler()} style={styles.retryBtn}>
+                    <Text style={styles.retryText}>Retry</Text>
+                  </Pressable>
+                </View>
+              )}
 
-            {/* Symbol cards */}
-            {data?.profiles.map((profile) => (
-              <SymbolCard
-                key={profile.code}
-                profile={profile}
-                onOpenStructure={(p) => setSelectedSymbol(p)}
-              />
-            ))}
-          </>
-        ) : (
-          /* SMC Signals View */
-          <View style={styles.signalsContainer}>
-            {recentSignals.length === 0 ? (
-              <View style={styles.emptySignalsCard}>
-                <Text style={styles.emptySignalsTitle}>No active setups detected</Text>
-                <Text style={styles.emptySignalsHint}>
-                  Falcon FX &amp; SMC engine is monitoring 10 synthetic index feeds for Break of Structure,
-                  liquidity sweeps, and fair value gap retracements.
-                </Text>
+              {/* Symbol cards */}
+              {data?.profiles.map((profile) => (
+                <SymbolCard
+                  key={profile.code}
+                  profile={profile}
+                  onOpenStructure={(p) => setSelectedSymbol(p)}
+                />
+              ))}
+            </Animated.View>
+
+            {/* Pane 2: SMC Signals */}
+            <Animated.View
+              pointerEvents={activeSegment === 'signals' ? 'auto' : 'none'}
+              style={[
+                styles.paneContainer,
+                { width: viewportWidth, opacity: signalsOpacity },
+              ]}
+              onLayout={(e) => {
+                const h = e.nativeEvent.layout.height;
+                if (h > 0 && h !== signalsHeight) {
+                  setSignalsHeight(h);
+                  if (activeSegment === 'signals' && signalsHeight === null) {
+                    heightAnim.setValue(h);
+                  }
+                }
+              }}
+            >
+              <View style={styles.signalsContainer}>
+                {recentSignals.length === 0 ? (
+                  <View style={styles.emptySignalsCard}>
+                    <Text style={styles.emptySignalsTitle}>No active setups detected</Text>
+                    <Text style={styles.emptySignalsHint}>
+                      Falcon FX &amp; SMC engine is monitoring 10 synthetic index feeds for Break of Structure,
+                      liquidity sweeps, and fair value gap retracements.
+                    </Text>
+                  </View>
+                ) : (
+                  recentSignals.map((signal) => (
+                    <SignalCard key={signal.id} signal={signal} />
+                  ))
+                )}
               </View>
-            ) : (
-              recentSignals.map((signal) => (
-                <SignalCard key={signal.id} signal={signal} />
-              ))
-            )}
-          </View>
-        )}
+            </Animated.View>
+          </Animated.View>
+        </Animated.View>
 
         {/* Footer */}
         <View style={styles.footer}>
@@ -435,6 +564,7 @@ const styles = StyleSheet.create({
 
   // Segmented control
   segmentContainer: {
+    position: 'relative',
     flexDirection: 'row',
     backgroundColor: C.panel,
     borderColor: C.border,
@@ -442,17 +572,24 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: 4,
   },
+  segmentSlider: {
+    position: 'absolute',
+    top: 4,
+    left: 4,
+    bottom: 4,
+    backgroundColor: '#26140E',
+    borderColor: C.orange,
+    borderWidth: 1,
+    borderRadius: 10,
+    zIndex: 0,
+  },
   segmentBtn: {
     flex: 1,
     minHeight: 48,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 10,
-  },
-  segmentBtnActive: {
-    backgroundColor: '#26140E',
-    borderColor: C.orange,
-    borderWidth: 1,
+    zIndex: 1,
   },
   segmentText: {
     color: C.muted,
@@ -462,6 +599,17 @@ const styles = StyleSheet.create({
   },
   segmentTextActive: {
     color: C.orange,
+  },
+
+  viewportWrapper: {
+    width: '100%',
+  },
+  slidingTrack: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  paneContainer: {
+    gap: 16,
   },
 
   summaryRow: {
