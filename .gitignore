@@ -1,0 +1,9 @@
+node_modules/
+.expo/
+dist/
+coverage/
+.env
+npm-debug.log*
+*.tsbuildinfo
+# Scratch / probe scripts
+probe_symbols.mjs
