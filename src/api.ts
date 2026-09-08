@@ -53,6 +53,49 @@ export function onApiBaseUrlChange(listener: (url: string) => void): () => void 
   return () => urlChangeListeners.delete(listener);
 }
 
+import { ALL_SYMBOLS } from './types';
+
+export const OFFLINE_FALLBACK_STATE: ControllerState = {
+  serverInstanceId: 'offline-demo-mode',
+  revision: 1,
+  status: 'stopped',
+  accountType: 'Standard',
+  mode: 'DEMO',
+  connected: false,
+  lastHeartbeat: new Date().toISOString(),
+  balance: 20,
+  equity: 20,
+  sessionPnl: 0,
+  dailyPnl: 0,
+  weeklyPnl: 0,
+  drawdown: 0,
+  marginUsagePercent: 0,
+  selectedSymbols: [...ALL_SYMBOLS],
+  positions: [],
+  riskPolicy: {
+    initialBalance: 20,
+    absoluteEquityFloor: 15,
+    maximumTotalLoss: 5,
+    defaultRiskPerTrade: 0.1,
+    hardMaxRiskPerTrade: 0.2,
+    dailyLossLock: 0.4,
+    weeklyLossLock: 1,
+    maxOpenPositions: 1,
+    maxMarginUsagePercent: 20,
+  },
+  dailyLocked: false,
+  weeklyLocked: false,
+  equityFloorLocked: false,
+  activity: [
+    {
+      id: 'offline-init-01',
+      at: new Date().toISOString(),
+      kind: 'info',
+      message: 'Running in offline demo mode. Pull to refresh or check connection in Profile.',
+    },
+  ],
+};
+
 export const KNOWN_HOST_CANDIDATES = [
   'http://10.186.129.215:4000',
   'http://localhost:4000',
@@ -61,36 +104,45 @@ export const KNOWN_HOST_CANDIDATES = [
 ];
 
 /**
- * Fast network probe that tests candidate URLs against /api/state.
- * If current API_BASE_URL is unresponsive, automatically updates API_BASE_URL to the working host.
+ * Concurrent network probe that tests candidate URLs against /api/state in parallel.
+ * Resolves within milliseconds to the first responding host.
  */
 export async function probeCandidateUrls(customCandidates?: string[]): Promise<string | null> {
   const candidates = Array.from(
     new Set([
+      'http://10.186.129.215:4000',
+      'http://localhost:4000',
+      'http://127.0.0.1:4000',
       API_BASE_URL,
       ...(customCandidates ?? []),
       ...KNOWN_HOST_CANDIDATES,
     ].map(normalizeBaseUrl))
   );
 
-  for (const candidate of candidates) {
+  const probe = async (url: string): Promise<string> => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 1200);
     try {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 1200);
-      const resp = await fetch(`${candidate}/api/state`, {
+      const resp = await fetch(`${url}/api/state`, {
         signal: controller.signal,
         headers: { 'Content-Type': 'application/json' },
       });
       clearTimeout(timer);
-      if (resp.ok) {
-        setApiBaseUrl(candidate);
-        return candidate;
-      }
-    } catch {
-      // Candidate not reachable, proceed to next
+      if (resp.ok) return url;
+      throw new Error(`Candidate ${url} returned ${resp.status}`);
+    } catch (err) {
+      clearTimeout(timer);
+      throw err;
     }
+  };
+
+  try {
+    const active = await Promise.any(candidates.map(probe));
+    setApiBaseUrl(active);
+    return active;
+  } catch {
+    return null;
   }
-  return null;
 }
 
 let activeAuthToken: string | null = null;

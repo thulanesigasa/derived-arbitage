@@ -8,7 +8,6 @@ import {
   Pressable,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
@@ -36,7 +35,6 @@ import {
   HomeIcon,
   ProfileIcon,
   ProfilerIcon,
-  ShieldIcon,
 } from './src/components/TabIcons';
 
 const colors = {
@@ -111,8 +109,8 @@ const TAB_DEFS: Array<{
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabId>('home');
-  const [state, setState] = useState<ControllerState | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [state, setState] = useState<ControllerState>(OFFLINE_FALLBACK_STATE);
+  const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [online, setOnline] = useState(false);
@@ -143,13 +141,10 @@ export default function App() {
   });
 
   const [currentApiUrl, setCurrentApiUrl] = useState(() => getApiBaseUrl());
-  const [targetUrlInput, setTargetUrlInput] = useState(() => getApiBaseUrl());
-  const [probing, setProbing] = useState(false);
 
   useEffect(() => {
     return onApiBaseUrlChange((newUrl) => {
       setCurrentApiUrl(newUrl);
-      setTargetUrlInput(newUrl);
     });
   }, []);
 
@@ -157,7 +152,6 @@ export default function App() {
     if (customUrl) {
       setApiBaseUrl(customUrl);
       setCurrentApiUrl(customUrl);
-      setTargetUrlInput(customUrl);
     }
     if (!silent) setLoading(true);
 
@@ -171,12 +165,10 @@ export default function App() {
       if (!mounted.current) return;
 
       // Automatically attempt candidate host auto-discovery
-      setProbing(true);
       try {
         const workingHost = await probeCandidateUrls();
         if (workingHost && mounted.current) {
           setCurrentApiUrl(workingHost);
-          setTargetUrlInput(workingHost);
           const recovered = await getState();
           setState(recovered);
           setOnline(true);
@@ -184,9 +176,7 @@ export default function App() {
           return;
         }
       } catch {
-        // Fallback to error UI
-      } finally {
-        if (mounted.current) setProbing(false);
+        // Continue with offline fallback state
       }
 
       setOnline(false);
@@ -197,13 +187,6 @@ export default function App() {
         setRefreshing(false);
       }
     }
-  }, []);
-
-  const handleLaunchOfflineDemo = useCallback(() => {
-    setState(OFFLINE_FALLBACK_STATE);
-    setOnline(false);
-    setError(null);
-    setLoading(false);
   }, []);
 
   useEffect(() => {
@@ -292,101 +275,6 @@ export default function App() {
     },
     [busy, load, state]
   );
-
-  // Initial connection screen or recovery dialog if unreachable
-  if (!state) {
-    if (loading && !error && !probing) {
-      return (
-        <View style={styles.centered}>
-          <ActivityIndicator size="large" color={colors.orange} />
-          <Text style={styles.loadingTitle}>Connecting to mobile controller…</Text>
-          <Text style={styles.loadingHint}>{currentApiUrl}</Text>
-        </View>
-      );
-    }
-
-    return (
-      <SafeAreaProvider>
-        <SafeAreaView style={styles.recoverySafeArea} edges={['top', 'bottom', 'left', 'right']}>
-          <StatusBar style="light" />
-          <View style={styles.recoveryContainer}>
-            <View style={styles.recoveryHeader}>
-              <ShieldIcon size={44} color={colors.orange} />
-              <Text style={styles.recoveryTitle}>BRIDGE CONNECTION</Text>
-              <Text style={styles.recoverySubtitle}>
-                {probing
-                  ? 'Probing candidate network hosts…'
-                  : `Unable to connect to controller server at ${currentApiUrl}`}
-              </Text>
-            </View>
-
-            {error ? (
-              <View style={styles.errorBox}>
-                <Text style={styles.errorBoxText}>{error}</Text>
-              </View>
-            ) : null}
-
-            <View style={styles.recoveryCard}>
-              <Text style={styles.recoverySectionTitle}>TARGET SERVER URL</Text>
-              <TextInput
-                style={styles.recoveryInput}
-                value={targetUrlInput}
-                onChangeText={setTargetUrlInput}
-                autoCapitalize="none"
-                autoCorrect={false}
-                placeholder="http://10.186.129.215:4000"
-                placeholderTextColor={colors.muted}
-              />
-
-              <Text style={styles.quickSelectTitle}>QUICK SWITCH HOSTS</Text>
-              <View style={styles.chipsRow}>
-                {KNOWN_HOST_CANDIDATES.map((host) => (
-                  <Pressable
-                    key={host}
-                    style={[
-                      styles.chip,
-                      targetUrlInput === host && styles.chipActive,
-                    ]}
-                    onPress={() => {
-                      setTargetUrlInput(host);
-                      void load(false, host);
-                    }}
-                  >
-                    <Text
-                      style={[
-                        styles.chipText,
-                        targetUrlInput === host && styles.chipTextActive,
-                      ]}
-                    >
-                      {host.replace(/^http:\/\//, '')}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
-
-              <Pressable
-                style={styles.primaryButton}
-                onPress={() => void load(false, targetUrlInput)}
-              >
-                {loading || probing ? (
-                  <ActivityIndicator size="small" color="#080808" />
-                ) : (
-                  <Text style={styles.primaryButtonText}>RECONNECT TO BRIDGE</Text>
-                )}
-              </Pressable>
-
-              <Pressable
-                style={styles.secondaryButton}
-                onPress={handleLaunchOfflineDemo}
-              >
-                <Text style={styles.secondaryButtonText}>LAUNCH OFFLINE DEMO</Text>
-              </Pressable>
-            </View>
-          </View>
-        </SafeAreaView>
-      </SafeAreaProvider>
-    );
-  }
 
   return (
     <SafeAreaProvider>
@@ -571,135 +459,5 @@ const styles = StyleSheet.create({
     color: colors.muted,
     fontSize: 12,
     textAlign: 'center',
-  },
-
-  // ─── Connection Recovery Screen Styles ───
-  recoverySafeArea: {
-    flex: 1,
-    backgroundColor: colors.bg,
-  },
-  recoveryContainer: {
-    flex: 1,
-    padding: 24,
-    justifyContent: 'center',
-  },
-  recoveryHeader: {
-    alignItems: 'center',
-    marginBottom: 20,
-    gap: 8,
-  },
-  recoveryTitle: {
-    color: colors.text,
-    fontSize: 18,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-  },
-  recoverySubtitle: {
-    color: colors.muted,
-    fontSize: 13,
-    textAlign: 'center',
-    lineHeight: 18,
-    paddingHorizontal: 16,
-  },
-  errorBox: {
-    backgroundColor: '#1E140C',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 107, 0, 0.3)',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 16,
-  },
-  errorBoxText: {
-    color: colors.orange,
-    fontSize: 12,
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    textAlign: 'center',
-  },
-  recoveryCard: {
-    backgroundColor: colors.panel,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 16,
-    padding: 20,
-    gap: 12,
-  },
-  recoverySectionTitle: {
-    color: colors.muted,
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.8,
-  },
-  recoveryInput: {
-    backgroundColor: colors.bg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 8,
-    color: colors.text,
-    paddingHorizontal: 14,
-    height: 48,
-    fontSize: 13,
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-  },
-  quickSelectTitle: {
-    color: colors.muted,
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-    marginTop: 4,
-  },
-  chipsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  chip: {
-    backgroundColor: colors.bg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    minHeight: 36,
-    justifyContent: 'center',
-  },
-  chipActive: {
-    borderColor: colors.orange,
-    backgroundColor: 'rgba(255, 107, 0, 0.1)',
-  },
-  chipText: {
-    color: colors.muted,
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  chipTextActive: {
-    color: colors.orange,
-  },
-  primaryButton: {
-    backgroundColor: colors.orange,
-    borderRadius: 8,
-    minHeight: 48,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 8,
-  },
-  primaryButtonText: {
-    color: '#080808',
-    fontSize: 13,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-  },
-  secondaryButton: {
-    backgroundColor: colors.panelAlt,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 8,
-    minHeight: 48,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  secondaryButtonText: {
-    color: colors.text,
-    fontSize: 12,
-    fontWeight: '700',
   },
 });

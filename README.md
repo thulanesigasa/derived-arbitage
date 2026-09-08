@@ -103,6 +103,8 @@ When switching between Wi-Fi networks (e.g. home vs. office) or running on diffe
 
 ### 2. Controller Tab
 - Detailed Risk Guardrails: Absolute equity floor ($15.00), default risk/trade ($0.10), hard max, daily/weekly loss locks, margin ceiling
+- **Non-Blocking State Synchronization**: Renders all guardrails, floor metrics, and gate inspection cards immediately without blocking on network spinners
+- **Bridge Synchronizing Banner**: Inline offline indicator with tactile `SYNC` action for instant manual polling
 - Safety Intervention: Emergency Exit button with double confirmation
 - Simulated positions list with side, P&L, and simulated indicators
 - Monitored instruments: Compact 3-item view with internal nested scroll and custom Uiverse `ToggleSwitch`
