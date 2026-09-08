@@ -199,7 +199,9 @@ export function ProfileScreen() {
               placeholderTextColor={colors.muted}
               keyboardType="numeric"
             />
-            <Text style={styles.fieldHint}>Default 1089 is public Deriv WebSocket gateway.</Text>
+            <Text style={styles.fieldHint}>
+              Keep 1089 (Deriv's universal public gateway). No registration required (not your MetaQuotes ID).
+            </Text>
           </View>
 
           <View style={styles.fieldGroup}>
