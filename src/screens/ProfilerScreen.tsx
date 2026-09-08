@@ -219,9 +219,6 @@ export function ProfilerScreen() {
           <Text style={styles.eyebrow}>LIVE MARKET DATA</Text>
           <Text style={styles.title}>Profiler</Text>
         </View>
-        <View style={styles.demoBadge}>
-          <Text style={styles.demoText}>READ ONLY</Text>
-        </View>
       </View>
 
       {/* Connection + summary bar */}
@@ -300,8 +297,6 @@ const styles = StyleSheet.create({
   header:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 },
   eyebrow:       { color: C.cyan, fontSize: 10, fontWeight: '800', letterSpacing: 2 },
   title:         { color: C.text, fontSize: 28, fontWeight: '800', letterSpacing: -0.6 },
-  demoBadge:     { backgroundColor: '#0D2035', borderColor: '#1E3A5F', borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
-  demoText:      { color: C.blue, fontSize: 10, fontWeight: '900', letterSpacing: 1.2 },
 
   connBadge:     { flexDirection: 'row', alignItems: 'center', gap: 7, borderWidth: 1, borderRadius: 10, padding: 10, backgroundColor: C.panel },
   dot:           { width: 7, height: 7, borderRadius: 4 },
