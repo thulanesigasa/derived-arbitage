@@ -6,13 +6,13 @@ import {
   Platform,
   Pressable,
   RefreshControl,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Switch,
   Text,
   View,
 } from 'react-native';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { API_BASE_URL, getState, sendControl, stateSocketUrl, updateSymbols } from './src/api';
 import { ALL_SYMBOLS, type AutomationStatus, type ControlAction, type ControllerState, type SymbolName } from './src/types';
 import { ProfilerScreen } from './src/screens/ProfilerScreen';
@@ -387,37 +387,39 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<TabId>('controller');
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar style="light" />
+    <SafeAreaProvider>
+      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+        <StatusBar style="light" />
 
-      {/* Screen content */}
-      <View style={styles.screenArea}>
-        {activeTab === 'controller' ? <AppContent /> : <ProfilerScreen />}
-      </View>
+        {/* Screen content */}
+        <View style={styles.screenArea}>
+          {activeTab === 'controller' ? <AppContent /> : <ProfilerScreen />}
+        </View>
 
-      {/* Bottom tab bar */}
-      <View style={styles.tabBar}>
-        {TAB_DEFS.map(({ id, label }) => {
-          const active = activeTab === id;
-          return (
-            <Pressable
-              key={id}
-              accessibilityRole="button"
-              accessibilityLabel={label}
-              accessibilityState={{ selected: active }}
-              onPress={() => setActiveTab(id)}
-              style={styles.tabItem}
-            >
-              {/* Active indicator pip */}
-              <View style={[styles.tabPip, active && styles.tabPipActive]} />
-              <Text style={[styles.tabLabel, active ? styles.tabLabelActive : styles.tabLabelIdle]}>
-                {label}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
-    </SafeAreaView>
+        {/* Bottom tab bar */}
+        <View style={styles.tabBar}>
+          {TAB_DEFS.map(({ id, label }) => {
+            const active = activeTab === id;
+            return (
+              <Pressable
+                key={id}
+                accessibilityRole="button"
+                accessibilityLabel={label}
+                accessibilityState={{ selected: active }}
+                onPress={() => setActiveTab(id)}
+                style={styles.tabItem}
+              >
+                {/* Active indicator pip */}
+                <View style={[styles.tabPip, active && styles.tabPipActive]} />
+                <Text style={[styles.tabLabel, active ? styles.tabLabelActive : styles.tabLabelIdle]}>
+                  {label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      </SafeAreaView>
+    </SafeAreaProvider>
   );
 }
 

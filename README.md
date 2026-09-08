@@ -43,6 +43,7 @@ A personal Android controller for a Deriv MT5 EA trading Volatility, Boom, Crash
 - **Grid & Spacing**: 4-column stretch layout, 16px margins & gutters, 8px grid spacing (8, 16, 24, 32, 48, 56, 64)
 - **Touch Targets**: Minimum 48×48dp (Android) / 44×44pt (iOS) across all buttons, tab items, and switches
 - **Color System**: 60% Background (`#07111F`), 30% Panel (`#0D1A2B`), 10% Accent (`#2DD4BF` Cyan)
+- **Safe Area Insets**: Handled via `react-native-safe-area-context` (`SafeAreaProvider` + `SafeAreaView` with explicit top/side edges)
 - **No Status Badges**: Strictly zero status badges or indicator tags (e.g. READ ONLY, DEMO ONLY, STOPPED, REVIEW, OK) in component UIs (Rule 16)
 
 ---
