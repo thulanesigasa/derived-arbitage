@@ -6,7 +6,6 @@
   "main": "node_modules/expo/AppEntry.js",
   "scripts": {
     "dev": "concurrently --kill-others-on-fail --raw \"npm:server:dev\" \"npm:expo:start\"",
-
     "dev:win": "powershell -Command \"Start-Process powershell -ArgumentList '-NoExit','-Command','cd \\\"$PWD\\\"; npx expo start --lan --port 8082' -WindowStyle Normal; npm run server:dev\"",
     "expo:start": "expo start --lan --port 8082",
     "server:dev": "tsx watch server/src/index.ts",
@@ -26,6 +25,7 @@
     "express": "latest",
     "react": "19.2.3",
     "react-native": "0.86.3",
+    "react-native-safe-area-context": "~5.7.0",
     "ws": "latest"
   },
   "devDependencies": {
