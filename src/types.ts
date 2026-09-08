@@ -201,3 +201,55 @@ export interface InstrumentStructureResponse {
   structure: SMCStructureAnalysis;
 }
 
+export interface Mt5Position {
+  ticket: number;
+  symbol: string;
+  type: 'BUY' | 'SELL';
+  lots: number;
+  openPrice: number;
+  currentPrice: number;
+  stopLoss: number;
+  takeProfit: number;
+  profitUsd: number;
+  openTime: string;
+}
+
+export interface Mt5TelemetryPayload {
+  account: number;
+  balance: number;
+  equity: number;
+  margin: number;
+  freeMargin: number;
+  openPositions: Mt5Position[];
+  dailyPnlUsd: number;
+  riskLocked: boolean;
+  equityFloorLocked: boolean;
+  terminalTime: string;
+}
+
+export interface Mt5Command {
+  id: string;
+  type: 'EXECUTE_ORDER' | 'CLOSE_POSITION' | 'FLATTEN_ALL' | 'PING';
+  symbol?: string;
+  direction?: 'BUY' | 'SELL';
+  lots?: number;
+  stopLoss?: number;
+  takeProfit?: number;
+  ticket?: number;
+  timestamp: string;
+}
+
+export interface Mt5BridgeStatus {
+  connected: boolean;
+  lastHeartbeat: string | null;
+  account: number | null;
+  balance: number;
+  equity: number;
+  freeMargin: number;
+  dailyPnlUsd: number;
+  openPositions: Mt5Position[];
+  riskLocked: boolean;
+  equityFloorLocked: boolean;
+  pendingCommandsCount: number;
+}
+

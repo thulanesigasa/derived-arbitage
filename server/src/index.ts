@@ -7,6 +7,7 @@ import { ALL_SYMBOLS, type ControlAction, type SymbolName } from '../../src/type
 import { ControllerStore, TransitionError } from './stateMachine.js';
 import { MarketProfiler } from './deriv/marketProfiler.js';
 import { ExecutionEngine } from './strategy/executionEngine.js';
+import { Mt5Bridge } from './mt5/mt5Bridge.js';
 
 const port       = Number(process.env.CONTROL_SERVER_PORT ?? 4000);
 const host       = process.env.CONTROL_SERVER_HOST ?? '0.0.0.0';
@@ -14,6 +15,7 @@ const derivAppId = process.env.DERIV_APP_ID ?? '1089';  // public demo app_id
 const derivToken = process.env.DERIV_API_TOKEN ?? null; // optional read-only token
 
 const store           = new ControllerStore();
+const mt5Bridge       = new Mt5Bridge(store);
 const profiler        = new MarketProfiler(derivAppId, derivToken);
 const executionEngine = new ExecutionEngine(store);
 
@@ -43,6 +45,9 @@ app.post('/api/control', (req, res, next) => {
     if (!action || !['start', 'pause', 'resume', 'stop', 'emergencyExit'].includes(action))
       throw new TransitionError('Unknown control action.', 'INVALID_REQUEST');
     validateEnvelope(expectedRevision, requestId);
+    if (action === 'emergencyExit') {
+      mt5Bridge.triggerEmergencyFlatten();
+    }
     res.json(store.control(action, expectedRevision as number, requestId as string));
   } catch (error) { next(error); }
 });
@@ -97,6 +102,37 @@ app.get('/api/strategy/structure/:code', (req, res) => {
   const structure = executionEngine.getMarketStructure(code);
   const atr       = executionEngine.getAggregator().getATR(code);
   res.json({ code, atr, candles, structure });
+});
+
+// ─── MT5 Bridge (Phase 4) endpoints ─────────────────────────────────────────
+
+/** Real-time telemetry ingestion from MT5 FalconEA */
+app.post('/api/mt5/telemetry', (req, res) => {
+  const status = mt5Bridge.handleTelemetry(req.body);
+  res.json({ ok: true, status });
+});
+
+/** Poll pending execution commands for MT5 terminal */
+app.get('/api/mt5/commands', (_req, res) => {
+  const commands = mt5Bridge.pollCommands();
+  res.json({ commands });
+});
+
+/** Ingest order execution result from MT5 terminal */
+app.post('/api/mt5/order-result', (req, res) => {
+  mt5Bridge.handleOrderResult(req.body);
+  res.json({ ok: true });
+});
+
+/** Full MT5 bridge status (connection, telemetry, locks, open positions) */
+app.get('/api/mt5/status', (_req, res) => {
+  res.json(mt5Bridge.getStatus());
+});
+
+/** Manual emergency flatten kill switch */
+app.post('/api/mt5/flatten', (_req, res) => {
+  const command = mt5Bridge.triggerEmergencyFlatten();
+  res.json({ ok: true, command });
 });
 
 // ─── Error handler ───────────────────────────────────────────────────────────
