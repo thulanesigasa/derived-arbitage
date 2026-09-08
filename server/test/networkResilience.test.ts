@@ -99,4 +99,28 @@ describe('Network & Connection Resilience', () => {
       expect(['volatility', 'boom', 'crash', 'step']).toContain(s.group);
     });
   });
+
+  it('calculates segment slider and horizontal track slide interpolation values accurately', () => {
+    function interpolate(val: number, inRange: [number, number], outRange: [number, number]): number {
+      const [inMin, inMax] = inRange;
+      const [outMin, outMax] = outRange;
+      const ratio = Math.max(0, Math.min(1, (val - inMin) / (inMax - inMin)));
+      return outMin + ratio * (outMax - outMin);
+    }
+
+    const viewportWidth = 360;
+    const segmentPillWidth = 170;
+
+    // Profiles state (0)
+    expect(interpolate(0, [0, 1], [0, -viewportWidth])).toBe(0);
+    expect(interpolate(0, [0, 1], [0, segmentPillWidth])).toBe(0);
+
+    // SMC Signals state (1)
+    expect(interpolate(1, [0, 1], [0, -viewportWidth])).toBe(-360);
+    expect(interpolate(1, [0, 1], [0, segmentPillWidth])).toBe(170);
+
+    // Halfway transition (0.5)
+    expect(interpolate(0.5, [0, 1], [0, -viewportWidth])).toBe(-180);
+    expect(interpolate(0.5, [0, 1], [0, segmentPillWidth])).toBe(85);
+  });
 });
