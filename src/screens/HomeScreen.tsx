@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { AppHeader } from '../components/AppHeader';
 import { PauseIcon, PlayIcon, QuotesIcon, StopIcon } from '../components/TabIcons';
+import { getApiBaseUrl } from '../api';
 import type { ControlAction, ControllerState } from '../types';
 
 interface HomeScreenProps {
@@ -131,12 +132,12 @@ export function HomeScreen({
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={primaryAction.label}
-            disabled={busy || !online || isTransitioning}
+            disabled={busy || isTransitioning}
             onPress={() => onControl(primaryAction.action)}
             style={({ pressed }) => [
               styles.dockButton,
               styles.dockButtonPrimary,
-              (busy || !online || isTransitioning) && styles.disabledBtn,
+              (busy || isTransitioning) && styles.disabledBtn,
               pressed && styles.pressedBtn,
             ]}
           >
@@ -171,12 +172,12 @@ export function HomeScreen({
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Stop Robot"
-            disabled={busy || !online || isTransitioning || state?.status === 'stopped'}
+            disabled={busy || isTransitioning || state?.status === 'stopped'}
             onPress={() => onControl('stop')}
             style={({ pressed }) => [
               styles.dockButton,
               styles.dockButtonSecondary,
-              (busy || !online || isTransitioning || state?.status === 'stopped') &&
+              (busy || isTransitioning || state?.status === 'stopped') &&
                 styles.disabledBtn,
               pressed && styles.pressedBtn,
             ]}
@@ -187,6 +188,24 @@ export function HomeScreen({
             <Text style={styles.dockButtonTextSecondary}>STOP</Text>
           </Pressable>
         </View>
+
+        {/* Bridge Synchronizing Banner */}
+        {!online && (
+          <View style={styles.syncNotice}>
+            <View style={styles.syncNoticeContent}>
+              <Text style={styles.syncNoticeTitle}>Controller Bridge Synchronizing</Text>
+              <Text style={styles.syncNoticeSubtitle}>Awaiting server sync at {getApiBaseUrl()}</Text>
+            </View>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Sync connection with bridge"
+              onPress={onRefresh}
+              style={styles.syncBtn}
+            >
+              <Text style={styles.syncBtnText}>SYNC</Text>
+            </Pressable>
+          </View>
+        )}
 
         {/* Transitioning Banner */}
         {isTransitioning && (
@@ -590,5 +609,45 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 12,
     fontWeight: '700',
+  },
+
+  syncNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#1E140C',
+    borderColor: colors.orange,
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 12,
+  },
+  syncNoticeContent: {
+    flex: 1,
+    gap: 2,
+  },
+  syncNoticeTitle: {
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  syncNoticeSubtitle: {
+    color: colors.muted,
+    fontSize: 11,
+  },
+  syncBtn: {
+    minHeight: 48,
+    minWidth: 70,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.orange,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+  },
+  syncBtnText: {
+    color: '#080808',
+    fontSize: 12,
+    fontWeight: '800',
   },
 });
