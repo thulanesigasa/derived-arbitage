@@ -160,7 +160,8 @@ derived_arbitage/
 │   ├── api.ts                     # Mobile ↔ server REST/WS client
 │   ├── types.ts                   # Shared types (ControllerState, SymbolProfile…)
 │   ├── components/
-│   │   └── AppHeader.tsx          # Rule 15 App Bar respecting OS status bar chrome
+│   │   ├── AppHeader.tsx          # Rule 15 App Bar respecting OS status bar chrome
+│   │   └── ToggleSwitch.tsx       # Uiverse.io custom animated pill switch
 │   └── screens/
 │       └── ProfilerScreen.tsx     # Phase 2 live market data tab
 └── server/
