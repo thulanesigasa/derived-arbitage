@@ -35,12 +35,12 @@ export function ToggleSwitch({
 
   const backgroundColor = animatedValue.interpolate({
     inputRange: [0, 1],
-    outputRange: ['#142236', '#2DD4BF'],
+    outputRange: ['#262626', '#FF6B00'],
   });
 
   const borderColor = animatedValue.interpolate({
     inputRange: [0, 1],
-    outputRange: ['#283D56', '#22AB99'],
+    outputRange: ['#383838', '#E65C00'],
   });
 
   return (

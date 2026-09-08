@@ -22,14 +22,14 @@ interface HomeScreenProps {
 }
 
 const colors = {
-  bg: '#07111F',
-  panel: '#0D1A2B',
-  panelAlt: '#102238',
-  border: '#21344C',
-  text: '#F1F5F9',
-  muted: '#91A4BB',
-  cyan: '#2DD4BF',
-  cyanDark: '#123C3B',
+  bg: '#080808',
+  panel: '#161616',
+  panelAlt: '#1E1E1E',
+  border: '#282828',
+  text: '#FFFFFF',
+  muted: '#9A9A9A',
+  orange: '#FF6B00',
+  orangeDark: '#2D1405',
 };
 
 function money(value: number, signed = false): string {
@@ -74,14 +74,14 @@ export function HomeScreen({
         style={styles.root}
         contentContainerStyle={styles.content}
         refreshControl={
-          <RefreshControl tintColor={colors.cyan} refreshing={refreshing} onRefresh={onRefresh} />
+          <RefreshControl tintColor={colors.orange} refreshing={refreshing} onRefresh={onRefresh} />
         }
       >
         {/* Robot Hero Card */}
         <View style={styles.robotCard}>
           <View style={styles.robotAvatarContainer}>
             <View style={styles.robotRing}>
-              <RobotIcon size={46} color={online ? colors.cyan : colors.muted} />
+              <RobotIcon size={46} color={online ? colors.orange : colors.muted} />
             </View>
             <Text style={styles.robotStateText}>{robotStateLabel}</Text>
           </View>
@@ -98,7 +98,7 @@ export function HomeScreen({
           <View style={styles.kpiGrid}>
             <View style={styles.kpiCell}>
               <Text style={styles.kpiLabel}>TODAY P&L</Text>
-              <Text style={[styles.kpiValue, { color: (state?.sessionPnl ?? 0) >= 0 ? colors.cyan : '#FB7185' }]}>
+              <Text style={[styles.kpiValue, { color: (state?.sessionPnl ?? 0) >= 0 ? colors.orange : colors.muted }]}>
                 {state ? money(state.sessionPnl, true) : '—'}
               </Text>
             </View>
@@ -120,7 +120,7 @@ export function HomeScreen({
 
           {/* Heartbeat connection info */}
           <View style={styles.connectionRow}>
-            <View style={[styles.connectionDot, { backgroundColor: online ? colors.cyan : '#FB7185' }]} />
+            <View style={[styles.connectionDot, { backgroundColor: online ? colors.orange : colors.muted }]} />
             <Text style={styles.connectionText}>
               {online ? 'Mock bridge connected · rev ' + (state?.revision ?? 0) : 'Server offline'}
             </Text>
@@ -132,7 +132,7 @@ export function HomeScreen({
           <Text style={styles.actionsTitle}>ROBOT CONTROLS</Text>
           {isTransitioning && (
             <View style={styles.transitionRow}>
-              <ActivityIndicator color={colors.cyan} />
+              <ActivityIndicator color={colors.orange} />
               <Text style={styles.transitionText}>Processing {state?.status}…</Text>
             </View>
           )}
@@ -183,7 +183,7 @@ export function HomeScreen({
 const styles = StyleSheet.create({
   screenRoot: { flex: 1, backgroundColor: colors.bg },
   root: { flex: 1, backgroundColor: colors.bg },
-  content: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 48, gap: 16 },
+  content: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 120, gap: 16 },
 
   robotCard: {
     backgroundColor: colors.panel,
@@ -202,14 +202,14 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: '#102238',
+    backgroundColor: '#1C1C1C',
     borderWidth: 2,
-    borderColor: colors.cyan,
+    borderColor: colors.orange,
     alignItems: 'center',
     justifyContent: 'center',
   },
   robotStateText: {
-    color: colors.cyan,
+    color: colors.orange,
     fontSize: 12,
     fontWeight: '800',
     letterSpacing: 1.2,
@@ -234,7 +234,7 @@ const styles = StyleSheet.create({
 
   kpiGrid: {
     flexDirection: 'row',
-    backgroundColor: '#091828',
+    backgroundColor: '#101010',
     borderColor: colors.border,
     borderWidth: 1,
     borderRadius: 12,
@@ -297,7 +297,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   transitionText: {
-    color: colors.cyan,
+    color: colors.orange,
     fontSize: 12,
     fontWeight: '700',
   },
@@ -308,22 +308,22 @@ const styles = StyleSheet.create({
   primaryBtn: {
     flex: 1,
     minHeight: 52,
-    backgroundColor: colors.cyan,
+    backgroundColor: colors.orange,
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 16,
   },
   primaryBtnText: {
-    color: '#041510',
+    color: '#080808',
     fontSize: 15,
     fontWeight: '800',
   },
   stopBtn: {
     minHeight: 52,
     minWidth: 100,
-    backgroundColor: '#192A3E',
-    borderColor: '#38506B',
+    backgroundColor: '#222222',
+    borderColor: '#383838',
     borderWidth: 1,
     borderRadius: 12,
     alignItems: 'center',

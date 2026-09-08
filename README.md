@@ -39,11 +39,11 @@ A personal Android controller for a Deriv MT5 EA trading Volatility, Boom, Crash
 ## Mobile Development Standards (Rule 15)
 
 - **Target Platforms**: Android (first), iOS
-- **Navigation Chrome**: Bottom tab bar dynamically accounts for OS chrome (Android: 56px nav + 48px gesture bar = 104px; iOS: 56px tab bar + 34px home indicator = 90px)
+- **Navigation Chrome**: Floating pill bottom navigation bar with a smooth animated sliding indicator (`Animated.spring`), dynamically accounting for OS chrome (Android: 48px gesture chrome; iOS: 34px home indicator)
 - **App Bar & Header**: Dedicated App Bar (`56px` Android / `96px` iOS) respecting device status bar height so device time and chrome never overlay header titles
 - **Grid & Spacing**: 4-column stretch layout, 16px margins & gutters, 8px grid spacing (8, 16, 24, 32, 48, 56, 64)
 - **Touch Targets**: Minimum 48×48dp (Android) / 44×44pt (iOS) across all buttons, tab items, and switches
-- **Color System**: 60% Background (`#07111F`), 30% Panel (`#0D1A2B`), 10% Accent (`#2DD4BF` Cyan)
+- **Color System**: 60% Background (`#080808` Pitch Black), 30% Panel (`#161616` Matte Charcoal), 10% Accent (`#FF6B00` Vivid Electric Orange), Text (`#FFFFFF` Pure White)
 - **Safe Area Insets**: Handled via `react-native-safe-area-context` (`SafeAreaProvider` + `SafeAreaView` with explicit top/side edges)
 - **No Status Badges**: Strictly zero status badges or indicator tags (e.g. READ ONLY, DEMO ONLY, STOPPED, REVIEW, OK) in component UIs (Rule 16)
 

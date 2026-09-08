@@ -23,15 +23,14 @@ interface ControllerScreenProps {
 }
 
 const colors = {
-  bg: '#07111F',
-  panel: '#0D1A2B',
-  panelAlt: '#102238',
-  border: '#21344C',
-  text: '#F1F5F9',
-  muted: '#91A4BB',
-  cyan: '#2DD4BF',
-  cyanDark: '#123C3B',
-  red: '#FB7185',
+  bg: '#080808',
+  panel: '#161616',
+  panelAlt: '#1E1E1E',
+  border: '#282828',
+  text: '#FFFFFF',
+  muted: '#9A9A9A',
+  orange: '#FF6B00',
+  orangeDark: '#2D1405',
 };
 
 function money(value: number): string {
@@ -52,7 +51,7 @@ export function ControllerScreen({
       <View style={styles.screenRoot}>
         <AppHeader eyebrow="RISK & EXECUTION" title="Controller" />
         <View style={styles.connectingContainer}>
-          <ActivityIndicator size="large" color={colors.cyan} />
+          <ActivityIndicator size="large" color={colors.orange} />
           <Text style={styles.connectingTitle}>Connecting to controller bridge…</Text>
           <Text style={styles.connectingHint}>Awaiting state synchronization</Text>
         </View>
@@ -69,7 +68,7 @@ export function ControllerScreen({
         style={styles.root}
         contentContainerStyle={styles.content}
         refreshControl={
-          <RefreshControl tintColor={colors.cyan} refreshing={refreshing} onRefresh={onRefresh} />
+          <RefreshControl tintColor={colors.orange} refreshing={refreshing} onRefresh={onRefresh} />
         }
       >
         {/* Risk Guardrails Card */}
@@ -81,8 +80,8 @@ export function ControllerScreen({
               <Text style={styles.floorValue}>{money(state.riskPolicy.absoluteEquityFloor)}</Text>
               <Text style={styles.floorHint}>{money(floorDistance)} buffer remaining</Text>
             </View>
-            <View style={[styles.statusRing, { borderColor: state.equityFloorLocked ? colors.red : colors.cyan }]}>
-              <Text style={[styles.statusRingText, { color: state.equityFloorLocked ? colors.red : colors.cyan }]}>
+            <View style={[styles.statusRing, { borderColor: colors.orange }]}>
+              <Text style={[styles.statusRingText, { color: colors.orange }]}>
                 {state.equityFloorLocked ? 'LOCKED' : 'ARMED'}
               </Text>
             </View>
@@ -169,7 +168,7 @@ export function ControllerScreen({
                   <Text style={styles.posSymbol}>{pos.symbol}</Text>
                   <Text style={styles.posSide}>{pos.side.toUpperCase()} · simulated</Text>
                 </View>
-                <Text style={[styles.posPnl, { color: pos.unrealizedPnl >= 0 ? colors.cyan : colors.red }]}>
+                <Text style={[styles.posPnl, { color: pos.unrealizedPnl >= 0 ? colors.orange : colors.muted }]}>
                   {pos.unrealizedPnl >= 0 ? '+' : ''}${pos.unrealizedPnl.toFixed(2)}
                 </Text>
               </View>
@@ -211,7 +210,7 @@ export function ControllerScreen({
 const styles = StyleSheet.create({
   screenRoot: { flex: 1, backgroundColor: colors.bg },
   root: { flex: 1, backgroundColor: colors.bg },
-  content: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 48, gap: 16 },
+  content: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 120, gap: 16 },
 
   card: {
     backgroundColor: colors.panel,
@@ -261,7 +260,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 10,
     paddingVertical: 5,
-    backgroundColor: '#091828',
+    backgroundColor: '#101010',
   },
   statusRingText: {
     fontSize: 10,
@@ -372,13 +371,13 @@ const styles = StyleSheet.create({
     minHeight: 48,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#9F3850',
-    backgroundColor: '#2A1018',
+    borderColor: colors.orange,
+    backgroundColor: '#26140E',
     alignItems: 'center',
     justifyContent: 'center',
   },
   emergencyBtnText: {
-    color: colors.red,
+    color: colors.orange,
     fontSize: 14,
     fontWeight: '800',
   },
