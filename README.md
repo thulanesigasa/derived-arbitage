@@ -1,137 +1,221 @@
-# Mobile EA Controller — Demo MVP
+# Mobile EA Controller — Deriv Synthetic Indices
 
-A polished Android-first Expo controller for a **local, simulated** execution service. This MVP does not connect to Deriv, MT5, a VPS, a broker price feed, or any trading account. It never requests credentials and it cannot place an order.
+A personal Android controller for a Deriv MT5 EA trading Volatility, Boom, Crash, and Step synthetic indices. This project is structured in validated phases — no live trading until every gate passes.
 
-## What this MVP proves
+> **Demo only.** This codebase currently connects to a mock control server and the Deriv WebSocket API for read-only market profiling. No trades, no real orders, no broker credentials stored here.
 
-- A phone controller can receive live state over WebSocket and send idempotent control commands.
-- Start, Pause, Resume, Stop, and confirmed Emergency Exit follow a validated server state machine.
-- Risk policy is visible in the app and enforced on the mock server, especially the absolute **$15 equity floor**.
-- All ten requested synthetic instruments can be included in a simulated monitoring watchlist.
-- A server restart is predictable: the demo returns to `stopped`, clears transient state, creates a new server instance ID, and records the restart in the activity log.
+---
 
-Strategy and trade generation are deliberately absent. Any later Falcon FX/SMC-inspired or relative-value features must be statistically tested and independently risk-reviewed. They must never be described as guaranteed arbitrage or guaranteed profit.
+## Project Status
+
+| Phase | Description | Status |
+|-------|-------------|--------|
+| 1 | Demo mobile controller + mock server | ✅ Complete |
+| 2 | Market Profiler — live Deriv WebSocket data | ✅ Complete |
+| 3 | Strategy engine (Falcon FX / SMC signals) | 🔲 Planned |
+| 4 | MQL5 EA with independent risk engine | 🔲 Planned |
+| 5 | VPS bridge + HTTPS/WSS auth | 🔲 Planned |
+| 6 | Live activation gate (demo-proven only) | 🔲 Planned |
+
+---
+
+## Instruments
+
+| Symbol | Group | Code |
+|--------|-------|------|
+| Volatility 10 Index | Volatility | `R_10` |
+| Volatility 50 Index | Volatility | `R_50` |
+| Volatility 75 Index | Volatility | `R_75` |
+| Volatility 100 Index | Volatility | `R_100` |
+| Volatility 100 (1s) Index | Volatility | `1HZ100V` |
+| Step Index | Step | `stpRNG` |
+| Boom 500 Index | Boom | `BOOM500` |
+| Boom 1000 Index | Boom | `BOOM1000` |
+| Crash 500 Index | Crash | `CRASH500` |
+| Crash 100 Index | Crash | `CRASH300` |
+
+---
 
 ## Requirements
 
-- Windows 10/11 with Node.js 20 or newer
+- Windows 10/11 with Node.js 20+
 - An Android phone with [Expo Go](https://expo.dev/go)
-- The computer and phone on the same private Wi-Fi/LAN
+- Computer and phone on the same Wi-Fi/LAN
 
-## Quick start
+---
 
-Open PowerShell in this folder:
+## Quick Start
 
 ```powershell
 npm install
 npm run dev
 ```
 
-The combined command starts the local mock server and Expo. Expo keeps its QR code in the terminal. Scan it from Expo Go on Android.
+Scan the QR code from Expo Go on Android. The app starts on port **8082**.
 
-If combined terminal rendering is awkward, use two PowerShell windows:
-
-```powershell
-npm run server:dev
-```
+If you get port conflicts, run this first:
 
 ```powershell
-npm run expo:start
+@(8081, 8082, 4000) | ForEach-Object { $port = $_; netstat -ano | Select-String ":$port\s" | ForEach-Object { $procId = ($_ -split '\s+')[-1]; if ($procId -match '^\d+$') { Stop-Process -Id ([int]$procId) -Force -ErrorAction SilentlyContinue } } }
 ```
 
-The mock server health check is [http://localhost:4000/health](http://localhost:4000/health). It explicitly returns `mode: DEMO` and `simulated: true`.
+---
 
-## Physical Android phone and LAN setup
+## Tabs
 
-Expo Go normally tells the app which LAN address served the bundle. The app derives the control API as `http://<that-computer-ip>:4000`, so no setup is usually needed.
+### Controller Tab
+- Start / Pause / Resume / Stop controls
+- Emergency Exit with confirmation
+- Live balance, equity, P&L, drawdown
+- Risk guardrails panel
+- Simulated positions list
+- Monitored instruments watchlist
+- Activity log
 
-If automatic discovery is wrong:
+### Profiler Tab (Phase 2)
+- Live connection to Deriv WebSocket API
+- Spread distribution (median and P95) for each symbol
+- Tick velocity (ticks per second)
+- Affordability assessment against the $20/$15 risk policy
+- Per-symbol group badges (VOL / BOOM / CRASH / STEP)
 
-1. Run `ipconfig` and find the computer's active Wi-Fi/Ethernet **IPv4 Address** (for example `192.168.1.42`).
-2. Copy `.env.example` to `.env`.
-3. Set `EXPO_PUBLIC_API_URL=http://192.168.1.42:4000` using your real address.
-4. Restart `npm run dev` after changing `.env`.
+---
 
-The exact API URL in use is shown at the bottom of the app and on its offline screen.
+## Configuration
 
-If the phone cannot connect:
+Copy `.env.example` to `.env` and edit:
 
-- Confirm both devices are on the same network and disable mobile-data switching temporarily.
-- Avoid guest Wi-Fi or access-point isolation, which blocks device-to-device traffic.
-- Allow Node.js on **Private networks** if Windows Defender Firewall prompts. If no prompt appears, create a private-network inbound rule for TCP ports `4000` (mock API) and `8081` (Expo development server). Do not expose these demo ports on a public network or router.
-- Test `http://<computer-ip>:4000/health` in the phone browser. A JSON response means the LAN path works.
+```env
+# Your computer's LAN IP (for physical Android testing)
+EXPO_PUBLIC_API_URL=http://192.168.1.42:4000
 
-## Controls and semantics
+# Server ports
+CONTROL_SERVER_HOST=0.0.0.0
+CONTROL_SERVER_PORT=4000
 
-- **Start:** asks the mock server to enter `starting`, then `running`.
-- **Pause:** blocks new simulated entries while retaining open-position management semantics.
-- **Resume:** returns a paused demo to running after risk locks are checked.
-- **Stop:** ends automation but preserves connection/monitoring and does not abandon an open simulated position.
-- **Emergency Exit:** uses a separate confirmation and predictably clears every simulated position before returning to stopped.
+# Deriv WebSocket API (Phase 2)
+DERIV_APP_ID=1089           # Public demo app_id — works without registration
+DERIV_API_TOKEN=            # Optional read-only token for full symbol data
+```
 
-Every mutation includes a unique request ID and expected state revision. Retried request IDs return the original acknowledgement; stale revisions are rejected instead of silently applying a command to changed state.
+To get real symbol data (spot prices, pip sizes), create a **Read-only** API token at [app.deriv.com/account/api-token](https://app.deriv.com/account/api-token) and set `DERIV_API_TOKEN` in `.env`. **Never** set a write-access or trading token here.
 
-## Fixed demo risk policy
+---
+
+## Risk Policy (Demo)
 
 | Guard | Value |
-|---|---:|
-| Initial simulated balance | $20.00 |
+|-------|------:|
+| Starting balance | $20.00 |
 | Absolute equity floor | $15.00 |
-| Maximum total loss | $5.00 |
-| Default risk per trade | $0.10 |
-| Hard risk maximum until validated | $0.20 |
+| Max total loss | $5.00 |
+| Default risk / trade | $0.10 |
+| Hard max risk / trade | $0.20 |
 | Daily loss lock | $0.40 |
 | Weekly loss lock | $1.00 |
-| Maximum open positions | 1 |
-| Maximum margin usage | 20% |
+| Max open positions | 1 |
+| Max margin usage | 20% |
 | Profit cap | None |
+
+---
 
 ## Architecture
 
-```text
-┌──────────────────────────────┐       LAN REST + WebSocket       ┌────────────────────────────┐
-│ Android / Expo Go            │ ───────────────────────────────▶ │ Local mock control server  │
-│ UI, status, guarded controls │ ◀─────────────────────────────── │ State machine + risk gates │
-└──────────────────────────────┘          simulated state          └────────────────────────────┘
-                                                                      │
-                                                                      └── No broker / MT5 link
+```
+Android App (Expo Go / Expo React Native)
+        │  HTTP REST + WebSocket (LAN)
+        ▼
+Control Bridge Server (Node.js · localhost:4000)
+        │  /api/state, /api/control, /api/profiler/*
+        ├─── Mock state machine (Phase 1)
+        └─── Deriv WebSocket client (Phase 2)
+                  │  wss://ws.derivws.com
+                  └─── Live tick data, spread profiling
 ```
 
-Code boundaries are intentional:
+**Target architecture (Phase 5+):**
+```
+Android App → Authenticated HTTPS/WSS Bridge (VPS)
+                       → MT5 Terminal
+                       → MQL5 EA
+                       → DerivSVG-Server-03 (live)
+```
 
-- `src/api.ts` is the phone-side bridge client and configurable API boundary.
-- `server/src/stateMachine.ts` owns control transitions, revision checks, idempotency, and server acknowledgements.
-- `server/src/risk.ts` owns server-side entry-risk decisions.
-- `server/src/index.ts` exposes REST and live WebSocket state.
+---
 
-## Checks
+## Directory Structure
+
+```
+derived_arbitage/
+├── App.tsx                        # Root: tab nav, Controller + Profiler screens
+├── app.json                       # Expo config
+├── package.json                   # Scripts + deps
+├── .env.example                   # Config template (never commit .env)
+├── src/
+│   ├── api.ts                     # Mobile ↔ server REST/WS client
+│   ├── types.ts                   # Shared types (ControllerState, SymbolProfile…)
+│   └── screens/
+│       └── ProfilerScreen.tsx     # Phase 2 live market data tab
+└── server/
+    ├── src/
+    │   ├── index.ts               # Express server, WS broadcast, endpoints
+    │   ├── stateMachine.ts        # Control state machine, idempotency
+    │   ├── risk.ts                # Trade risk assessment, lock calculation
+    │   └── deriv/                 # Phase 2: Deriv WebSocket integration
+    │       ├── derivClient.ts     # WS client, auth, reconnect, tick subs
+    │       ├── tickStore.ts       # Rolling tick buffer, spread stats
+    │       ├── symbolMap.ts       # Display name ↔ Deriv API code mapping
+    │       └── marketProfiler.ts  # Symbol profiling, affordability check
+    └── test/
+        └── stateMachine.test.ts   # Automated transition tests
+```
+
+---
+
+## Scripts
 
 ```powershell
-npm run check
+npm run dev              # Start server + Expo (combined)
+npm run server:dev       # Server only (hot-reload)
+npm run expo:start       # Expo only (QR code on port 8082)
+npm run typecheck        # TypeScript check (app + server)
+npm run test             # Vitest automated tests
+npm run check            # typecheck + test
 ```
 
-This runs strict TypeScript checks for the Expo app and server plus automated tests for allowed/invalid transitions, stale revisions, idempotent replays, Emergency Exit, the equity floor, and core risk guards.
+---
 
-## Demo limitations
+## Phase 2 Notes — Market Profiler
 
-- Values are initialized locally and are explicitly simulated; there is no broker truth source.
-- No trading strategy, signal logic, tick model, or automatic position generation exists.
-- Watchlist switches configure monitoring presentation only.
-- State is intentionally in memory. Restarting resets to a safe stopped demo rather than pretending to recover live execution.
-- This is a development build, not a hardened production control plane.
+The profiler uses the Deriv public WebSocket API (`app_id=1089`) by default. With the public app_id, `active_symbols` returns an empty list — the profiler seeds from the known symbol list and still subscribes to tick streams. Real spot prices, pip sizes, and spread data will only appear once Deriv confirms the tick subscription by sending ticks.
 
-## Production roadmap (gated)
+**To unlock full data:** create your own Deriv app at [app.deriv.com/account/api-token](https://app.deriv.com/account/api-token), set `DERIV_APP_ID` to your own ID, and optionally set `DERIV_API_TOKEN` with a **Read** scope token.
 
-```text
-Android controller
-  → authenticated HTTPS/WSS bridge on a VPS
-  → MT5 terminal
-  → signed/versioned MQL5 EA
-  → Deriv demo account
-  → independently reviewed live-activation gate
-  → user's own Standard live account (only with explicit approval)
+Affordability assessment is indicative only. Without MT5 lot size and tick value data, we cannot compute exact dollar cost per trade. Full affordability requires Phase 4 (MQL5 EA spec collection).
+
+---
+
+## Production Roadmap (Gated)
+
+```
+Android app (Expo Go / standalone APK)
+  → HTTPS/WSS bridge with mutual auth (VPS)
+  → MT5 terminal (DerivSVG-Server-03)
+  → MQL5 EA with independent risk guard
+  → Deriv demo account soak test (8–12 weeks)
+  → Live activation gate (all gates must pass)
+  → Minimum-size live trading (one symbol, reviewed)
 ```
 
-Before any live phase, add mutual authentication or short-lived tokens, TLS certificate validation, replay protection, authorization per device, encrypted audit logs, command reconciliation, watchdogs, reconnect recovery, an external kill switch, broker-state verification, and staged Deriv demo soak tests. Broker credentials should remain on the VPS/terminal side in OS-protected secret storage or a managed secrets vault; never store them in the Expo app, source code, `.env` committed to Git, logs, or mobile persistent storage.
+**Live activation gate (non-negotiable):**
+- Profit factor ≥ 1.20 at normal costs, > 1.00 at 2× costs
+- Max drawdown < $3 in Monte Carlo (95th percentile)
+- No dependency on ≤ 5 lucky trades
+- No martingale, grid, or recovery sizing anywhere
+- 8+ week demo forward-test within backtest range
 
-Live activation must be a separate, explicit, reviewed release gate. No strategy can promise profit, and no statistical relationship should be called arbitrage unless its execution, costs, slippage, and failure modes justify that term.
+---
+
+## Security (Production)
+
+Before any live phase: mutual TLS, short-lived JWT auth, device binding, encrypted audit logs, command reconciliation, reconnect watchdogs, external kill switch, and broker-state verification. Deriv credentials must stay inside the MT5 terminal on the VPS — never in the app, source code, `.env` committed to Git, or mobile storage.
