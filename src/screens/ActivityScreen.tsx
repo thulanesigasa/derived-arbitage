@@ -52,11 +52,9 @@ export function ActivityScreen({ state, refreshing, onRefresh }: ActivityScreenP
               const markColor =
                 item.kind === 'danger'
                   ? '#FB7185'
-                  : item.kind === 'warning'
-                  ? '#FBBF24'
                   : item.kind === 'success'
                   ? colors.cyan
-                  : '#60A5FA';
+                  : colors.muted;
 
               return (
                 <View key={item.id} style={[styles.activityRow, !isLast && styles.rowBorder]}>

@@ -34,7 +34,6 @@ const colors = {
   muted: '#91A4BB',
   cyan: '#2DD4BF',
   cyanDark: '#123C3B',
-  red: '#FB7185',
 };
 
 function requestId(prefix: string): string {
