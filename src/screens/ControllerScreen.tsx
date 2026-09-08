@@ -13,6 +13,7 @@ import { AppHeader } from '../components/AppHeader';
 import { ToggleSwitch } from '../components/ToggleSwitch';
 import { LiveActivationModal } from '../components/LiveActivationModal';
 import { ALL_SYMBOLS, type ControlAction, type ControllerState, type SymbolName } from '../types';
+import { OFFLINE_FALLBACK_STATE } from '../api';
 
 interface ControllerScreenProps {
   state: ControllerState | null;
@@ -49,19 +50,7 @@ export function ControllerScreen({
   onChangeSymbol,
 }: ControllerScreenProps) {
   const [gateModalVisible, setGateModalVisible] = useState(false);
-
-  if (!state) {
-    return (
-      <View style={styles.screenRoot}>
-        <AppHeader eyebrow="RISK & EXECUTION" title="Controller" />
-        <View style={styles.connectingContainer}>
-          <ActivityIndicator size="large" color={colors.orange} />
-          <Text style={styles.connectingTitle}>Connecting to controller bridge…</Text>
-          <Text style={styles.connectingHint}>Awaiting state synchronization</Text>
-        </View>
-      </View>
-    );
-  }
+  const activeState = state ?? OFFLINE_FALLBACK_STATE;
 
   const confirmEmergency = () => {
     Alert.alert(
@@ -74,7 +63,7 @@ export function ControllerScreen({
     );
   };
 
-  const floorDistance = state.equity - state.riskPolicy.absoluteEquityFloor;
+  const floorDistance = activeState.equity - activeState.riskPolicy.absoluteEquityFloor;
 
   return (
     <View style={styles.screenRoot}>
@@ -86,18 +75,43 @@ export function ControllerScreen({
           <RefreshControl tintColor={colors.orange} refreshing={refreshing} onRefresh={onRefresh} />
         }
       >
+        {/* Offline / Synchronization Banner */}
+        {!online && (
+          <View style={styles.syncBanner}>
+            <View style={styles.syncBannerTextWrap}>
+              <Text style={styles.syncBannerTitle}>BRIDGE SYNCHRONIZING</Text>
+              <Text style={styles.syncBannerHint}>
+                {refreshing
+                  ? 'Connecting to controller bridge…'
+                  : 'Awaiting state synchronization. Tap to sync.'}
+              </Text>
+            </View>
+            <Pressable
+              style={styles.syncButton}
+              onPress={onRefresh}
+              disabled={refreshing}
+            >
+              {refreshing ? (
+                <ActivityIndicator size="small" color="#080808" />
+              ) : (
+                <Text style={styles.syncButtonText}>SYNC</Text>
+              )}
+            </Pressable>
+          </View>
+        )}
+
         {/* Risk Guardrails Card */}
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>RISK GUARDRAILS</Text>
           <View style={styles.floorRow}>
             <View style={styles.floorBlock}>
               <Text style={styles.floorLabel}>ABSOLUTE EQUITY FLOOR</Text>
-              <Text style={styles.floorValue}>{money(state.riskPolicy.absoluteEquityFloor)}</Text>
+              <Text style={styles.floorValue}>{money(activeState.riskPolicy.absoluteEquityFloor)}</Text>
               <Text style={styles.floorHint}>{money(floorDistance)} buffer remaining</Text>
             </View>
             <View style={[styles.statusRing, { borderColor: colors.orange }]}>
               <Text style={[styles.statusRingText, { color: colors.orange }]}>
-                {state.equityFloorLocked ? 'LOCKED' : 'ARMED'}
+                {activeState.equityFloorLocked ? 'LOCKED' : 'ARMED'}
               </Text>
             </View>
           </View>
@@ -106,27 +120,27 @@ export function ControllerScreen({
 
           <View style={styles.guardGrid}>
             <View style={styles.guardItem}>
-              <Text style={styles.guardValue}>{money(state.riskPolicy.defaultRiskPerTrade)}</Text>
+              <Text style={styles.guardValue}>{money(activeState.riskPolicy.defaultRiskPerTrade)}</Text>
               <Text style={styles.guardLabel}>risk / trade</Text>
             </View>
             <View style={styles.guardItem}>
-              <Text style={styles.guardValue}>{money(state.riskPolicy.hardMaxRiskPerTrade)}</Text>
+              <Text style={styles.guardValue}>{money(activeState.riskPolicy.hardMaxRiskPerTrade)}</Text>
               <Text style={styles.guardLabel}>hard maximum</Text>
             </View>
             <View style={styles.guardItem}>
-              <Text style={styles.guardValue}>{money(state.riskPolicy.dailyLossLock)}</Text>
+              <Text style={styles.guardValue}>{money(activeState.riskPolicy.dailyLossLock)}</Text>
               <Text style={styles.guardLabel}>daily lock</Text>
             </View>
             <View style={styles.guardItem}>
-              <Text style={styles.guardValue}>{money(state.riskPolicy.weeklyLossLock)}</Text>
+              <Text style={styles.guardValue}>{money(activeState.riskPolicy.weeklyLossLock)}</Text>
               <Text style={styles.guardLabel}>weekly lock</Text>
             </View>
             <View style={styles.guardItem}>
-              <Text style={styles.guardValue}>{money(state.riskPolicy.maximumTotalLoss)}</Text>
+              <Text style={styles.guardValue}>{money(activeState.riskPolicy.maximumTotalLoss)}</Text>
               <Text style={styles.guardLabel}>total loss max</Text>
             </View>
             <View style={styles.guardItem}>
-              <Text style={styles.guardValue}>{state.riskPolicy.maxMarginUsagePercent}%</Text>
+              <Text style={styles.guardValue}>{activeState.riskPolicy.maxMarginUsagePercent}%</Text>
               <Text style={styles.guardLabel}>margin ceiling</Text>
             </View>
           </View>
@@ -135,7 +149,7 @@ export function ControllerScreen({
         {/* Monitored Instruments Section (Compact 3 visible with scroll) */}
         <View style={styles.cardHeaderOnly}>
           <Text style={styles.sectionTitle}>
-            MONITORED INSTRUMENTS ({state.selectedSymbols.length}/{ALL_SYMBOLS.length} ACTIVE)
+            MONITORED INSTRUMENTS ({activeState.selectedSymbols.length}/{ALL_SYMBOLS.length} ACTIVE)
           </Text>
           <View style={styles.scrollListCard}>
             <ScrollView
@@ -145,7 +159,7 @@ export function ControllerScreen({
               persistentScrollbar={true}
             >
               {ALL_SYMBOLS.map((symbol, index) => {
-                const selected = state.selectedSymbols.includes(symbol);
+                const selected = activeState.selectedSymbols.includes(symbol);
                 return (
                   <View
                     key={symbol}
@@ -170,14 +184,14 @@ export function ControllerScreen({
 
         {/* Positions Section */}
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>SIMULATED POSITIONS ({state.positions.length})</Text>
-          {state.positions.length === 0 ? (
+          <Text style={styles.sectionTitle}>SIMULATED POSITIONS ({activeState.positions.length})</Text>
+          {activeState.positions.length === 0 ? (
             <View style={styles.emptyState}>
               <Text style={styles.emptyTitle}>No active positions</Text>
               <Text style={styles.emptyHint}>The robot is waiting for qualifying structural setups.</Text>
             </View>
           ) : (
-            state.positions.map((pos) => (
+            activeState.positions.map((pos) => (
               <View key={pos.id} style={styles.positionRow}>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.posSymbol}>{pos.symbol}</Text>
@@ -217,11 +231,11 @@ export function ControllerScreen({
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Emergency Exit"
-            disabled={busy || !online || state.status === 'stopped'}
+            disabled={busy || !online || activeState.status === 'stopped'}
             onPress={confirmEmergency}
             style={({ pressed }) => [
               styles.emergencyBtn,
-              (busy || !online || state.status === 'stopped') && styles.disabledBtn,
+              (busy || !online || activeState.status === 'stopped') && styles.disabledBtn,
               pressed && styles.pressedBtn,
             ]}
           >
@@ -233,7 +247,7 @@ export function ControllerScreen({
         <LiveActivationModal
           visible={gateModalVisible}
           onClose={() => setGateModalVisible(false)}
-          controllerState={state}
+          controllerState={activeState}
           onActivated={() => onRefresh()}
         />
       </ScrollView>
@@ -459,5 +473,46 @@ const styles = StyleSheet.create({
     color: colors.muted,
     fontSize: 12,
     textAlign: 'center',
+  },
+  syncBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#1C1510',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 107, 0, 0.3)',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 16,
+    gap: 12,
+  },
+  syncBannerTextWrap: {
+    flex: 1,
+  },
+  syncBannerTitle: {
+    color: colors.orange,
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  syncBannerHint: {
+    color: colors.muted,
+    fontSize: 11,
+    marginTop: 2,
+    lineHeight: 16,
+  },
+  syncButton: {
+    backgroundColor: colors.orange,
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    minHeight: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  syncButtonText: {
+    color: '#080808',
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0.5,
   },
 });
