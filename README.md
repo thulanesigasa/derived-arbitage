@@ -66,6 +66,26 @@ If you get port conflicts, run this first:
 
 ---
 
+## Network Connectivity & Connection Resilience
+
+When switching between Wi-Fi networks (e.g. home vs. office) or running on different clients (web browser, Android phone, Android emulator), IP addresses can change. The mobile controller includes multi-layer connection resilience:
+
+1. **Web Browser Automatic Host Matching**:
+   - When opened in a browser (e.g., `http://localhost:8082` or `http://10.186.129.215:8082`), the app automatically targets `http://${window.location.hostname}:4000`, avoiding stale LAN IPs.
+2. **Multi-Host Auto-Discovery (`src/api.ts`)**:
+   - Requests enforce a strict 3,500ms timeout with `AbortController` to eliminate infinite loading spinners.
+   - If the initial host is unreachable, `probeCandidateUrls()` automatically tests known candidate endpoints in parallel/sequence (`http://10.186.129.215:4000`, `http://localhost:4000`, `http://127.0.0.1:4000`, `http://10.0.2.2:4000`) and self-heals by switching to the first responding host.
+3. **Connection Recovery Screen (`App.tsx`)**:
+   - If the server bridge cannot be reached, the app displays a responsive recovery screen with:
+     - Error diagnostics and current target URL
+     - Quick-switch host chips for instant one-tap switching
+     - Custom URL input field
+     - **Launch Offline Demo** mode button, allowing complete offline inspection of the UI without network dependency.
+4. **Profile Bridge Synchronization (`ProfileScreen.tsx`)**:
+   - Setting `bridgeUrl` in Profile instantly synchronizes `API_BASE_URL` and persists across app restarts via AsyncStorage.
+
+---
+
 ## Application Sections (5 Tabs)
 
 ### 1. Home Tab (Cybernetic Robot Command Center)
