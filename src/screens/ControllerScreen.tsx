@@ -1,4 +1,5 @@
 import {
+  ActivityIndicator,
   Alert,
   Pressable,
   RefreshControl,
@@ -46,7 +47,18 @@ export function ControllerScreen({
   onControl,
   onChangeSymbol,
 }: ControllerScreenProps) {
-  if (!state) return null;
+  if (!state) {
+    return (
+      <View style={styles.screenRoot}>
+        <AppHeader eyebrow="RISK & EXECUTION" title="Controller" />
+        <View style={styles.connectingContainer}>
+          <ActivityIndicator size="large" color={colors.cyan} />
+          <Text style={styles.connectingTitle}>Connecting to controller bridge…</Text>
+          <Text style={styles.connectingHint}>Awaiting state synchronization</Text>
+        </View>
+      </View>
+    );
+  }
 
   const floorDistance = state.equity - state.riskPolicy.absoluteEquityFloor;
 
@@ -375,5 +387,23 @@ const styles = StyleSheet.create({
   },
   pressedBtn: {
     opacity: 0.75,
+  },
+  connectingContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 32,
+    gap: 12,
+  },
+  connectingTitle: {
+    color: colors.text,
+    fontSize: 15,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  connectingHint: {
+    color: colors.muted,
+    fontSize: 12,
+    textAlign: 'center',
   },
 });
