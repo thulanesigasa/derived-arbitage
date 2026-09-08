@@ -164,9 +164,13 @@ export function ControllerScreen({
           ) : (
             state.positions.map((pos) => (
               <View key={pos.id} style={styles.positionRow}>
-                <View>
+                <View style={{ flex: 1 }}>
                   <Text style={styles.posSymbol}>{pos.symbol}</Text>
-                  <Text style={styles.posSide}>{pos.side.toUpperCase()} · simulated</Text>
+                  <Text style={styles.posSide}>
+                    {pos.side.toUpperCase()}
+                    {pos.entryPrice ? ` · @ ${pos.entryPrice.toFixed(2)}` : ' · simulated'}
+                    {pos.takeProfit ? ` · TP ${pos.takeProfit.toFixed(2)}` : ''}
+                  </Text>
                 </View>
                 <Text style={[styles.posPnl, { color: pos.unrealizedPnl >= 0 ? colors.orange : colors.muted }]}>
                   {pos.unrealizedPnl >= 0 ? '+' : ''}${pos.unrealizedPnl.toFixed(2)}

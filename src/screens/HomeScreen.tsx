@@ -79,6 +79,11 @@ export function HomeScreen({
     if (isTransitioning) {
       return `[${timestamp}] Executing ${state?.status} sequence...`;
     }
+    if (state?.positions && state.positions.length > 0) {
+      const pos = state.positions[0]!;
+      const pnlSign = pos.unrealizedPnl >= 0 ? '+' : '';
+      return `[${timestamp}] Active ${pos.side} on ${pos.symbol} (${pnlSign}$${pos.unrealizedPnl.toFixed(2)}) · Target: 1:${pos.rrRatio ?? 2.5} R:R`;
+    }
     if (state?.status === 'running') {
       const pairCount = state.selectedSymbols.length;
       return `[${timestamp}] Falcon FX active · Monitoring ${pairCount} synthetic feeds`;
@@ -87,7 +92,14 @@ export function HomeScreen({
       return `[${timestamp}] New entries paused · Market price feeds active`;
     }
     return `[${timestamp}] System standby · Ready for automated execution`;
-  }, [online, isTransitioning, state?.status, state?.selectedSymbols.length, timestamp]);
+  }, [
+    online,
+    isTransitioning,
+    state?.positions,
+    state?.status,
+    state?.selectedSymbols.length,
+    timestamp,
+  ]);
 
   return (
     <View style={styles.screenRoot}>

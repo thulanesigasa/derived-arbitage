@@ -45,6 +45,11 @@ export interface SimulatedPosition {
   unrealizedPnl: number;
   openedAt: string;
   simulated: true;
+  entryPrice?: number;
+  stopLoss?: number;
+  takeProfit?: number;
+  setupName?: string;
+  rrRatio?: number;
 }
 
 export interface ActivityItem {
@@ -117,3 +122,43 @@ export interface ProfilerApiState {
   profiles:         SymbolProfile[];
   lastRefreshedAt:  string | null;
 }
+
+// ─── Strategy Engine (Phase 3) ──────────────────────────────────────────────
+
+export interface Candle {
+  timestamp: number; // epoch ms
+  open:      number;
+  high:      number;
+  low:       number;
+  close:     number;
+  volume:    number;
+}
+
+export type SetupType =
+  | 'SMC_BOS_CONTINUATION'
+  | 'SMC_CHOCH_REVERSAL'
+  | 'FALCON_LIQUIDITY_SWEEP'
+  | 'SMC_FVG_RETEST';
+
+export interface StrategySignal {
+  id:         string;
+  symbol:     SymbolName;
+  symbolCode: string;
+  side:       'BUY' | 'SELL';
+  setupName:  SetupType;
+  entryPrice: number;
+  stopLoss:   number;
+  takeProfit: number;
+  riskUsd:    number;
+  rrRatio:    number;
+  confidence: number;
+  createdAt:  string;
+}
+
+export interface StrategyApiState {
+  enabled:       boolean;
+  activeSignals: StrategySignal[];
+  recentSignals: StrategySignal[];
+  trackedPairs:  number;
+}
+

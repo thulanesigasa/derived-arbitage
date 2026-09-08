@@ -56,7 +56,7 @@ function activity(kind: ActivityItem['kind'], message: string, now = new Date())
   return { id: randomUUID(), at: now.toISOString(), kind, message };
 }
 
-function log(state: ControllerState, kind: ActivityItem['kind'], message: string): void {
+export function log(state: ControllerState, kind: ActivityItem['kind'], message: string): void {
   state.activity = [activity(kind, message), ...state.activity].slice(0, 30);
 }
 
@@ -84,11 +84,16 @@ export class ControllerStore {
     this.listeners.forEach((listener) => listener(snapshot));
   }
 
-  private mutate(fn: (state: ControllerState) => void): void {
+  mutate(fn: (state: ControllerState) => void): void {
     fn(this.state);
     Object.assign(this.state, calculateLocks(this.state));
     this.state.revision += 1;
     this.publish();
+  }
+
+  updateState(fn: (state: ControllerState) => void): ControllerState {
+    this.mutate(fn);
+    return this.snapshot;
   }
 
   heartbeat(now = new Date()): ControllerState {

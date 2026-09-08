@@ -6,14 +6,22 @@ import { WebSocketServer, WebSocket } from 'ws';
 import { ALL_SYMBOLS, type ControlAction, type SymbolName } from '../../src/types.js';
 import { ControllerStore, TransitionError } from './stateMachine.js';
 import { MarketProfiler } from './deriv/marketProfiler.js';
+import { ExecutionEngine } from './strategy/executionEngine.js';
 
 const port       = Number(process.env.CONTROL_SERVER_PORT ?? 4000);
 const host       = process.env.CONTROL_SERVER_HOST ?? '0.0.0.0';
 const derivAppId = process.env.DERIV_APP_ID ?? '1089';  // public demo app_id
 const derivToken = process.env.DERIV_API_TOKEN ?? null; // optional read-only token
 
-const store    = new ControllerStore();
-const profiler = new MarketProfiler(derivAppId, derivToken);
+const store           = new ControllerStore();
+const profiler        = new MarketProfiler(derivAppId, derivToken);
+const executionEngine = new ExecutionEngine(store);
+
+// Connect real-time tick stream to strategy execution engine
+profiler.onTick((symbolCode, quote, epoch, ask, bid) => {
+  executionEngine.handleTick(symbolCode, quote, epoch, ask, bid);
+});
+
 const app      = express();
 
 app.use(cors());
@@ -68,6 +76,18 @@ app.post('/api/profiler/refresh', (_req, res, next) => {
   profiler.refreshActiveSymbols()
     .then(() => res.json({ ok: true }))
     .catch(next);
+});
+
+// ─── Strategy Engine (Phase 3) endpoints ────────────────────────────────────
+
+/** Full strategy engine state: active signals, recent setups, and tracked pairs. */
+app.get('/api/strategy/signals', (_req, res) => res.json(executionEngine.getState()));
+
+/** Aggregated multi-timeframe candles for an instrument code. */
+app.get('/api/strategy/candles/:code', (req, res) => {
+  const n    = Math.min(Number(req.query['n'] ?? 50), 120);
+  const code = req.params['code'] ?? '';
+  res.json({ code, count: n, candles: executionEngine.getCandles(code, n) });
 });
 
 // ─── Error handler ───────────────────────────────────────────────────────────
