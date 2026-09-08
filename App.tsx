@@ -8,7 +8,6 @@ import {
   RefreshControl,
   ScrollView,
   StyleSheet,
-  Switch,
   Text,
   View,
 } from 'react-native';
@@ -17,6 +16,7 @@ import { API_BASE_URL, getState, sendControl, stateSocketUrl, updateSymbols } fr
 import { ALL_SYMBOLS, type AutomationStatus, type ControlAction, type ControllerState, type SymbolName } from './src/types';
 import { ProfilerScreen } from './src/screens/ProfilerScreen';
 import { AppHeader } from './src/components/AppHeader';
+import { ToggleSwitch } from './src/components/ToggleSwitch';
 
 
 const colors = {
@@ -327,27 +327,32 @@ function AppContent() {
         ))}
       </Card>
 
-      <SectionTitle title="Monitored instruments" hint={`${state.selectedSymbols.length} of ${ALL_SYMBOLS.length} selected`} />
-      <Card style={styles.listCard}>
-        {ALL_SYMBOLS.map((symbol, index) => {
-          const selected = state.selectedSymbols.includes(symbol);
-          return (
-            <View key={symbol} style={[styles.symbolRow, index < ALL_SYMBOLS.length - 1 && styles.symbolBorder]}>
-              <View style={styles.symbolTextWrap}>
-                <Text style={styles.symbolName}>{symbol}</Text>
-                <Text style={styles.symbolMode}>Mock data · no broker feed</Text>
+      <SectionTitle title="Monitored instruments" hint={`${state.selectedSymbols.length} of ${ALL_SYMBOLS.length} active · scroll list`} />
+      <Card style={styles.scrollListCard}>
+        <ScrollView
+          style={styles.instrumentScrollView}
+          nestedScrollEnabled={true}
+          showsVerticalScrollIndicator={true}
+          persistentScrollbar={true}
+        >
+          {ALL_SYMBOLS.map((symbol, index) => {
+            const selected = state.selectedSymbols.includes(symbol);
+            return (
+              <View key={symbol} style={[styles.symbolRow, index < ALL_SYMBOLS.length - 1 && styles.symbolBorder]}>
+                <View style={styles.symbolTextWrap}>
+                  <Text style={styles.symbolName}>{symbol}</Text>
+                  <Text style={styles.symbolMode}>Mock data · no broker feed</Text>
+                </View>
+                <ToggleSwitch
+                  accessibilityLabel={`${selected ? 'Disable' : 'Enable'} ${symbol}`}
+                  value={selected}
+                  disabled={busy || !online}
+                  onValueChange={(enabled) => void changeSymbol(symbol, enabled)}
+                />
               </View>
-              <Switch
-                accessibilityLabel={`${selected ? 'Disable' : 'Enable'} ${symbol}`}
-                value={selected}
-                disabled={busy || !online}
-                onValueChange={(enabled) => void changeSymbol(symbol, enabled)}
-                trackColor={{ false: '#334155', true: '#1F766D' }}
-                thumbColor={selected ? colors.cyan : '#CBD5E1'}
-              />
-            </View>
-          );
-        })}
+            );
+          })}
+        </ScrollView>
       </Card>
 
       <SectionTitle title="Activity" hint="Latest first" />
@@ -498,7 +503,9 @@ const styles = StyleSheet.create({
   guardValue: { color: colors.text, fontSize: 15, fontWeight: '800' },
   guardLabel: { color: colors.muted, fontSize: 10, marginTop: 3 },
   listCard: { paddingVertical: 3 },
-  symbolRow: { flexDirection: 'row', alignItems: 'center', minHeight: 64, paddingHorizontal: 13, paddingVertical: 8 },
+  scrollListCard: { paddingVertical: 0, paddingHorizontal: 0, overflow: 'hidden' },
+  instrumentScrollView: { maxHeight: 198 },
+  symbolRow: { flexDirection: 'row', alignItems: 'center', minHeight: 64, paddingHorizontal: 16, paddingVertical: 8 },
   symbolBorder: { borderBottomWidth: 1, borderBottomColor: colors.border },
   symbolTextWrap: { flex: 1, paddingRight: 12 },
   symbolName: { color: colors.text, fontSize: 13, fontWeight: '600' },
