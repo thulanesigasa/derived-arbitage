@@ -19,23 +19,8 @@ const C = {
   border:     '#21344C',
   text:       '#F1F5F9',
   muted:      '#91A4BB',
+  accent:     '#2DD4BF',
   cyan:       '#2DD4BF',
-  cyanDark:   '#123C3B',
-  amber:      '#FBBF24',
-  amberDark:  '#3C3015',
-  red:        '#FB7185',
-  redDark:    '#451A25',
-  blue:       '#60A5FA',
-  green:      '#4ADE80',
-  greenDark:  '#14532D',
-  purple:     '#A78BFA',
-};
-
-const GROUP_COLOR: Record<SymbolProfile['group'], string> = {
-  volatility: C.blue,
-  boom:       C.green,
-  crash:      C.red,
-  step:       C.amber,
 };
 
 const GROUP_LABEL: Record<SymbolProfile['group'], string> = {
@@ -61,28 +46,6 @@ function fmt(v: number | null, decimals = 2): string {
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-function ConnectionBadge({ connected, authorized }: { connected: boolean; authorized: boolean }) {
-  const color = connected ? C.cyan : C.red;
-  const label = !connected
-    ? 'Deriv API — Offline'
-    : authorized
-    ? 'Deriv API — Authorized'
-    : 'Deriv API — Connected (no token)';
-
-  return (
-    <View style={[styles.connBadge, { borderColor: connected ? C.cyanDark : C.redDark }]}>
-      <View style={[styles.dot, { backgroundColor: color }]} />
-      <Text style={[styles.connLabel, { color }]}>{label}</Text>
-    </View>
-  );
-}
-
-function AffordBadge({ affordable, available }: { affordable: boolean; available: boolean }) {
-  if (!available) return <View style={[styles.badge, { backgroundColor: '#1C2C3E' }]}><Text style={[styles.badgeText, { color: C.muted }]}>N/A</Text></View>;
-  if (affordable)  return <View style={[styles.badge, { backgroundColor: C.greenDark }]}><Text style={[styles.badgeText, { color: C.green }]}>OK</Text></View>;
-  return                  <View style={[styles.badge, { backgroundColor: C.amberDark }]}><Text style={[styles.badgeText, { color: C.amber }]}>REVIEW</Text></View>;
-}
-
 function SparkBar({ value, max, color }: { value: number; max: number; color: string }) {
   const width = max > 0 ? Math.min((value / max) * 100, 100) : 0;
   return (
@@ -93,23 +56,21 @@ function SparkBar({ value, max, color }: { value: number; max: number; color: st
 }
 
 function SymbolCard({ profile }: { profile: SymbolProfile }) {
-  const groupColor = GROUP_COLOR[profile.group];
-  const decimals   = profile.pip < 0.01 ? 5 : 2;
+  const decimals = profile.pip < 0.01 ? 5 : 2;
 
   return (
     <View style={[styles.card, !profile.available && styles.cardDimmed]}>
       {/* Header row */}
       <View style={styles.cardHeader}>
         <View style={styles.cardHeaderLeft}>
-          <View style={[styles.groupChip, { backgroundColor: groupColor + '22', borderColor: groupColor + '55' }]}>
-            <Text style={[styles.groupChipText, { color: groupColor }]}>{GROUP_LABEL[profile.group]}</Text>
+          <View style={styles.groupChip}>
+            <Text style={styles.groupChipText}>{GROUP_LABEL[profile.group]}</Text>
           </View>
           <View style={styles.nameBlock}>
             <Text style={styles.symbolName}>{profile.display}</Text>
             <Text style={styles.symbolCode}>{profile.code}</Text>
           </View>
         </View>
-        <AffordBadge affordable={profile.affordable} available={profile.available} />
       </View>
 
       {/* Metrics grid */}
@@ -120,7 +81,7 @@ function SymbolCard({ profile }: { profile: SymbolProfile }) {
         </View>
         <View style={styles.metricCell}>
           <Text style={styles.metricLabel}>SPREAD (MED)</Text>
-          <Text style={[styles.metricValue, { color: profile.spreadMedian !== null ? (profile.affordable ? C.cyan : C.amber) : C.muted }]}>
+          <Text style={[styles.metricValue, { color: profile.spreadMedian !== null ? C.cyan : C.muted }]}>
             {fmt(profile.spreadMedian, decimals)}
           </Text>
         </View>
@@ -130,7 +91,7 @@ function SymbolCard({ profile }: { profile: SymbolProfile }) {
         </View>
         <View style={styles.metricCell}>
           <Text style={styles.metricLabel}>TICKS/SEC</Text>
-          <Text style={[styles.metricValue, { color: C.blue }]}>
+          <Text style={[styles.metricValue, { color: C.cyan }]}>
             {profile.tickVelocity > 0 ? profile.tickVelocity.toFixed(2) : '—'}
           </Text>
         </View>
@@ -140,14 +101,14 @@ function SymbolCard({ profile }: { profile: SymbolProfile }) {
       {profile.tickVelocity > 0 && (
         <View style={styles.velRow}>
           <Text style={styles.velLabel}>Tick velocity</Text>
-          <SparkBar value={profile.tickVelocity} max={2} color={C.blue} />
+          <SparkBar value={profile.tickVelocity} max={2} color={C.cyan} />
           <Text style={styles.velCount}>{profile.tickCount.toLocaleString()} collected</Text>
         </View>
       )}
 
       {/* Affordability note */}
       <View style={styles.noteRow}>
-        <View style={[styles.noteDot, { backgroundColor: profile.affordable ? C.cyan : profile.available ? C.amber : C.muted }]} />
+        <View style={[styles.noteDot, { backgroundColor: profile.affordable ? C.cyan : C.muted }]} />
         <Text style={styles.noteText}>{profile.affordabilityNote}</Text>
       </View>
 
@@ -221,34 +182,31 @@ export function ProfilerScreen() {
         </View>
       </View>
 
-      {/* Connection + summary bar */}
+      {/* Summary bar */}
       {data && (
-        <>
-          <ConnectionBadge connected={data.connected} authorized={data.authorized} />
-          <View style={styles.summaryRow}>
-            <View style={styles.summaryCell}>
-              <Text style={[styles.summaryValue, { color: C.cyan }]}>{affordable}</Text>
-              <Text style={styles.summaryLabel}>Affordable</Text>
-            </View>
-            <View style={[styles.sumDivider]} />
-            <View style={styles.summaryCell}>
-              <Text style={[styles.summaryValue, { color: C.blue }]}>{available}</Text>
-              <Text style={styles.summaryLabel}>Available</Text>
-            </View>
-            <View style={[styles.sumDivider]} />
-            <View style={styles.summaryCell}>
-              <Text style={[styles.summaryValue, { color: C.text }]}>{total}</Text>
-              <Text style={styles.summaryLabel}>Total</Text>
-            </View>
-            <View style={[styles.sumDivider]} />
-            <View style={styles.summaryCell}>
-              <Text style={[styles.summaryValue, { color: C.muted }]}>
-                {data.lastRefreshedAt ? relativeTime(data.lastRefreshedAt) : '—'}
-              </Text>
-              <Text style={styles.summaryLabel}>Refreshed</Text>
-            </View>
+        <View style={styles.summaryRow}>
+          <View style={styles.summaryCell}>
+            <Text style={[styles.summaryValue, { color: C.cyan }]}>{affordable}</Text>
+            <Text style={styles.summaryLabel}>Affordable</Text>
           </View>
-        </>
+          <View style={[styles.sumDivider]} />
+          <View style={styles.summaryCell}>
+            <Text style={[styles.summaryValue, { color: C.text }]}>{available}</Text>
+            <Text style={styles.summaryLabel}>Available</Text>
+          </View>
+          <View style={[styles.sumDivider]} />
+          <View style={styles.summaryCell}>
+            <Text style={[styles.summaryValue, { color: C.text }]}>{total}</Text>
+            <Text style={styles.summaryLabel}>Total</Text>
+          </View>
+          <View style={[styles.sumDivider]} />
+          <View style={styles.summaryCell}>
+            <Text style={[styles.summaryValue, { color: C.muted }]}>
+              {data.lastRefreshedAt ? relativeTime(data.lastRefreshedAt) : '—'}
+            </Text>
+            <Text style={styles.summaryLabel}>Refreshed</Text>
+          </View>
+        </View>
       )}
 
       {/* Loading state */}
@@ -293,43 +251,36 @@ export function ProfilerScreen() {
 
 const styles = StyleSheet.create({
   root:          { flex: 1, backgroundColor: C.bg },
-  content:       { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 48, gap: 10 },
-  header:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 },
-  eyebrow:       { color: C.cyan, fontSize: 10, fontWeight: '800', letterSpacing: 2 },
-  title:         { color: C.text, fontSize: 28, fontWeight: '800', letterSpacing: -0.6 },
+  content:       { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 48, gap: 16 },
+  header:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
+  eyebrow:       { color: C.cyan, fontSize: 11, fontWeight: '800', letterSpacing: 2 },
+  title:         { color: C.text, fontSize: 32, lineHeight: 40, fontWeight: '800', letterSpacing: -0.8 },
 
-  connBadge:     { flexDirection: 'row', alignItems: 'center', gap: 7, borderWidth: 1, borderRadius: 10, padding: 10, backgroundColor: C.panel },
-  dot:           { width: 7, height: 7, borderRadius: 4 },
-  connLabel:     { fontSize: 12, fontWeight: '700' },
-
-  summaryRow:    { flexDirection: 'row', backgroundColor: C.panel, borderColor: C.border, borderWidth: 1, borderRadius: 14, overflow: 'hidden' },
+  summaryRow:    { flexDirection: 'row', backgroundColor: C.panel, borderColor: C.border, borderWidth: 1, borderRadius: 16, overflow: 'hidden' },
   summaryCell:   { flex: 1, alignItems: 'center', paddingVertical: 12 },
   summaryValue:  { fontSize: 20, fontWeight: '800' },
   summaryLabel:  { color: C.muted, fontSize: 10, marginTop: 2 },
   sumDivider:    { width: 1, backgroundColor: C.border },
 
-  centered:      { alignItems: 'center', paddingVertical: 40, gap: 12 },
-  loadingText:   { color: C.text, fontSize: 15, fontWeight: '600' },
-  loadingHint:   { color: C.muted, fontSize: 11 },
+  centered:      { alignItems: 'center', paddingVertical: 40, gap: 16 },
+  loadingText:   { color: C.text, fontSize: 16, fontWeight: '600' },
+  loadingHint:   { color: C.muted, fontSize: 12 },
 
-  errorBanner:   { backgroundColor: C.redDark, borderColor: '#7F2940', borderWidth: 1, borderRadius: 12, padding: 14, gap: 10 },
+  errorBanner:   { backgroundColor: '#3A141D', borderColor: '#7F2940', borderWidth: 1, borderRadius: 12, padding: 16, gap: 12 },
   errorText:     { color: '#FECDD3', fontSize: 13 },
-  retryBtn:      { alignSelf: 'flex-start', backgroundColor: '#7F2940', borderRadius: 8, paddingHorizontal: 14, paddingVertical: 7 },
-  retryText:     { color: C.text, fontSize: 12, fontWeight: '700' },
+  retryBtn:      { alignSelf: 'flex-start', minHeight: 48, minWidth: 80, alignItems: 'center', justifyContent: 'center', backgroundColor: '#7F2940', borderRadius: 8, paddingHorizontal: 16, paddingVertical: 12 },
+  retryText:     { color: C.text, fontSize: 13, fontWeight: '700' },
 
   // Symbol card
   card:          { backgroundColor: C.panel, borderColor: C.border, borderWidth: 1, borderRadius: 18, padding: 14, gap: 10 },
   cardDimmed:    { opacity: 0.55 },
   cardHeader:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   cardHeaderLeft:{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
-  groupChip:     { borderWidth: 1, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 3 },
-  groupChipText: { fontSize: 9, fontWeight: '900', letterSpacing: 0.8 },
+  groupChip:     { backgroundColor: '#102238', borderColor: C.border, borderWidth: 1, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 3 },
+  groupChipText: { color: C.cyan, fontSize: 9, fontWeight: '900', letterSpacing: 0.8 },
   nameBlock:     { flex: 1 },
   symbolName:    { color: C.text, fontSize: 13, fontWeight: '700' },
   symbolCode:    { color: C.muted, fontSize: 10, marginTop: 1 },
-
-  badge:         { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 },
-  badgeText:     { fontSize: 10, fontWeight: '900', letterSpacing: 0.5 },
 
   metricsRow:    { flexDirection: 'row', gap: 4 },
   metricCell:    { flex: 1, backgroundColor: '#091828', borderRadius: 10, padding: 10 },
@@ -348,8 +299,8 @@ const styles = StyleSheet.create({
   lastTick:      { color: '#4A6480', fontSize: 10, textAlign: 'right' },
 
   footer:        { alignItems: 'center', paddingTop: 16, gap: 6 },
-  footerTitle:   { color: C.amber, fontSize: 10, fontWeight: '900', letterSpacing: 1.5 },
+  footerTitle:   { color: C.cyan, fontSize: 10, fontWeight: '900', letterSpacing: 1.5 },
   footerText:    { color: C.muted, fontSize: 11, lineHeight: 17, textAlign: 'center' },
-  footerApi:     { color: C.blue, fontSize: 11 },
-  footerClock:   { color: '#4A6480', fontSize: 10 },
+  footerApi:     { color: C.muted, fontSize: 11 },
+  footerClock:   { color: C.muted, fontSize: 10 },
 });
