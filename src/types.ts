@@ -64,7 +64,7 @@ export interface ControllerState {
   revision: number;
   status: AutomationStatus;
   accountType: 'Standard';
-  mode: 'DEMO';
+  mode: 'DEMO' | 'LIVE';
   connected: boolean;
   lastHeartbeat: string;
   balance: number;
@@ -251,5 +251,58 @@ export interface Mt5BridgeStatus {
   riskLocked: boolean;
   equityFloorLocked: boolean;
   pendingCommandsCount: number;
+}
+
+// ─── Phase 5: Auth & Security Types ──────────────────────────────────────────
+
+export interface AuthTokenResponse {
+  token: string;
+  expiresIn: number;
+  tokenType: 'Bearer';
+  deviceId: string;
+  issuedAt: string;
+}
+
+export interface AuthDevice {
+  deviceId: string;
+  label: string;
+  registeredAt: string;
+  lastActiveAt: string;
+}
+
+export interface AuthCredentials {
+  apiKey: string;
+  deviceId: string;
+}
+
+// ─── Phase 6: Live Activation Gate Types ─────────────────────────────────────
+
+export interface GateEvaluation {
+  id: string;
+  title: string;
+  passed: boolean;
+  currentValue: number | string;
+  threshold: number | string;
+  unit: string;
+  description: string;
+}
+
+export interface MonteCarloSimulationResult {
+  iterations: number;
+  confidencePercent: number;
+  simulatedMaxDrawdown: number;
+  worstCaseDrawdown: number;
+  medianDrawdown: number;
+  passed: boolean;
+}
+
+export interface LiveActivationReport {
+  eligibleForLive: boolean;
+  evaluatedAt: string;
+  gates: GateEvaluation[];
+  monteCarlo: MonteCarloSimulationResult;
+  totalTradesEvaluated: number;
+  demoPeriodDays: number;
+  summary: string;
 }
 

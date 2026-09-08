@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppHeader } from '../components/AppHeader';
-import { API_BASE_URL } from '../api';
+import { API_BASE_URL, authenticateBridge, setAuthCredentials } from '../api';
 
 const colors = {
   bg: '#080808',
@@ -31,6 +31,9 @@ interface ProfileConfig {
   mt5Server: string;
   mt5Account: string;
   bridgeUrl: string;
+  vpsApiKey: string;
+  deviceId: string;
+  authToken: string | null;
 }
 
 const DEFAULT_CONFIG: ProfileConfig = {
@@ -39,10 +42,14 @@ const DEFAULT_CONFIG: ProfileConfig = {
   mt5Server: 'DerivSVG-Server-03',
   mt5Account: 'Demo/Live Standard',
   bridgeUrl: API_BASE_URL,
+  vpsApiKey: 'falcon-vps-key-2026',
+  deviceId: 'device-demo-android-01',
+  authToken: null,
 };
 
 export function ProfileScreen() {
   const [config, setConfig] = useState<ProfileConfig>(DEFAULT_CONFIG);
+  const [authenticating, setAuthenticating] = useState(false);
   const [testingDeriv, setTestingDeriv] = useState(false);
   const [testingBridge, setTestingBridge] = useState(false);
   const [savedNote, setSavedNote] = useState(false);
@@ -55,6 +62,11 @@ export function ProfileScreen() {
         if (raw) {
           const parsed = JSON.parse(raw) as ProfileConfig;
           setConfig((prev) => ({ ...prev, ...parsed }));
+          setAuthCredentials({
+            token: parsed.authToken,
+            apiKey: parsed.vpsApiKey,
+            deviceId: parsed.deviceId,
+          });
         }
       } catch {
         // Fallback to default
@@ -110,6 +122,30 @@ export function ProfileScreen() {
       setTestingBridge(false);
     }
   }, []);
+
+  const handleAuthenticate = useCallback(async () => {
+    setAuthenticating(true);
+    try {
+      const res = await authenticateBridge(config.vpsApiKey, config.deviceId);
+      setConfig((c) => ({ ...c, authToken: res.token }));
+      setAuthCredentials({ token: res.token, apiKey: config.vpsApiKey, deviceId: config.deviceId });
+      await AsyncStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({ ...config, authToken: res.token })
+      );
+      Alert.alert(
+        'VPS Bridge Authenticated',
+        `Bearer JWT token issued successfully for device ${res.deviceId}. Valid for 24 hours.`
+      );
+    } catch (err) {
+      Alert.alert(
+        'Authentication Failed',
+        err instanceof Error ? err.message : 'Failed to authenticate with VPS bridge.'
+      );
+    } finally {
+      setAuthenticating(false);
+    }
+  }, [config]);
 
   return (
     <View style={styles.screenRoot}>
@@ -204,6 +240,47 @@ export function ProfileScreen() {
           >
             <Text style={styles.secondaryBtnText}>
               {testingBridge ? 'Pinging VPS…' : 'Test Bridge Ping'}
+            </Text>
+          </Pressable>
+        </View>
+
+        {/* VPS Bridge Security & Auth (Phase 5) */}
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>VPS BRIDGE SECURITY & AUTH</Text>
+
+          <View style={styles.fieldGroup}>
+            <Text style={styles.fieldLabel}>VPS BRIDGE API KEY</Text>
+            <TextInput
+              style={styles.input}
+              value={config.vpsApiKey}
+              onChangeText={(text) => setConfig((c) => ({ ...c, vpsApiKey: text }))}
+              placeholder="falcon-vps-key-2026"
+              placeholderTextColor={colors.muted}
+              secureTextEntry
+            />
+            <Text style={styles.fieldHint}>Master API key protecting HTTPS/WSS control endpoints.</Text>
+          </View>
+
+          <View style={styles.fieldGroup}>
+            <Text style={styles.fieldLabel}>ENROLLED DEVICE IDENTIFIER</Text>
+            <TextInput
+              style={styles.input}
+              value={config.deviceId}
+              onChangeText={(text) => setConfig((c) => ({ ...c, deviceId: text }))}
+              placeholder="device-demo-android-01"
+              placeholderTextColor={colors.muted}
+            />
+            <Text style={styles.fieldHint}>Unique mobile device binding ID for cryptographic token issue.</Text>
+          </View>
+
+          <Pressable
+            accessibilityRole="button"
+            disabled={authenticating}
+            onPress={() => void handleAuthenticate()}
+            style={({ pressed }) => [styles.secondaryBtn, pressed && styles.pressedBtn]}
+          >
+            <Text style={styles.secondaryBtnText}>
+              {authenticating ? 'Authenticating…' : 'Authenticate & Issue JWT Token'}
             </Text>
           </Pressable>
         </View>

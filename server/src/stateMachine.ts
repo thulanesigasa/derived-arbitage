@@ -156,6 +156,23 @@ export class ControllerStore {
     return response;
   }
 
+  activateLiveMode(expectedRevision: number, requestId: string, eligible: boolean): ControllerState {
+    const cached = this.requestCache.get(requestId);
+    if (cached) return structuredClone(cached);
+    this.assertRevision(expectedRevision);
+
+    if (!eligible) {
+      throw new TransitionError('Cannot activate LIVE: non-negotiable activation gates failed.', 'ACTIVATION_GATE_LOCKED');
+    }
+
+    this.mutate((state) => {
+      state.mode = 'LIVE';
+      log(state, 'success', '[LIVE ACTIVATION] System verified by 5 non-negotiable gates. LIVE mode activated.');
+    });
+
+    return this.cache(requestId);
+  }
+
   replaceForTest(next: ControllerState): void {
     this.state = structuredClone(next);
   }
