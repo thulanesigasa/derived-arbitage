@@ -13,14 +13,14 @@ import { AppHeader } from '../components/AppHeader';
 import { API_BASE_URL } from '../api';
 
 const colors = {
-  bg: '#07111F',
-  panel: '#0D1A2B',
-  panelAlt: '#102238',
-  border: '#21344C',
-  text: '#F1F5F9',
-  muted: '#91A4BB',
-  cyan: '#2DD4BF',
-  cyanDark: '#123C3B',
+  bg: '#080808',
+  panel: '#161616',
+  panelAlt: '#1E1E1E',
+  border: '#282828',
+  text: '#FFFFFF',
+  muted: '#9A9A9A',
+  orange: '#FF6B00',
+  orangeDark: '#2D1405',
 };
 
 const STORAGE_KEY = '@mobile_ea_profile_config';
@@ -224,17 +224,17 @@ export function ProfileScreen() {
 const styles = StyleSheet.create({
   screenRoot: { flex: 1, backgroundColor: colors.bg },
   root: { flex: 1, backgroundColor: colors.bg },
-  content: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 48, gap: 16 },
+  content: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 120, gap: 16 },
 
   savedBanner: {
-    backgroundColor: colors.cyanDark,
-    borderColor: colors.cyan,
+    backgroundColor: '#26180E',
+    borderColor: colors.orange,
     borderWidth: 1,
     borderRadius: 12,
     padding: 12,
   },
   savedText: {
-    color: colors.cyan,
+    color: colors.orange,
     fontSize: 13,
     fontWeight: '700',
     textAlign: 'center',
@@ -265,7 +265,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   input: {
-    backgroundColor: '#091828',
+    backgroundColor: '#101010',
     borderColor: colors.border,
     borderWidth: 1,
     borderRadius: 10,
@@ -276,7 +276,7 @@ const styles = StyleSheet.create({
     minHeight: 48,
   },
   readOnlyText: {
-    color: colors.cyan,
+    color: colors.orange,
     fontSize: 13,
     paddingVertical: 6,
   },
@@ -288,8 +288,8 @@ const styles = StyleSheet.create({
 
   secondaryBtn: {
     minHeight: 48,
-    backgroundColor: '#192A3E',
-    borderColor: '#38506B',
+    backgroundColor: '#222222',
+    borderColor: '#383838',
     borderWidth: 1,
     borderRadius: 10,
     alignItems: 'center',
@@ -298,14 +298,14 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   secondaryBtnText: {
-    color: colors.cyan,
+    color: colors.orange,
     fontSize: 13,
     fontWeight: '700',
   },
 
   saveBtn: {
     minHeight: 52,
-    backgroundColor: colors.cyan,
+    backgroundColor: colors.orange,
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
@@ -313,7 +313,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   saveBtnText: {
-    color: '#041510',
+    color: '#080808',
     fontSize: 15,
     fontWeight: '800',
   },

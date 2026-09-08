@@ -14,14 +14,14 @@ import { AppHeader } from '../components/AppHeader';
 
 // ─── Design tokens (matches App.tsx palette) ─────────────────────────────────
 const C = {
-  bg:         '#07111F',
-  panel:      '#0D1A2B',
-  panelAlt:   '#102238',
-  border:     '#21344C',
-  text:       '#F1F5F9',
-  muted:      '#91A4BB',
-  accent:     '#2DD4BF',
-  cyan:       '#2DD4BF',
+  bg:         '#080808',
+  panel:      '#161616',
+  panelAlt:   '#1E1E1E',
+  border:     '#282828',
+  text:       '#FFFFFF',
+  muted:      '#9A9A9A',
+  accent:     '#FF6B00',
+  orange:     '#FF6B00',
 };
 
 const GROUP_LABEL: Record<SymbolProfile['group'], string> = {
@@ -82,7 +82,7 @@ function SymbolCard({ profile }: { profile: SymbolProfile }) {
         </View>
         <View style={styles.metricCell}>
           <Text style={styles.metricLabel}>SPREAD (MED)</Text>
-          <Text style={[styles.metricValue, { color: profile.spreadMedian !== null ? C.cyan : C.muted }]}>
+          <Text style={[styles.metricValue, { color: profile.spreadMedian !== null ? C.orange : C.muted }]}>
             {fmt(profile.spreadMedian, decimals)}
           </Text>
         </View>
@@ -92,7 +92,7 @@ function SymbolCard({ profile }: { profile: SymbolProfile }) {
         </View>
         <View style={styles.metricCell}>
           <Text style={styles.metricLabel}>TICKS/SEC</Text>
-          <Text style={[styles.metricValue, { color: C.cyan }]}>
+          <Text style={[styles.metricValue, { color: C.orange }]}>
             {profile.tickVelocity > 0 ? profile.tickVelocity.toFixed(2) : '—'}
           </Text>
         </View>
@@ -102,14 +102,14 @@ function SymbolCard({ profile }: { profile: SymbolProfile }) {
       {profile.tickVelocity > 0 && (
         <View style={styles.velRow}>
           <Text style={styles.velLabel}>Tick velocity</Text>
-          <SparkBar value={profile.tickVelocity} max={2} color={C.cyan} />
+          <SparkBar value={profile.tickVelocity} max={2} color={C.orange} />
           <Text style={styles.velCount}>{profile.tickCount.toLocaleString()} collected</Text>
         </View>
       )}
 
       {/* Affordability note */}
       <View style={styles.noteRow}>
-        <View style={[styles.noteDot, { backgroundColor: profile.affordable ? C.cyan : C.muted }]} />
+        <View style={[styles.noteDot, { backgroundColor: profile.affordable ? C.orange : C.muted }]} />
         <Text style={styles.noteText}>{profile.affordabilityNote}</Text>
       </View>
 
@@ -171,7 +171,7 @@ export function ProfilerScreen() {
         contentContainerStyle={styles.content}
         refreshControl={
           <RefreshControl
-            tintColor={C.cyan}
+            tintColor={C.orange}
             refreshing={refreshing}
             onRefresh={() => { setRefreshing(true); void fetchProfiler(true); }}
           />
@@ -181,7 +181,7 @@ export function ProfilerScreen() {
       {data && (
         <View style={styles.summaryRow}>
           <View style={styles.summaryCell}>
-            <Text style={[styles.summaryValue, { color: C.cyan }]}>{affordable}</Text>
+            <Text style={[styles.summaryValue, { color: C.orange }]}>{affordable}</Text>
             <Text style={styles.summaryLabel}>Affordable</Text>
           </View>
           <View style={[styles.sumDivider]} />
@@ -207,7 +207,7 @@ export function ProfilerScreen() {
       {/* Loading state */}
       {loading && !data && (
         <View style={styles.centered}>
-          <ActivityIndicator size="large" color={C.cyan} />
+          <ActivityIndicator size="large" color={C.orange} />
           <Text style={styles.loadingText}>Connecting to Deriv API…</Text>
           <Text style={styles.loadingHint}>{API_BASE_URL}/api/profiler/status</Text>
         </View>
@@ -248,7 +248,7 @@ export function ProfilerScreen() {
 const styles = StyleSheet.create({
   screenRoot:    { flex: 1, backgroundColor: C.bg },
   root:          { flex: 1, backgroundColor: C.bg },
-  content:       { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 48, gap: 16 },
+  content:       { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 120, gap: 16 },
 
   summaryRow:    { flexDirection: 'row', backgroundColor: C.panel, borderColor: C.border, borderWidth: 1, borderRadius: 16, overflow: 'hidden' },
   summaryCell:   { flex: 1, alignItems: 'center', paddingVertical: 12 },
@@ -260,40 +260,40 @@ const styles = StyleSheet.create({
   loadingText:   { color: C.text, fontSize: 16, fontWeight: '600' },
   loadingHint:   { color: C.muted, fontSize: 12 },
 
-  errorBanner:   { backgroundColor: '#3A141D', borderColor: '#7F2940', borderWidth: 1, borderRadius: 12, padding: 16, gap: 12 },
-  errorText:     { color: '#FECDD3', fontSize: 13 },
-  retryBtn:      { alignSelf: 'flex-start', minHeight: 48, minWidth: 80, alignItems: 'center', justifyContent: 'center', backgroundColor: '#7F2940', borderRadius: 8, paddingHorizontal: 16, paddingVertical: 12 },
-  retryText:     { color: C.text, fontSize: 13, fontWeight: '700' },
+  errorBanner:   { backgroundColor: '#26140E', borderColor: C.orange, borderWidth: 1, borderRadius: 12, padding: 16, gap: 12 },
+  errorText:     { color: '#FFFFFF', fontSize: 13 },
+  retryBtn:      { alignSelf: 'flex-start', minHeight: 48, minWidth: 80, alignItems: 'center', justifyContent: 'center', backgroundColor: C.orange, borderRadius: 8, paddingHorizontal: 16, paddingVertical: 12 },
+  retryText:     { color: '#080808', fontSize: 13, fontWeight: '700' },
 
   // Symbol card
   card:          { backgroundColor: C.panel, borderColor: C.border, borderWidth: 1, borderRadius: 18, padding: 14, gap: 10 },
   cardDimmed:    { opacity: 0.55 },
   cardHeader:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   cardHeaderLeft:{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
-  groupChip:     { backgroundColor: '#102238', borderColor: C.border, borderWidth: 1, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 3 },
-  groupChipText: { color: C.cyan, fontSize: 9, fontWeight: '900', letterSpacing: 0.8 },
+  groupChip:     { backgroundColor: '#1C1C1C', borderColor: C.border, borderWidth: 1, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 3 },
+  groupChipText: { color: C.orange, fontSize: 9, fontWeight: '900', letterSpacing: 0.8 },
   nameBlock:     { flex: 1 },
   symbolName:    { color: C.text, fontSize: 13, fontWeight: '700' },
   symbolCode:    { color: C.muted, fontSize: 10, marginTop: 1 },
 
   metricsRow:    { flexDirection: 'row', gap: 4 },
-  metricCell:    { flex: 1, backgroundColor: '#091828', borderRadius: 10, padding: 10 },
+  metricCell:    { flex: 1, backgroundColor: '#101010', borderRadius: 10, padding: 10 },
   metricLabel:   { color: C.muted, fontSize: 9, fontWeight: '700', letterSpacing: 0.5 },
   metricValue:   { color: C.text, fontSize: 14, fontWeight: '800', marginTop: 4 },
 
   velRow:        { flexDirection: 'row', alignItems: 'center', gap: 8 },
   velLabel:      { color: C.muted, fontSize: 10, width: 72 },
   velCount:      { color: C.muted, fontSize: 10 },
-  sparkTrack:    { flex: 1, height: 4, backgroundColor: '#1C2C3E', borderRadius: 2, overflow: 'hidden' },
+  sparkTrack:    { flex: 1, height: 4, backgroundColor: '#262626', borderRadius: 2, overflow: 'hidden' },
   sparkFill:     { height: '100%', borderRadius: 2 },
 
   noteRow:       { flexDirection: 'row', alignItems: 'flex-start', gap: 7 },
   noteDot:       { width: 6, height: 6, borderRadius: 3, marginTop: 4 },
   noteText:      { color: C.muted, fontSize: 11, lineHeight: 16, flex: 1 },
-  lastTick:      { color: '#4A6480', fontSize: 10, textAlign: 'right' },
+  lastTick:      { color: C.muted, fontSize: 10, textAlign: 'right' },
 
   footer:        { alignItems: 'center', paddingTop: 16, gap: 6 },
-  footerTitle:   { color: C.cyan, fontSize: 10, fontWeight: '900', letterSpacing: 1.5 },
+  footerTitle:   { color: C.orange, fontSize: 10, fontWeight: '900', letterSpacing: 1.5 },
   footerText:    { color: C.muted, fontSize: 11, lineHeight: 17, textAlign: 'center' },
   footerApi:     { color: C.muted, fontSize: 11 },
   footerClock:   { color: C.muted, fontSize: 10 },

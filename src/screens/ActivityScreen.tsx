@@ -15,12 +15,12 @@ interface ActivityScreenProps {
 }
 
 const colors = {
-  bg: '#07111F',
-  panel: '#0D1A2B',
-  border: '#21344C',
-  text: '#F1F5F9',
-  muted: '#91A4BB',
-  cyan: '#2DD4BF',
+  bg: '#080808',
+  panel: '#161616',
+  border: '#282828',
+  text: '#FFFFFF',
+  muted: '#9A9A9A',
+  orange: '#FF6B00',
 };
 
 export function ActivityScreen({ state, refreshing, onRefresh }: ActivityScreenProps) {
@@ -33,7 +33,7 @@ export function ActivityScreen({ state, refreshing, onRefresh }: ActivityScreenP
         style={styles.root}
         contentContainerStyle={styles.content}
         refreshControl={
-          <RefreshControl tintColor={colors.cyan} refreshing={refreshing} onRefresh={onRefresh} />
+          <RefreshControl tintColor={colors.orange} refreshing={refreshing} onRefresh={onRefresh} />
         }
       >
         <View style={styles.card}>
@@ -50,10 +50,8 @@ export function ActivityScreen({ state, refreshing, onRefresh }: ActivityScreenP
             activities.map((item, index) => {
               const isLast = index === activities.length - 1;
               const markColor =
-                item.kind === 'danger'
-                  ? '#FB7185'
-                  : item.kind === 'success'
-                  ? colors.cyan
+                item.kind === 'success' || item.kind === 'danger'
+                  ? colors.orange
                   : colors.muted;
 
               return (
@@ -82,7 +80,7 @@ export function ActivityScreen({ state, refreshing, onRefresh }: ActivityScreenP
 const styles = StyleSheet.create({
   screenRoot: { flex: 1, backgroundColor: colors.bg },
   root: { flex: 1, backgroundColor: colors.bg },
-  content: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 48, gap: 16 },
+  content: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 120, gap: 16 },
 
   card: {
     backgroundColor: colors.panel,

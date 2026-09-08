@@ -26,22 +26,22 @@ export function AppHeader({ eyebrow, title }: AppHeaderProps) {
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#07111F',
+    backgroundColor: '#080808',
     borderBottomWidth: 1,
-    borderBottomColor: '#21344C',
+    borderBottomColor: '#202020',
   },
   appBar: {
     paddingHorizontal: 16,
     justifyContent: 'center',
   },
   eyebrow: {
-    color: '#2DD4BF',
+    color: '#FF6B00',
     fontSize: 11,
     fontWeight: '800',
     letterSpacing: 1.8,
   },
   title: {
-    color: '#F1F5F9',
+    color: '#FFFFFF',
     fontSize: 24,
     lineHeight: 30,
     fontWeight: '800',

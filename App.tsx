@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Animated,
   Platform,
   Pressable,
   StyleSheet,
@@ -26,14 +27,14 @@ import {
 } from './src/components/TabIcons';
 
 const colors = {
-  bg: '#07111F',
-  panel: '#0D1A2B',
-  panelAlt: '#102238',
-  border: '#21344C',
-  text: '#F1F5F9',
-  muted: '#91A4BB',
-  cyan: '#2DD4BF',
-  cyanDark: '#123C3B',
+  bg: '#080808',
+  panel: '#161616',
+  panelAlt: '#1E1E1E',
+  border: '#282828',
+  text: '#FFFFFF',
+  muted: '#9A9A9A',
+  orange: '#FF6B00',
+  orangeDark: '#2D1405',
 };
 
 function requestId(prefix: string): string {
@@ -64,6 +65,28 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mounted = useRef(true);
+
+  // Animated sliding pill indicator for bottom tab navigation
+  const tabAnim = useRef(new Animated.Value(0)).current;
+  const [pillContainerWidth, setPillContainerWidth] = useState(0);
+
+  useEffect(() => {
+    const targetIndex = TAB_DEFS.findIndex((t) => t.id === activeTab);
+    if (targetIndex >= 0) {
+      Animated.spring(tabAnim, {
+        toValue: targetIndex,
+        useNativeDriver: true,
+        friction: 8,
+        tension: 65,
+      }).start();
+    }
+  }, [activeTab, tabAnim]);
+
+  const tabWidth = pillContainerWidth > 0 ? pillContainerWidth / TAB_DEFS.length : 0;
+  const translateX = tabAnim.interpolate({
+    inputRange: [0, 1, 2, 3, 4],
+    outputRange: [0, tabWidth, tabWidth * 2, tabWidth * 3, tabWidth * 4],
+  });
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -169,7 +192,7 @@ export default function App() {
   if (loading && !state) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color={colors.cyan} />
+        <ActivityIndicator size="large" color={colors.orange} />
         <Text style={styles.loadingTitle}>Connecting to mobile controller…</Text>
         <Text style={styles.loadingHint}>{API_BASE_URL}</Text>
       </View>
@@ -228,28 +251,50 @@ export default function App() {
           {activeTab === 'profile' && <ProfileScreen />}
         </View>
 
-        {/* Bottom tab bar (Rule 15: accounts for OS chrome + SVGs) */}
-        <View style={styles.tabBar}>
-          {TAB_DEFS.map(({ id, label, Icon }) => {
-            const active = activeTab === id;
-            const color = active ? colors.cyan : colors.muted;
-            return (
-              <Pressable
-                key={id}
-                accessibilityRole="button"
-                accessibilityLabel={label}
-                accessibilityState={{ selected: active }}
-                onPress={() => setActiveTab(id)}
-                style={styles.tabItem}
+        {/* Floating Pill Tab Navigation Bar with Animated Sliding Indicator (Rule 15 & Reference Design) */}
+        <View style={styles.floatingNavWrapper}>
+          <View
+            style={styles.pillBar}
+            onLayout={(e) => setPillContainerWidth(e.nativeEvent.layout.width)}
+          >
+            {/* Smooth animated sliding indicator */}
+            {tabWidth > 0 && (
+              <Animated.View
+                style={[
+                  styles.slidingIndicator,
+                  {
+                    width: tabWidth,
+                    transform: [{ translateX }],
+                  },
+                ]}
               >
-                <View style={[styles.tabPip, active && styles.tabPipActive]} />
-                <Icon size={20} color={color} />
-                <Text style={[styles.tabLabel, active ? styles.tabLabelActive : styles.tabLabelIdle]}>
-                  {label}
-                </Text>
-              </Pressable>
-            );
-          })}
+                <View style={styles.sliderBubble}>
+                  <View style={styles.sliderTopPip} />
+                </View>
+              </Animated.View>
+            )}
+
+            {/* Tab items */}
+            {TAB_DEFS.map(({ id, label, Icon }) => {
+              const active = activeTab === id;
+              const color = active ? colors.orange : colors.muted;
+              return (
+                <Pressable
+                  key={id}
+                  accessibilityRole="button"
+                  accessibilityLabel={label}
+                  accessibilityState={{ selected: active }}
+                  onPress={() => setActiveTab(id)}
+                  style={styles.tabItem}
+                >
+                  <Icon size={20} color={color} />
+                  <Text style={[styles.tabLabel, active ? styles.tabLabelActive : styles.tabLabelIdle]}>
+                    {label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
         </View>
       </SafeAreaView>
     </SafeAreaProvider>
@@ -260,38 +305,71 @@ const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: colors.bg },
   screenArea: { flex: 1 },
 
-  // ─── Tab bar (Rule 15: accounts for OS chrome) ─────────────────────────────
-  tabBar: {
+  // ─── Floating Pill Tab Bar (Rule 15: accounts for OS chrome + floating pill design) ──
+  floatingNavWrapper: {
+    position: 'absolute',
+    bottom: Platform.OS === 'android' ? 48 : 34,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+  },
+  pillBar: {
     flexDirection: 'row',
-    backgroundColor: '#0A1825',
-    borderTopWidth: 1,
-    borderTopColor: '#1C2D3E',
-    height: Platform.OS === 'android' ? 104 : 90,
-    paddingBottom: Platform.OS === 'android' ? 48 : 34,
-    paddingTop: 6,
+    height: 64,
+    backgroundColor: '#161616',
+    borderRadius: 32,
+    borderWidth: 1,
+    borderColor: '#282828',
+    alignItems: 'center',
+    position: 'relative',
+    overflow: 'hidden',
+    elevation: 8,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.5,
+    shadowRadius: 10,
+  },
+  slidingIndicator: {
+    position: 'absolute',
+    top: 4,
+    bottom: 4,
+    left: 0,
+    paddingHorizontal: 4,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  sliderBubble: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#26140E',
+    borderRadius: 24,
+    borderWidth: 1.5,
+    borderColor: colors.orange,
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+  },
+  sliderTopPip: {
+    width: 14,
+    height: 3,
+    borderRadius: 1.5,
+    backgroundColor: colors.orange,
+    marginTop: 2,
   },
   tabItem: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: Platform.OS === 'android' ? 48 : 44,
+    minHeight: 48,
     gap: 3,
-  },
-  tabPip: {
-    width: 16,
-    height: 3,
-    borderRadius: 2,
-    backgroundColor: 'transparent',
-  },
-  tabPipActive: {
-    backgroundColor: colors.cyan,
+    zIndex: 2,
   },
   tabLabel: {
     fontSize: 10,
     fontWeight: '700',
   },
   tabLabelActive: {
-    color: colors.cyan,
+    color: '#FFFFFF',
   },
   tabLabelIdle: {
     color: colors.muted,
