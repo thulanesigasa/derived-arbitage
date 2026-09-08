@@ -52,41 +52,53 @@ export class MarketProfiler {
   async refreshActiveSymbols(): Promise<void> {
     if (!this.client.connected) return;
     try {
-      const resp = await this.client.send({ active_symbols: 'brief', product_type: 'basic' });
-      const list = resp['active_symbols'] as Array<{
-        symbol:           string;
-        display_name:     string;
-        pip:              string;
-        spot:             number;
-        exchange_is_open: number;
-      }> | undefined;
+      const resp = await this.client.send({ active_symbols: 'brief' });
+      const list = (resp['active_symbols'] ?? []) as Array<{
+        symbol?:                  string;
+        underlying_symbol?:       string;
+        display_name?:            string;
+        underlying_symbol_name?:  string;
+        pip?:                     string;
+        pip_size?:                number;
+        spot?:                    number;
+        exchange_is_open?:        number;
+        is_trading_suspended?:    number;
+      }>;
 
       if (Array.isArray(list) && list.length > 0) {
         this.activeInfo.clear();
 
         for (const item of list) {
+          const code = item.underlying_symbol ?? item.symbol ?? '';
+          const name = item.underlying_symbol_name ?? item.display_name ?? '';
+          const pipVal = typeof item.pip_size === 'number'
+            ? item.pip_size
+            : item.pip ? parseFloat(item.pip) : 0.01;
+          const spotVal = typeof item.spot === 'number' ? item.spot : 0;
+          const openVal = item.exchange_is_open === 1 || item.is_trading_suspended === 0;
+
           // Primary match: exact code
-          if (SYMBOL_MAP.some((s) => s.code === item.symbol)) {
-            this.activeInfo.set(item.symbol, {
-              pip:    parseFloat(item.pip),
-              spot:   item.spot,
-              isOpen: item.exchange_is_open === 1,
+          if (SYMBOL_MAP.some((s) => s.code === code || (s.code === 'CRASH300' && code === 'CRASH300N'))) {
+            this.activeInfo.set(code, {
+              pip:    pipVal,
+              spot:   spotVal,
+              isOpen: openVal,
             });
             continue;
           }
 
           // Fallback: match by display name keywords
-          const normalized = item.display_name.toLowerCase();
+          const normalized = name.toLowerCase();
           const matched = SYMBOL_MAP.find(
             (s) =>
               !this.activeInfo.has(s.code) &&
               normalized.includes(s.display.toLowerCase().replace(' index', '')),
           );
           if (matched) {
-            this.activeInfo.set(item.symbol, {
-              pip:    parseFloat(item.pip),
-              spot:   item.spot,
-              isOpen: item.exchange_is_open === 1,
+            this.activeInfo.set(code, {
+              pip:    pipVal,
+              spot:   spotVal,
+              isOpen: openVal,
             });
           }
         }
@@ -95,10 +107,8 @@ export class MarketProfiler {
           `[MarketProfiler] Symbols refreshed via active_symbols — ${this.activeInfo.size}/${SYMBOL_MAP.length} found`,
         );
       } else {
-        // active_symbols returned empty (happens with public app_id=1089).
-        // Pre-seed from our known list so tick subscriptions can still gather data.
-        // pip and spot will be updated from incoming ticks.
-        console.log('[MarketProfiler] active_symbols returned 0 results — seeding from known list. Set DERIV_APP_ID in .env for full data.');
+        // Pre-seed from known list if empty
+        console.log('[MarketProfiler] Seeding active symbols from known list');
         for (const sym of SYMBOL_MAP) {
           if (!this.activeInfo.has(sym.code)) {
             this.activeInfo.set(sym.code, { pip: 0.01, spot: 0, isOpen: true });

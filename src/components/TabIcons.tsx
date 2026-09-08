@@ -1,4 +1,4 @@
-import Svg, { Path } from 'react-native-svg';
+import Svg, { Path, Polygon, Rect } from 'react-native-svg';
 
 interface IconProps {
   size?: number;
@@ -9,7 +9,7 @@ interface IconProps {
  * SVGs from http://svgrepo.com/ adhering to Rule 2 and Rule 4
  */
 
-export function HomeIcon({ size = 20, color = '#2DD4BF' }: IconProps) {
+export function HomeIcon({ size = 20, color = '#FF6B00' }: IconProps) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <Path
@@ -20,7 +20,7 @@ export function HomeIcon({ size = 20, color = '#2DD4BF' }: IconProps) {
   );
 }
 
-export function ControllerIcon({ size = 20, color = '#2DD4BF' }: IconProps) {
+export function ControllerIcon({ size = 20, color = '#FF6B00' }: IconProps) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <Path
@@ -41,7 +41,7 @@ export function ControllerIcon({ size = 20, color = '#2DD4BF' }: IconProps) {
   );
 }
 
-export function ProfilerIcon({ size = 20, color = '#2DD4BF' }: IconProps) {
+export function ProfilerIcon({ size = 20, color = '#FF6B00' }: IconProps) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <Path
@@ -55,7 +55,7 @@ export function ProfilerIcon({ size = 20, color = '#2DD4BF' }: IconProps) {
   );
 }
 
-export function ActivityIcon({ size = 20, color = '#2DD4BF' }: IconProps) {
+export function ActivityIcon({ size = 20, color = '#FF6B00' }: IconProps) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <Path
@@ -69,7 +69,7 @@ export function ActivityIcon({ size = 20, color = '#2DD4BF' }: IconProps) {
   );
 }
 
-export function ProfileIcon({ size = 20, color = '#2DD4BF' }: IconProps) {
+export function ProfileIcon({ size = 20, color = '#FF6B00' }: IconProps) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <Path
@@ -90,7 +90,7 @@ export function ProfileIcon({ size = 20, color = '#2DD4BF' }: IconProps) {
   );
 }
 
-export function RobotIcon({ size = 48, color = '#2DD4BF' }: IconProps) {
+export function RobotIcon({ size = 48, color = '#FF6B00' }: IconProps) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <Path
@@ -105,6 +105,52 @@ export function RobotIcon({ size = 48, color = '#2DD4BF' }: IconProps) {
         stroke={color}
         strokeWidth="2"
         strokeLinecap="round"
+      />
+    </Svg>
+  );
+}
+
+export function PlayIcon({ size = 20, color = '#FFFFFF' }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Polygon points="6 4 20 12 6 20 6 4" fill={color} />
+    </Svg>
+  );
+}
+
+export function PauseIcon({ size = 20, color = '#FFFFFF' }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Rect x="6" y="4" width="4" height="16" rx="1.5" fill={color} />
+      <Rect x="14" y="4" width="4" height="16" rx="1.5" fill={color} />
+    </Svg>
+  );
+}
+
+export function StopIcon({ size = 20, color = '#FFFFFF' }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Rect x="5" y="5" width="14" height="14" rx="2.5" fill={color} />
+    </Svg>
+  );
+}
+
+export function QuotesIcon({ size = 20, color = '#FFFFFF' }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M3 3v18h18"
+        stroke={color}
+        strokeWidth="2.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <Path
+        d="M7 16l4-5 4 3 5-7"
+        stroke={color}
+        strokeWidth="2.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
       />
     </Svg>
   );

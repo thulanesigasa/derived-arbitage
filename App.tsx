@@ -217,6 +217,7 @@ export default function App() {
                 void load(true);
               }}
               onControl={(action) => void performControl(action)}
+              onNavigateTab={(tab) => setActiveTab(tab)}
             />
           )}
 
