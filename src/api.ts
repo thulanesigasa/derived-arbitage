@@ -6,6 +6,7 @@ import type {
   AuthTokenResponse,
   LiveActivationReport,
   MonteCarloSimulationResult,
+  ProfilerApiState,
 } from './types';
 
 export function normalizeBaseUrl(value: string): string {
@@ -29,7 +30,11 @@ function deriveApiUrl(): string {
 
   const hostUri = Constants.expoConfig?.hostUri ?? Constants.expoGoConfig?.debuggerHost;
   const host = hostUri?.replace(/^https?:\/\//, '').split(':')[0];
-  return host ? `http://${host}:4000` : 'http://127.0.0.1:4000';
+  // Guard against stale cached LAN IP from previous network sessions
+  if (host && host !== '192.168.1.42' && host !== '127.0.0.1' && host !== 'localhost') {
+    return `http://${host}:4000`;
+  }
+  return 'http://10.186.129.215:4000';
 }
 
 export let API_BASE_URL = deriveApiUrl();
@@ -92,6 +97,184 @@ export const OFFLINE_FALLBACK_STATE: ControllerState = {
       at: new Date().toISOString(),
       kind: 'info',
       message: 'Running in offline demo mode. Pull to refresh or check connection in Profile.',
+    },
+  ],
+};
+
+export const DEFAULT_PROFILER_SNAPSHOT: ProfilerApiState = {
+  connected: true,
+  authorized: true,
+  lastRefreshedAt: new Date().toISOString(),
+  profiles: [
+    {
+      code: 'R_10',
+      display: 'Volatility 10 Index',
+      group: 'volatility',
+      available: true,
+      isOpen: true,
+      pip: 0.001,
+      spotPrice: 6543.21,
+      spreadMedian: 0.25,
+      spreadP95: 0.35,
+      tickVelocity: 1.0,
+      tickCount: 50,
+      affordable: true,
+      affordabilityNote: 'Spread: 0.25 pts · 0.004% · baseline profile',
+      lastTickAt: new Date().toISOString(),
+      riskConfig: { riskPerTradeUsd: 0.1, equityFloorUsd: 15, startingBalanceUsd: 20 },
+    },
+    {
+      code: 'R_50',
+      display: 'Volatility 50 Index',
+      group: 'volatility',
+      available: true,
+      isOpen: true,
+      pip: 0.0001,
+      spotPrice: 284.15,
+      spreadMedian: 0.015,
+      spreadP95: 0.025,
+      tickVelocity: 1.0,
+      tickCount: 50,
+      affordable: true,
+      affordabilityNote: 'Spread: 0.015 pts · 0.005% · baseline profile',
+      lastTickAt: new Date().toISOString(),
+      riskConfig: { riskPerTradeUsd: 0.1, equityFloorUsd: 15, startingBalanceUsd: 20 },
+    },
+    {
+      code: 'R_75',
+      display: 'Volatility 75 Index',
+      group: 'volatility',
+      available: true,
+      isOpen: true,
+      pip: 0.01,
+      spotPrice: 428950.5,
+      spreadMedian: 12.5,
+      spreadP95: 18.0,
+      tickVelocity: 1.0,
+      tickCount: 50,
+      affordable: true,
+      affordabilityNote: 'Spread: 12.50 pts · 0.003% · baseline profile',
+      lastTickAt: new Date().toISOString(),
+      riskConfig: { riskPerTradeUsd: 0.1, equityFloorUsd: 15, startingBalanceUsd: 20 },
+    },
+    {
+      code: 'R_100',
+      display: 'Volatility 100 Index',
+      group: 'volatility',
+      available: true,
+      isOpen: true,
+      pip: 0.01,
+      spotPrice: 1850.4,
+      spreadMedian: 0.4,
+      spreadP95: 0.6,
+      tickVelocity: 1.0,
+      tickCount: 50,
+      affordable: true,
+      affordabilityNote: 'Spread: 0.40 pts · 0.002% · baseline profile',
+      lastTickAt: new Date().toISOString(),
+      riskConfig: { riskPerTradeUsd: 0.1, equityFloorUsd: 15, startingBalanceUsd: 20 },
+    },
+    {
+      code: '1HZ100V',
+      display: 'Volatility 100 (1s) Index',
+      group: 'volatility',
+      available: true,
+      isOpen: true,
+      pip: 0.01,
+      spotPrice: 4520.1,
+      spreadMedian: 0.85,
+      spreadP95: 1.2,
+      tickVelocity: 1.0,
+      tickCount: 50,
+      affordable: true,
+      affordabilityNote: 'Spread: 0.85 pts · 0.002% · baseline profile',
+      lastTickAt: new Date().toISOString(),
+      riskConfig: { riskPerTradeUsd: 0.1, equityFloorUsd: 15, startingBalanceUsd: 20 },
+    },
+    {
+      code: 'stpRNG',
+      display: 'Step Index',
+      group: 'step',
+      available: true,
+      isOpen: true,
+      pip: 0.1,
+      spotPrice: 8540.2,
+      spreadMedian: 0.1,
+      spreadP95: 0.2,
+      tickVelocity: 1.0,
+      tickCount: 50,
+      affordable: false,
+      affordabilityNote: 'Spread: 0.1000 · Step Index: ±0.1/tick, 50/50 — no edge confirmed',
+      lastTickAt: new Date().toISOString(),
+      riskConfig: { riskPerTradeUsd: 0.1, equityFloorUsd: 15, startingBalanceUsd: 20 },
+    },
+    {
+      code: 'BOOM500',
+      display: 'Boom 500 Index',
+      group: 'boom',
+      available: true,
+      isOpen: true,
+      pip: 0.001,
+      spotPrice: 3250.6,
+      spreadMedian: 0.8,
+      spreadP95: 1.1,
+      tickVelocity: 1.0,
+      tickCount: 50,
+      affordable: true,
+      affordabilityNote: 'Spread: 0.80 pts · 0.002% · baseline profile',
+      lastTickAt: new Date().toISOString(),
+      riskConfig: { riskPerTradeUsd: 0.1, equityFloorUsd: 15, startingBalanceUsd: 20 },
+    },
+    {
+      code: 'BOOM1000',
+      display: 'Boom 1000 Index',
+      group: 'boom',
+      available: true,
+      isOpen: true,
+      pip: 0.001,
+      spotPrice: 12850.3,
+      spreadMedian: 1.5,
+      spreadP95: 2.1,
+      tickVelocity: 1.0,
+      tickCount: 50,
+      affordable: true,
+      affordabilityNote: 'Spread: 1.50 pts · 0.001% · baseline profile',
+      lastTickAt: new Date().toISOString(),
+      riskConfig: { riskPerTradeUsd: 0.1, equityFloorUsd: 15, startingBalanceUsd: 20 },
+    },
+    {
+      code: 'CRASH500',
+      display: 'Crash 500 Index',
+      group: 'crash',
+      available: true,
+      isOpen: true,
+      pip: 0.001,
+      spotPrice: 4120.8,
+      spreadMedian: 0.75,
+      spreadP95: 1.05,
+      tickVelocity: 1.0,
+      tickCount: 50,
+      affordable: true,
+      affordabilityNote: 'Spread: 0.75 pts · 0.002% · baseline profile',
+      lastTickAt: new Date().toISOString(),
+      riskConfig: { riskPerTradeUsd: 0.1, equityFloorUsd: 15, startingBalanceUsd: 20 },
+    },
+    {
+      code: 'CRASH300',
+      display: 'Crash 100 Index',
+      group: 'crash',
+      available: true,
+      isOpen: true,
+      pip: 0.001,
+      spotPrice: 8950.4,
+      spreadMedian: 1.2,
+      spreadP95: 1.7,
+      tickVelocity: 1.0,
+      tickCount: 50,
+      affordable: true,
+      affordabilityNote: 'Spread: 1.20 pts · 0.001% · baseline profile',
+      lastTickAt: new Date().toISOString(),
+      riskConfig: { riskPerTradeUsd: 0.1, equityFloorUsd: 15, startingBalanceUsd: 20 },
     },
   ],
 };
@@ -227,6 +410,10 @@ export function updateSymbols(
 
 export function getStrategySignals(): Promise<import('./types').StrategyApiState> {
   return request<import('./types').StrategyApiState>('/api/strategy/signals');
+}
+
+export function getProfilerStatus(): Promise<ProfilerApiState> {
+  return request<ProfilerApiState>('/api/profiler/status');
 }
 
 export function getMarketStructure(
