@@ -274,29 +274,47 @@ The Strategy Engine reconstructs multi-timeframe candles from the Deriv live tic
 
 ---
 
-## Phase 4 Notes — MQL5 EA with Independent Risk Engine
+## Phase 4 Notes — MQL5 EA with Institutional 1000-Line Risk Engine
 
-Phase 4 implements a native MetaTrader 5 Expert Advisor and an autonomous client-side risk engine designed for Deriv synthetic indices (`DerivSVG-Server-03`):
+Phase 4 implements a native, enterprise-grade MetaTrader 5 Expert Advisor and client-side risk suite designed for Deriv synthetic indices (`DerivSVG-Server-03`):
 
-- **Independent Risk Invariants (`mql5/Include/RiskEngine.mqh`)**:
-  - **Absolute Equity Floor**: Hard minimum `$15.00` USD. If terminal equity drops to or below this floor, an emergency flatten closes all open positions and locks all trading.
-  - **Daily Loss Lock**: Max `$0.40` USD daily loss threshold. Resets automatically at 00:00 server time. If breached, all open positions are flattened immediately.
-  - **Mandatory Hard Stop Loss**: Every order requires an explicit SL. Market orders without a valid SL are rejected immediately in the terminal thread before reaching the broker.
-  - **Max Open Positions**: Restricted to exactly 1 position across all instruments.
-  - **Volume Normalization**: Checks and rounds volume according to broker `SYMBOL_VOLUME_MIN`, `SYMBOL_VOLUME_MAX`, and `SYMBOL_VOLUME_STEP`.
-- **Bridge Client (`mql5/Include/BridgeClient.mqh`)**:
-  - Performs asynchronous HTTP `WebRequest()` calls to stream telemetry, poll execution commands, and return order execution confirmations.
-  - Requires adding the bridge server URL to MT5: `Tools -> Options -> Expert Advisors -> Allow WebRequest for listed URL: http://localhost:4000`.
-- **Falcon EA (`mql5/Experts/FalconEA.mq5`)**:
-  - `OnTick()`: Fast invariant protection on every incoming price tick.
-  - `OnTimer()`: 1-second cadence syncing telemetry, polling pending commands (`EXECUTE_ORDER`, `CLOSE_POSITION`, `FLATTEN_ALL`), and reporting execution results.
+- **Institutional Native Risk Engine (`mql5/Include/RiskEngine.mqh` — 1,243 lines)**:
+  - **Capital Preservation Invariants**:
+    - **Absolute Equity Floor**: Hard minimum `$15.00` USD with `$16.00` pre-warning defense. If terminal equity drops to or below $15.00, an emergency multi-pass flatten closes all open positions across all symbols and permanently locks trading.
+    - **Daily Loss Lock**: Max `$0.40` USD daily loss threshold (accounting for closed deals, commissions, swaps, and floating P&L). Resets automatically at 00:00 server time.
+    - **Weekly Loss Lock ($1.00) & Max Total Drawdown ($5.00)**: Multi-timeframe safety limits protecting capital against regime shifts.
+    - **Consecutive Loss Circuit Breaker**: 3 consecutive losses automatically triggers a mandatory 1-hour (`3600s`) cooldown period.
+  - **Dynamic Sizing & Pre-Trade Guards**:
+    - **Fractional Lot Sizing**: Computes exact lots from dollar risk: $\text{Lots} = \frac{\text{RiskUSD}}{\text{SL Distance Points} \times \text{TickValue} / \text{TickSize}}$ with broker `LotsMin`, `LotsMax`, and `LotsStep` step normalization.
+    - **Margin Ceiling Guard**: Pre-calculates required margin via `OrderCalcMargin()` to ensure total margin usage never exceeds 20.0% of balance.
+    - **Spread & Freeze Level Filter**: Rejects orders if the current spread exceeds allowable limits (`600 pts`) or if SL/TP is placed within broker freeze/stops levels.
+    - **Mandatory Hard Stop Loss**: Market orders without an explicit, valid SL are rejected in the MT5 terminal thread before ever reaching the broker.
+  - **Active Trade Lifecycle Defense**:
+    - **Dynamic Break-Even**: Locks in entry + 2 points profit once price reaches `1.5 R:R` in profit.
+    - **Dynamic Trailing Stop**: Trails SL at a configurable buffer (`30 pts`) in discrete steps (`10 pts`) as profits expand.
+  - **Flight Recorder & Audit Logging**:
+    - Persistent CSV disk logging (`MQL5/Files/falcon_risk_audit_YYYYMMDD.csv`) recording every tick check, order validation, rejection code, and financial metric.
+    - In-memory ring buffer (64 entries) for instant querying and HUD visualization.
+
+- **Resilient Bridge Client (`mql5/Include/BridgeClient.mqh` — 450 lines)**:
+  - Native MQL5 JSON parser (`CSimpleJsonParser`) handling unquoted literals, string properties, numbers, booleans, and command array deserialization without external libraries.
+  - Asynchronous HTTP `WebRequest()` client with round-trip latency tracking (`PingMs`), consecutive error detection, and success rate metrics.
+  - Idempotency buffer (64 commands) guaranteeing no command is ever executed twice if polled concurrently.
+  - Order execution feedback streaming (`SendOrderResult`) reporting fill prices, execution slippage in points, and return status codes.
+
+- **Falcon Expert Advisor (`mql5/Experts/FalconEA.mq5` — 445 lines)**:
+  - **On-Chart Heads-Up Display (HUD)**: Monospace terminal canvas rendering account equity, balance, free margin, margin usage %, peak equity, active risk invariant locks, cooldown timers, bridge connection latency, and open positions.
+  - `OnTick()`: Sub-millisecond invariant verification on every incoming price tick and dynamic position defense.
+  - `OnTimer()`: 1-second cadence syncing telemetry, polling pending commands (`EXECUTE_ORDER`, `CLOSE_POSITION`, `FLATTEN_ALL`, `PING`), and updating on-chart visual telemetry.
+  - `OnTradeTransaction()`: Real-time closed deal detection (`TRADE_TRANSACTION_DEAL_ADD`) updating win/loss streaks and audit metrics instantly upon trade completion.
+
 - **Server MT5 Bridge (`server/src/mt5/mt5Bridge.ts`)**:
   - Endpoints:
-    - `POST /api/mt5/telemetry`: Telemetry ingestion from MT5 (balance, equity, margin, daily PnL, open positions, risk locks). Reconciles real account metrics into `ControllerStore`.
+    - `POST /api/mt5/telemetry`: Real-time telemetry ingestion reconciling live MT5 balance, equity, margin, daily PnL, open positions, and lock states into `ControllerStore`.
     - `GET /api/mt5/commands`: Terminal command polling endpoint.
-    - `POST /api/mt5/order-result`: Ingests fills and rejections from MT5.
+    - `POST /api/mt5/order-result`: Ingests fills, slippage, and rejections from MT5.
     - `GET /api/mt5/status`: Live bridge connection status with a 10-second watchdog timeout.
-    - `POST /api/mt5/flatten`: Emergency flatten kill switch for remote execution.
+    - `POST /api/mt5/flatten`: Remote emergency flatten kill switch.
 
 ---
 
