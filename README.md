@@ -68,11 +68,18 @@ If you get port conflicts, run this first:
 
 ## Application Sections (5 Tabs)
 
-### 1. Home Tab
-- Robot command center with visual robot status avatar and pulse accent
-- Primary automation controls: Start Robot, Pause Entries, Resume, Stop
-- High-level KPI metrics: Active Equity, Today's P&L, Drawdown, Active Simulations
-- Live server bridge heartbeat and connection status
+### 1. Home Tab (Cybernetic Robot Command Center)
+- **High-tech Robot Hero Banner**: Futuristic cybernetic AI robot character with gradient identity overlay
+- **3-Button Quick Action Dock**:
+  - `START / PAUSE`: Primary execution toggle with tactile SVG action indicators
+  - `QUOTES`: Instant sliding shortcut to the live Profiler tab with market spreads & pips
+  - `STOP`: Immediate emergency stop halts all automated signals safely
+- **Active Robot Instance Card**:
+  - Robot avatar thumbnail with neon orange status ring
+  - Live monospace terminal console line (`>> [timestamp] Signal engine active · Monitoring 10 synthetic feeds`)
+  - Server bridge heartbeat indicator
+- **Performance & Portfolio KPIs**: Large active equity metric, Today P&L, Max Drawdown, and position counters
+- **Falcon FX Execution Parameters**: SMC signal engine rules, risk per trade, stop loss model, and daily loss locks
 
 ### 2. Controller Tab
 - Detailed Risk Guardrails: Absolute equity floor ($15.00), default risk/trade ($0.10), hard max, daily/weekly loss locks, margin ceiling
@@ -167,10 +174,12 @@ Android App → Authenticated HTTPS/WSS Bridge (VPS)
 
 ```
 derived_arbitage/
-├── App.tsx                        # Root: 5-tab router, WebSocket sync, state provider
+├── App.tsx                        # Root: 5-tab router, animated sliding dock, state provider
 ├── app.json                       # Expo config
 ├── package.json                   # Scripts + deps (react-native-svg, async-storage, etc.)
 ├── .env.example                   # Config template (never commit .env)
+├── assets/
+│   └── robot_hero.jpg             # Cybernetic AI robot asset for Home hero & avatar
 ├── src/
 │   ├── api.ts                     # Mobile ↔ server REST/WS client
 │   ├── types.ts                   # Shared types (ControllerState, SymbolProfile…)

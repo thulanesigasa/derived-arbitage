@@ -32,7 +32,9 @@ export class DerivClient {
   constructor(
     private readonly appId: string,
     private readonly token: string | null,
-    private readonly wsUrl = `wss://ws.derivws.com/websockets/v3?app_id=${appId}`,
+    private readonly wsUrl = appId && appId !== '1089'
+      ? `wss://ws.derivws.com/websockets/v3?app_id=${appId}`
+      : 'wss://api.derivws.com/trading/v1/options/ws/public',
   ) {}
 
   get connected()  { return this._connected; }
@@ -62,16 +64,20 @@ export class DerivClient {
     this.connListeners.forEach((l) => l(true));
     console.log('[DerivClient] Connected');
 
-    if (this.token) {
+    // Only send authorize on v3 WebSocket endpoints with non-PAT tokens
+    if (this.token && !this.token.startsWith('pat_') && !this.wsUrl.includes('/ws/public')) {
       try {
         const resp = await this.send({ authorize: this.token });
         if (resp['error']) throw new Error((resp['error'] as { message: string }).message);
         this._authorized = true;
         console.log('[DerivClient] Authorized as:', (resp['authorize'] as { loginid?: string })?.loginid ?? '?');
       } catch (err) {
-        console.warn('[DerivClient] Auth failed:', err instanceof Error ? err.message : err);
+        console.warn('[DerivClient] Auth warning:', err instanceof Error ? err.message : err);
         this._authorized = false;
       }
+    } else if (this.token && this.token.startsWith('pat_')) {
+      console.log('[DerivClient] Options PAT active for market profiling');
+      this._authorized = true;
     }
 
     // Re-establish tick subscriptions
