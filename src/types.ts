@@ -162,3 +162,42 @@ export interface StrategyApiState {
   trackedPairs:  number;
 }
 
+export interface SwingPoint {
+  index: number;
+  timestamp: number;
+  price: number;
+  type: 'HIGH' | 'LOW';
+}
+
+export interface FVGImbalance {
+  type: 'BULLISH' | 'BEARISH';
+  top: number;
+  bottom: number;
+  timestamp: number;
+  mitigated: boolean;
+}
+
+export interface SMCStructureAnalysis {
+  swingHighs: SwingPoint[];
+  swingLows: SwingPoint[];
+  lastBOS?: {
+    type: 'BULLISH' | 'BEARISH';
+    brokenPrice: number;
+    candleTimestamp: number;
+  };
+  lastCHoCH?: {
+    type: 'BULLISH' | 'BEARISH';
+    brokenPrice: number;
+    candleTimestamp: number;
+  };
+  activeFVGs: FVGImbalance[];
+  trend: 'BULLISH' | 'BEARISH' | 'RANGING';
+}
+
+export interface InstrumentStructureResponse {
+  code:      string;
+  atr:       number;
+  candles:   Candle[];
+  structure: SMCStructureAnalysis;
+}
+

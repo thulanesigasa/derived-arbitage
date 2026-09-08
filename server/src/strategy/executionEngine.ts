@@ -11,6 +11,7 @@ import { assessNewTrade } from '../risk.js';
 import { ControllerStore, log } from '../stateMachine.js';
 import { CandleAggregator } from './candleAggregator.js';
 import { FalconEngine } from './falconEngine.js';
+import { SMCDetector, type SMCStructureAnalysis } from './smcDetector.js';
 
 export class ExecutionEngine {
   private store: ControllerStore;
@@ -30,6 +31,11 @@ export class ExecutionEngine {
 
   getCandles(symbolCode: string, limit = 50): Candle[] {
     return this.aggregator.getCandles(symbolCode, limit);
+  }
+
+  getMarketStructure(symbolCode: string): SMCStructureAnalysis {
+    const candles = this.aggregator.getCandles(symbolCode, 50);
+    return SMCDetector.analyze(candles);
   }
 
   getRecentSignals(): StrategySignal[] {
