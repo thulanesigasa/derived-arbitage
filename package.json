@@ -5,7 +5,9 @@
   "type": "module",
   "main": "node_modules/expo/AppEntry.js",
   "scripts": {
-    "dev": "concurrently --kill-others-on-fail --names SERVER,EXPO --prefix-colors cyan,magenta \"npm:server:dev\" \"npm:expo:start\"",
+    "dev": "concurrently --kill-others-on-fail --raw \"npm:server:dev\" \"npm:expo:start\"",
+
+    "dev:win": "powershell -Command \"Start-Process powershell -ArgumentList '-NoExit','-Command','cd \\\"$PWD\\\"; npx expo start --lan --port 8082' -WindowStyle Normal; npm run server:dev\"",
     "expo:start": "expo start --lan --port 8082",
     "server:dev": "tsx watch server/src/index.ts",
     "server:start": "tsx server/src/index.ts",
