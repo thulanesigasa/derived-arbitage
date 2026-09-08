@@ -42,7 +42,11 @@ export let API_BASE_URL = deriveApiUrl();
 const urlChangeListeners = new Set<(url: string) => void>();
 
 export function setApiBaseUrl(url: string): void {
-  const normalized = normalizeBaseUrl(url);
+  let normalized = normalizeBaseUrl(url);
+  // Guard against stale cached LAN IP from previous network sessions
+  if (normalized.includes('192.168.1.42')) {
+    normalized = 'http://10.186.129.215:4000';
+  }
   if (normalized !== API_BASE_URL) {
     API_BASE_URL = normalized;
     urlChangeListeners.forEach((listener) => listener(normalized));

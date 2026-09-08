@@ -67,6 +67,10 @@ export function ProfileScreen() {
         const raw = await AsyncStorage.getItem(STORAGE_KEY);
         if (raw) {
           const parsed = JSON.parse(raw) as ProfileConfig;
+          if (parsed.bridgeUrl && parsed.bridgeUrl.includes('192.168.1.42')) {
+            parsed.bridgeUrl = 'http://10.186.129.215:4000';
+            await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
+          }
           setConfig((prev) => ({ ...prev, ...parsed }));
           if (parsed.bridgeUrl) {
             setApiBaseUrl(parsed.bridgeUrl);

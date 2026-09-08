@@ -91,9 +91,15 @@ When switching between Wi-Fi networks (e.g. home vs. office) or running on diffe
 ### 1. Home Tab (Cybernetic Robot Command Center)
 - **High-tech Robot Hero Banner**: Futuristic cybernetic AI robot character with gradient identity overlay
 - **3-Button Quick Action Dock**:
-  - `START / PAUSE`: Primary execution toggle with tactile SVG action indicators
+  - `START / PAUSE`: Primary execution toggle with tactile SVG action indicators. Remains responsive with automatic fallback execution dispatch.
   - `QUOTES`: Instant sliding shortcut to the live Profiler tab with market spreads & pips
   - `STOP`: Immediate emergency stop halts all automated signals safely
+- **Continuous Hybrid Connectivity & Polling Backup**:
+  - Background 3,500ms HTTP polling fallback ensures the controller stays synchronized and online even if OS-level cleartext restrictions or mobile networks drop WebSocket connections.
+  - WebSocket errors trigger automated silent HTTP state re-validation instead of abruptly stranding the app in an offline loop.
+  - Global `setApiBaseUrl` and `ProfileScreen` automatically sanitize AsyncStorage to purge stale cached LAN addresses (`192.168.1.42`) and prioritize the active Wi-Fi subnet (`10.186.129.215:4000`).
+- **Bridge Synchronizing Notice & Tactile SYNC**:
+  - When awaiting connection, an inline notice displays the target bridge URL along with a tactile `SYNC` action for instant manual polling.
 - **Active Robot Instance Card**:
   - Robot avatar thumbnail with neon orange status ring
   - Live monospace terminal console line (`>> [timestamp] Signal engine active · Monitoring 10 synthetic feeds`)

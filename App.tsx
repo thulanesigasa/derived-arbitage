@@ -192,6 +192,12 @@ export default function App() {
   useEffect(() => {
     mounted.current = true;
     void load();
+
+    // Periodic HTTP polling backup (every 3.5s) to guarantee the app stays online and synced even when WebSockets are unavailable or dropped by OS
+    const pollInterval = setInterval(() => {
+      void load(true);
+    }, 3500);
+
     let socket: WebSocket | null = null;
     let disposed = false;
 
@@ -212,15 +218,18 @@ export default function App() {
             // Ignore malformed mock messages
           }
         };
-        socket.onerror = () => mounted.current && setOnline(false);
+        socket.onerror = () => {
+          // Do not unconditionally flag offline if HTTP is succeeding; verify via silent HTTP load
+          if (mounted.current) void load(true);
+        };
         socket.onclose = () => {
           if (!mounted.current) return;
-          setOnline(false);
+          void load(true);
           reconnectTimer.current = setTimeout(connect, 3000);
         };
       } catch {
         if (!mounted.current) return;
-        setOnline(false);
+        void load(true);
         reconnectTimer.current = setTimeout(connect, 3000);
       }
     };
@@ -229,6 +238,7 @@ export default function App() {
     return () => {
       disposed = true;
       mounted.current = false;
+      clearInterval(pollInterval);
       if (reconnectTimer.current) clearTimeout(reconnectTimer.current);
       socket?.close();
     };

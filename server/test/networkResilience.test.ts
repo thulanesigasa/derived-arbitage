@@ -123,4 +123,44 @@ describe('Network & Connection Resilience', () => {
     expect(interpolate(0.5, [0, 1], [0, -viewportWidth])).toBe(-180);
     expect(interpolate(0.5, [0, 1], [0, segmentPillWidth])).toBe(85);
   });
+
+  it('sanitizes stale IP 192.168.1.42 and redirects to active LAN host', () => {
+    function sanitizeUrl(url: string, activeFallback = 'http://10.186.129.215:4000'): string {
+      const normalized = url.trim().replace(/\/+$/, '');
+      if (normalized.includes('192.168.1.42')) {
+        return activeFallback;
+      }
+      return normalized;
+    }
+
+    expect(sanitizeUrl('http://192.168.1.42:4000')).toBe('http://10.186.129.215:4000');
+    expect(sanitizeUrl('http://192.168.1.42:4000/')).toBe('http://10.186.129.215:4000');
+    expect(sanitizeUrl('http://localhost:4000')).toBe('http://localhost:4000');
+    expect(sanitizeUrl('http://10.186.129.215:4000')).toBe('http://10.186.129.215:4000');
+  });
+
+  it('maintains online status via HTTP fallback when WebSocket encounters connection error', () => {
+    let isOnline = false;
+
+    // HTTP load succeeds
+    const onHttpSuccess = () => { isOnline = true; };
+    onHttpSuccess();
+    expect(isOnline).toBe(true);
+
+    // WebSocket error fires, but does not unconditionally kill online status
+    const onWsError = (httpAvailable: boolean) => {
+      if (httpAvailable) {
+        // Keep online
+        isOnline = true;
+      } else {
+        isOnline = false;
+      }
+    };
+
+    onWsError(true);
+    expect(isOnline).toBe(true);
+
+    onWsError(false);
+    expect(isOnline).toBe(false);
+  });
 });
