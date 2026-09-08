@@ -13,7 +13,7 @@ A personal Android controller for a Deriv MT5 EA trading Volatility, Boom, Crash
 | 1 | Demo mobile controller + mock server | ✅ Complete |
 | 2 | Market Profiler — live Deriv WebSocket data | ✅ Complete |
 | 3 | Strategy engine (Falcon FX / SMC signals) | ✅ Complete |
-| 4 | MQL5 EA with independent risk engine | 🔲 Planned |
+| 4 | MQL5 EA with independent risk engine | ✅ Complete |
 | 5 | VPS bridge + HTTPS/WSS auth | 🔲 Planned |
 | 6 | Live activation gate (demo-proven only) | 🔲 Planned |
 
@@ -154,16 +154,23 @@ Android App (Expo Go / Expo React Native)
         │  HTTP REST + WebSocket (LAN)
         ▼
 Control Bridge Server (Node.js · localhost:4000)
-        │  /api/state, /api/control, /api/profiler/*, /api/strategy/*
+        │  /api/state, /api/control, /api/profiler/*, /api/strategy/*, /api/mt5/*
         ├─── Controller Store & State Machine (Phase 1)
         ├─── Deriv WebSocket client (Phase 2)
         │         │  wss://api.derivws.com/trading/v1/options/ws/public
         │         └─── Live tick data, spread profiling
-        └─── Strategy Engine (Phase 3)
-                  ├─── Candle Aggregator (M1/M5 rolling bars + dynamic ATR)
-                  ├─── SMC Pattern Detector (BOS, CHoCH, FVG, Order Blocks)
-                  ├─── Falcon FX Structure (Liquidity sweeps & continuation flags)
-                  └─── Execution Engine (Paper trades, live tick P&L, TP/SL monitoring)
+        ├─── Strategy Engine (Phase 3)
+        │         ├─── Candle Aggregator (M1/M5 rolling bars + dynamic ATR)
+        │         ├─── SMC Pattern Detector (BOS, CHoCH, FVG, Order Blocks)
+        │         ├─── Falcon FX Structure (Liquidity sweeps & continuation flags)
+        │         └─── Execution Engine (Paper trades, live tick P&L, TP/SL monitoring)
+        └─── MT5 Server Bridge (Phase 4)
+                  │  HTTP WebRequest (telemetry, commands, order-results)
+                  ▼
+MetaTrader 5 Terminal (DerivSVG-Server-03)
+        └─── FalconEA.mq5 (MQL5 Expert Advisor)
+                  ├─── RiskEngine.mqh (Client-side $15 floor & $0.40 daily loss lock)
+                  └─── BridgeClient.mqh (HTTP WebRequest client)
 ```
 
 **Target architecture (Phase 5+):**
@@ -186,9 +193,15 @@ derived_arbitage/
 ├── .env.example                   # Config template (never commit .env)
 ├── assets/
 │   └── robot_hero.jpg             # Cybernetic AI robot asset for Home hero & avatar
+├── mql5/                          # Phase 4: Native MetaTrader 5 Expert Advisor & Risk Engine
+│   ├── Experts/
+│   │   └── FalconEA.mq5           # Falcon FX & SMC Execution EA with timer & tick hooks
+│   └── Include/
+│       ├── RiskEngine.mqh         # Independent native risk engine ($15 floor, $0.40 loss lock)
+│       └── BridgeClient.mqh       # MQL5 WebRequest HTTP client for server bridge communication
 ├── src/
 │   ├── api.ts                     # Mobile ↔ server REST/WS client
-│   ├── types.ts                   # Shared types (ControllerState, StrategySignal, Candle…)
+│   ├── types.ts                   # Shared types (ControllerState, StrategySignal, Candle, Mt5…)
 │   ├── components/
 │   │   ├── AppHeader.tsx          # Rule 15 App Bar respecting OS status bar chrome
 │   │   ├── SmcStructureModal.tsx  # Market structure modal with SVG candle sparklines
@@ -202,7 +215,7 @@ derived_arbitage/
 │       └── ProfileScreen.tsx      # Tab 5: Account & MT5 VPS connectivity hub
 └── server/
     ├── src/
-    │   ├── index.ts               # Express server, WS broadcast, endpoints
+    │   ├── index.ts               # Express server, WS broadcast, REST endpoints
     │   ├── stateMachine.ts        # Control state machine, idempotency, mutators
     │   ├── risk.ts                # Trade risk assessment, lock calculation
     │   ├── deriv/                 # Phase 2: Deriv WebSocket integration
@@ -210,14 +223,17 @@ derived_arbitage/
     │   │   ├── tickStore.ts       # Rolling tick buffer, spread stats
     │   │   ├── symbolMap.ts       # Display name ↔ Deriv API code mapping
     │   │   └── marketProfiler.ts  # Symbol profiling, affordability check, onTick emitter
-    │   └── strategy/              # Phase 3: Strategy Engine (Falcon FX / SMC Signals)
-    │       ├── candleAggregator.ts# M1/M5 candle reconstruction + dynamic ATR
-    │       ├── smcDetector.ts     # Swing fractals, BOS, CHoCH, Fair Value Gaps
-    │       ├── falconEngine.ts    # Falcon FX liquidity sweeps & continuation signals
-    │       └── executionEngine.ts # Paper execution lifecycle, live tick P&L, TP/SL
+    │   ├── strategy/              # Phase 3: Strategy Engine (Falcon FX / SMC Signals)
+    │   │   ├── candleAggregator.ts# M1/M5 candle reconstruction + dynamic ATR
+    │   │   ├── smcDetector.ts     # Swing fractals, BOS, CHoCH, Fair Value Gaps
+    │   │   ├── falconEngine.ts    # Falcon FX liquidity sweeps & continuation signals
+    │   │   └── executionEngine.ts # Paper execution lifecycle, live tick P&L, TP/SL
+    │   └── mt5/                   # Phase 4: Server-side MT5 Bridge
+    │       └── mt5Bridge.ts       # Telemetry ingestion, command queueing, watchdog
     └── test/
         ├── stateMachine.test.ts   # Automated state machine transition tests
-        └── strategyEngine.test.ts # Strategy, candle, SMC, and execution tests
+        ├── strategyEngine.test.ts # Strategy, candle, SMC, and execution tests
+        └── mt5Bridge.test.ts      # MT5 bridge telemetry, queueing, and watchdog tests
 ```
 
 ---
@@ -241,8 +257,6 @@ The profiler uses the Deriv public WebSocket API (`app_id=1089`) by default. Wit
 
 **To unlock full data:** create your own Deriv app at [app.deriv.com/account/api-token](https://app.deriv.com/account/api-token), set `DERIV_APP_ID` to your own ID, and optionally set `DERIV_API_TOKEN` with a **Read** scope token.
 
-Affordability assessment is indicative only. Without MT5 lot size and tick value data, we cannot compute exact dollar cost per trade. Full affordability requires Phase 4 (MQL5 EA spec collection).
-
 ---
 
 ## Phase 3 Notes — Strategy Engine (Falcon FX / SMC Signals)
@@ -256,6 +270,33 @@ The Strategy Engine reconstructs multi-timeframe candles from the Deriv live tic
 - **REST Endpoints**:
   - `GET /api/strategy/signals`: Active and recent high-probability signals across all selected symbols.
   - `GET /api/strategy/candles/:code`: Recent aggregated candles (OHLCV) for chart analysis.
+  - `GET /api/strategy/structure/:code`: Live SMC market structure & ATR analysis.
+
+---
+
+## Phase 4 Notes — MQL5 EA with Independent Risk Engine
+
+Phase 4 implements a native MetaTrader 5 Expert Advisor and an autonomous client-side risk engine designed for Deriv synthetic indices (`DerivSVG-Server-03`):
+
+- **Independent Risk Invariants (`mql5/Include/RiskEngine.mqh`)**:
+  - **Absolute Equity Floor**: Hard minimum `$15.00` USD. If terminal equity drops to or below this floor, an emergency flatten closes all open positions and locks all trading.
+  - **Daily Loss Lock**: Max `$0.40` USD daily loss threshold. Resets automatically at 00:00 server time. If breached, all open positions are flattened immediately.
+  - **Mandatory Hard Stop Loss**: Every order requires an explicit SL. Market orders without a valid SL are rejected immediately in the terminal thread before reaching the broker.
+  - **Max Open Positions**: Restricted to exactly 1 position across all instruments.
+  - **Volume Normalization**: Checks and rounds volume according to broker `SYMBOL_VOLUME_MIN`, `SYMBOL_VOLUME_MAX`, and `SYMBOL_VOLUME_STEP`.
+- **Bridge Client (`mql5/Include/BridgeClient.mqh`)**:
+  - Performs asynchronous HTTP `WebRequest()` calls to stream telemetry, poll execution commands, and return order execution confirmations.
+  - Requires adding the bridge server URL to MT5: `Tools -> Options -> Expert Advisors -> Allow WebRequest for listed URL: http://localhost:4000`.
+- **Falcon EA (`mql5/Experts/FalconEA.mq5`)**:
+  - `OnTick()`: Fast invariant protection on every incoming price tick.
+  - `OnTimer()`: 1-second cadence syncing telemetry, polling pending commands (`EXECUTE_ORDER`, `CLOSE_POSITION`, `FLATTEN_ALL`), and reporting execution results.
+- **Server MT5 Bridge (`server/src/mt5/mt5Bridge.ts`)**:
+  - Endpoints:
+    - `POST /api/mt5/telemetry`: Telemetry ingestion from MT5 (balance, equity, margin, daily PnL, open positions, risk locks). Reconciles real account metrics into `ControllerStore`.
+    - `GET /api/mt5/commands`: Terminal command polling endpoint.
+    - `POST /api/mt5/order-result`: Ingests fills and rejections from MT5.
+    - `GET /api/mt5/status`: Live bridge connection status with a 10-second watchdog timeout.
+    - `POST /api/mt5/flatten`: Emergency flatten kill switch for remote execution.
 
 ---
 

@@ -7,3 +7,6 @@ npm-debug.log*
 *.tsbuildinfo
 # Scratch / probe scripts
 probe_symbols.mjs
+
+# MT5 Compiled binaries
+*.ex5
