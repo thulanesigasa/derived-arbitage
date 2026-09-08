@@ -258,7 +258,7 @@ export default function App() {
             style={styles.pillBar}
             onLayout={(e) => setPillContainerWidth(e.nativeEvent.layout.width)}
           >
-            {/* Smooth animated sliding indicator */}
+            {/* Smooth animated sliding underline indicator below active tab */}
             {tabWidth > 0 && (
               <Animated.View
                 style={[
@@ -269,9 +269,7 @@ export default function App() {
                   },
                 ]}
               >
-                <View style={styles.sliderBubble}>
-                  <View style={styles.sliderTopPip} />
-                </View>
+                <View style={styles.sliderLine} />
               </Animated.View>
             )}
 
@@ -333,35 +331,25 @@ const styles = StyleSheet.create({
   },
   slidingIndicator: {
     position: 'absolute',
-    top: 4,
-    bottom: 4,
+    bottom: 6,
     left: 0,
-    paddingHorizontal: 4,
+    height: 3,
     justifyContent: 'center',
     alignItems: 'center',
+    zIndex: 1,
   },
-  sliderBubble: {
-    width: '100%',
-    height: '100%',
-    backgroundColor: '#26140E',
-    borderRadius: 24,
-    borderWidth: 1.5,
-    borderColor: colors.orange,
-    alignItems: 'center',
-    justifyContent: 'flex-start',
-  },
-  sliderTopPip: {
-    width: 14,
+  sliderLine: {
+    width: 28,
     height: 3,
     borderRadius: 1.5,
     backgroundColor: colors.orange,
-    marginTop: 2,
   },
   tabItem: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     minHeight: 48,
+    paddingBottom: 4,
     gap: 3,
     zIndex: 2,
   },

@@ -39,7 +39,7 @@ A personal Android controller for a Deriv MT5 EA trading Volatility, Boom, Crash
 ## Mobile Development Standards (Rule 15)
 
 - **Target Platforms**: Android (first), iOS
-- **Navigation Chrome**: Floating pill bottom navigation bar with a smooth animated sliding indicator (`Animated.spring`), dynamically accounting for OS chrome (Android: 48px gesture chrome; iOS: 34px home indicator)
+- **Navigation Chrome**: Floating pill bottom navigation bar with a smooth animated sliding underline indicator (`Animated.spring`) positioned directly below the active tab, dynamically accounting for OS chrome (Android: 48px gesture chrome; iOS: 34px home indicator)
 - **App Bar & Header**: Dedicated App Bar (`56px` Android / `96px` iOS) respecting device status bar height so device time and chrome never overlay header titles
 - **Grid & Spacing**: 4-column stretch layout, 16px margins & gutters, 8px grid spacing (8, 16, 24, 32, 48, 56, 64)
 - **Touch Targets**: Minimum 48×48dp (Android) / 44×44pt (iOS) across all buttons, tab items, and switches
