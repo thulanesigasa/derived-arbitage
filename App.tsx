@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import {
   ActivityIndicator,
   Alert,
+  Platform,
   Pressable,
   RefreshControl,
   SafeAreaView,
@@ -66,17 +67,6 @@ function Metric({ label, value, tone }: { label: string; value: string; tone?: '
     <View style={styles.metric}>
       <Text style={styles.metricLabel}>{label}</Text>
       <Text style={[styles.metricValue, { color }]}>{value}</Text>
-    </View>
-  );
-}
-
-function StatusPill({ status }: { status: AutomationStatus }) {
-  const active = status === 'running';
-  const caution = ['starting', 'pausing', 'stopping', 'emergency'].includes(status);
-  return (
-    <View style={[styles.statusPill, active ? styles.statusActive : caution ? styles.statusCaution : styles.statusIdle]}>
-      <View style={[styles.statusDot, { backgroundColor: active ? colors.cyan : caution ? colors.amber : colors.muted }]} />
-      <Text style={styles.statusText}>{status.toUpperCase()}</Text>
     </View>
   );
 }
@@ -254,7 +244,6 @@ function AppContent() {
           <Text style={styles.eyebrow}>PERSONAL CONTROLLER</Text>
           <Text style={styles.title}>Mobile EA</Text>
         </View>
-        <View style={styles.demoBadge}><Text style={styles.demoText}>DEMO ONLY</Text></View>
       </View>
 
       <Card style={styles.heroCard}>
@@ -264,7 +253,6 @@ function AppContent() {
             <Text style={styles.equity}>{money(state.equity)}</Text>
             <Text style={styles.equityLabel}>Mock equity</Text>
           </View>
-          <StatusPill status={state.status} />
         </View>
         <View style={styles.connectionRow}>
           <View style={[styles.connectionDot, { backgroundColor: online ? colors.cyan : colors.red }]} />
@@ -437,35 +425,35 @@ export default function App() {
 const styles = StyleSheet.create({
   safeArea:        { flex: 1, backgroundColor: colors.bg },
   screenArea:      { flex: 1 },
-  // ─── Tab bar ───────────────────────────────────────────────────────────────
-  tabBar:          { flexDirection: 'row', backgroundColor: '#0A1825', borderTopWidth: 1, borderTopColor: '#1C2D3E', paddingBottom: 4 },
-  tabItem:         { flex: 1, alignItems: 'center', paddingVertical: 10, gap: 4 },
+  // ─── Tab bar (Rule 15: accounts for OS chrome) ─────────────────────────────
+  tabBar:          {
+    flexDirection: 'row',
+    backgroundColor: '#0A1825',
+    borderTopWidth: 1,
+    borderTopColor: '#1C2D3E',
+    height: Platform.OS === 'android' ? 104 : 90,
+    paddingBottom: Platform.OS === 'android' ? 48 : 34,
+    paddingTop: 8,
+  },
+  tabItem:         { flex: 1, alignItems: 'center', justifyContent: 'center', minHeight: Platform.OS === 'android' ? 48 : 44, gap: 4 },
   tabPip:          { width: 20, height: 3, borderRadius: 2, backgroundColor: 'transparent' },
   tabPipActive:    { backgroundColor: colors.cyan },
   tabLabel:        { fontSize: 11, fontWeight: '700' },
   tabLabelActive:  { color: colors.cyan },
   tabLabelIdle:    { color: colors.muted },
   // ─── Controller styles ─────────────────────────────────────────────────────
-  content: { paddingHorizontal: 18, paddingTop: 16, paddingBottom: 48, gap: 12 },
-  centered: { flex: 1, padding: 30, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg, gap: 14 },
+  content: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 48, gap: 16 },
+  centered: { flex: 1, padding: 32, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg, gap: 16 },
 
-  topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 },
+  topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
   eyebrow: { color: colors.cyan, fontSize: 11, fontWeight: '800', letterSpacing: 1.8 },
-  title: { color: colors.text, fontSize: 30, lineHeight: 36, fontWeight: '800', letterSpacing: -0.8 },
-  demoBadge: { backgroundColor: colors.amberDark, borderColor: '#735E1E', borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7 },
-  demoText: { color: colors.amber, fontSize: 11, fontWeight: '900', letterSpacing: 1 },
-  card: { backgroundColor: colors.panel, borderColor: colors.border, borderWidth: 1, borderRadius: 18, padding: 16 },
-  heroCard: { backgroundColor: colors.panelAlt, padding: 18 },
+  title: { color: colors.text, fontSize: 32, lineHeight: 40, fontWeight: '800', letterSpacing: -0.8 },
+  card: { backgroundColor: colors.panel, borderColor: colors.border, borderWidth: 1, borderRadius: 16, padding: 16 },
+  heroCard: { backgroundColor: colors.panelAlt, padding: 16 },
   rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 },
   accountLabel: { color: colors.muted, fontSize: 11, fontWeight: '800', letterSpacing: 1.2 },
   equity: { color: colors.text, fontSize: 38, lineHeight: 44, fontWeight: '800', letterSpacing: -1.2, marginTop: 4 },
   equityLabel: { color: colors.muted, fontSize: 13 },
-  statusPill: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 7, borderWidth: 1 },
-  statusActive: { backgroundColor: colors.cyanDark, borderColor: '#22766F' },
-  statusCaution: { backgroundColor: colors.amberDark, borderColor: '#735E1E' },
-  statusIdle: { backgroundColor: '#1C293A', borderColor: '#35465C' },
-  statusDot: { width: 7, height: 7, borderRadius: 4 },
-  statusText: { color: colors.text, fontSize: 10, fontWeight: '900', letterSpacing: 0.8 },
   connectionRow: { flexDirection: 'row', alignItems: 'center', marginTop: 18 },
   connectionDot: { width: 7, height: 7, borderRadius: 4, marginRight: 7 },
   connectionText: { color: colors.muted, fontSize: 12, flex: 1 },

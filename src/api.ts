@@ -6,7 +6,8 @@ function normalizeBaseUrl(value: string): string {
 }
 
 function deriveApiUrl(): string {
-  const configured = process.env.EXPO_PUBLIC_API_URL;
+  const g = globalThis as unknown as { process?: { env?: Record<string, string> } };
+  const configured = g.process?.env?.EXPO_PUBLIC_API_URL;
   if (configured) return normalizeBaseUrl(configured);
 
   const hostUri = Constants.expoConfig?.hostUri ?? Constants.expoGoConfig?.debuggerHost;

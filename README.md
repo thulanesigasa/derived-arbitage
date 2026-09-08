@@ -36,11 +36,14 @@ A personal Android controller for a Deriv MT5 EA trading Volatility, Boom, Crash
 
 ---
 
-## Requirements
+## Mobile Development Standards (Rule 15)
 
-- Windows 10/11 with Node.js 20+
-- An Android phone with [Expo Go](https://expo.dev/go)
-- Computer and phone on the same Wi-Fi/LAN
+- **Target Platforms**: Android (first), iOS
+- **Navigation Chrome**: Bottom tab bar dynamically accounts for OS chrome (Android: 56px nav + 48px gesture bar = 104px; iOS: 56px tab bar + 34px home indicator = 90px)
+- **Grid & Spacing**: 4-column stretch layout, 16px margins & gutters, 8px grid spacing (8, 16, 24, 32, 48, 56, 64)
+- **Touch Targets**: Minimum 48×48dp (Android) / 44×44pt (iOS) across all buttons, tab items, and switches
+- **Color System**: 60% Background (`#07111F`), 30% Panel (`#0D1A2B`), 10% Accent (`#2DD4BF` Cyan)
+- **No Status Badges**: Strictly zero status badges or indicator tags (e.g. READ ONLY, DEMO ONLY, STOPPED, REVIEW, OK) in component UIs (Rule 16)
 
 ---
 
