@@ -8,21 +8,90 @@ import type {
   MonteCarloSimulationResult,
 } from './types';
 
-function normalizeBaseUrl(value: string): string {
+export function normalizeBaseUrl(value: string): string {
   return value.trim().replace(/\/$/, '');
 }
 
 function deriveApiUrl(): string {
-  const g = globalThis as unknown as { process?: { env?: Record<string, string> } };
+  const g = globalThis as unknown as {
+    process?: { env?: Record<string, string> };
+  };
   const configured = g.process?.env?.EXPO_PUBLIC_API_URL;
   if (configured) return normalizeBaseUrl(configured);
+
+  // If running in a web browser, use the exact hostname serving the app
+  if (typeof window !== 'undefined' && window.location?.hostname) {
+    const webHost = window.location.hostname;
+    if (webHost && webHost !== '') {
+      return `http://${webHost}:4000`;
+    }
+  }
 
   const hostUri = Constants.expoConfig?.hostUri ?? Constants.expoGoConfig?.debuggerHost;
   const host = hostUri?.replace(/^https?:\/\//, '').split(':')[0];
   return host ? `http://${host}:4000` : 'http://127.0.0.1:4000';
 }
 
-export const API_BASE_URL = deriveApiUrl();
+export let API_BASE_URL = deriveApiUrl();
+
+const urlChangeListeners = new Set<(url: string) => void>();
+
+export function setApiBaseUrl(url: string): void {
+  const normalized = normalizeBaseUrl(url);
+  if (normalized !== API_BASE_URL) {
+    API_BASE_URL = normalized;
+    urlChangeListeners.forEach((listener) => listener(normalized));
+  }
+}
+
+export function getApiBaseUrl(): string {
+  return API_BASE_URL;
+}
+
+export function onApiBaseUrlChange(listener: (url: string) => void): () => void {
+  urlChangeListeners.add(listener);
+  return () => urlChangeListeners.delete(listener);
+}
+
+export const KNOWN_HOST_CANDIDATES = [
+  'http://10.186.129.215:4000',
+  'http://localhost:4000',
+  'http://127.0.0.1:4000',
+  'http://10.0.2.2:4000',
+];
+
+/**
+ * Fast network probe that tests candidate URLs against /api/state.
+ * If current API_BASE_URL is unresponsive, automatically updates API_BASE_URL to the working host.
+ */
+export async function probeCandidateUrls(customCandidates?: string[]): Promise<string | null> {
+  const candidates = Array.from(
+    new Set([
+      API_BASE_URL,
+      ...(customCandidates ?? []),
+      ...KNOWN_HOST_CANDIDATES,
+    ].map(normalizeBaseUrl))
+  );
+
+  for (const candidate of candidates) {
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 1200);
+      const resp = await fetch(`${candidate}/api/state`, {
+        signal: controller.signal,
+        headers: { 'Content-Type': 'application/json' },
+      });
+      clearTimeout(timer);
+      if (resp.ok) {
+        setApiBaseUrl(candidate);
+        return candidate;
+      }
+    } catch {
+      // Candidate not reachable, proceed to next
+    }
+  }
+  return null;
+}
 
 let activeAuthToken: string | null = null;
 let activeApiKey: string = 'falcon-vps-key-2026';
@@ -38,7 +107,7 @@ export function getAuthCredentials(): { token: string | null; apiKey: string; de
   return { token: activeAuthToken, apiKey: activeApiKey, deviceId: activeDeviceId };
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+async function request<T>(path: string, init?: RequestInit, timeoutMs = 3500): Promise<T> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     'x-device-id': activeDeviceId,
@@ -49,13 +118,26 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     headers['Authorization'] = `Bearer ${activeAuthToken}`;
   }
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...init,
-    headers: { ...headers, ...init?.headers },
-  });
-  const body = (await response.json()) as T & { error?: string };
-  if (!response.ok) throw new Error(body.error ?? `Request failed (${response.status})`);
-  return body;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(`${API_BASE_URL}${path}`, {
+      ...init,
+      signal: controller.signal,
+      headers: { ...headers, ...init?.headers },
+    });
+    clearTimeout(timer);
+    const body = (await response.json()) as T & { error?: string };
+    if (!response.ok) throw new Error(body.error ?? `Request failed (${response.status})`);
+    return body;
+  } catch (err) {
+    clearTimeout(timer);
+    if (err instanceof Error && err.name === 'AbortError') {
+      throw new Error(`Connection timed out after ${timeoutMs}ms reaching ${API_BASE_URL}`);
+    }
+    throw err;
+  }
 }
 
 export function authenticateBridge(apiKey: string, deviceId: string): Promise<AuthTokenResponse> {

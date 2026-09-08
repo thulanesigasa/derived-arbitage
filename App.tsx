@@ -8,11 +8,23 @@ import {
   Pressable,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
-import { API_BASE_URL, getState, sendControl, stateSocketUrl, updateSymbols } from './src/api';
-import type { ControlAction, ControllerState, SymbolName } from './src/types';
+import {
+  API_BASE_URL,
+  getApiBaseUrl,
+  setApiBaseUrl,
+  onApiBaseUrlChange,
+  probeCandidateUrls,
+  KNOWN_HOST_CANDIDATES,
+  getState,
+  sendControl,
+  stateSocketUrl,
+  updateSymbols,
+} from './src/api';
+import { ALL_SYMBOLS, type ControlAction, type ControllerState, type SymbolName } from './src/types';
 import { HomeScreen } from './src/screens/HomeScreen';
 import { ControllerScreen } from './src/screens/ControllerScreen';
 import { ProfilerScreen } from './src/screens/ProfilerScreen';
@@ -24,6 +36,7 @@ import {
   HomeIcon,
   ProfileIcon,
   ProfilerIcon,
+  ShieldIcon,
 } from './src/components/TabIcons';
 
 const colors = {
@@ -35,6 +48,47 @@ const colors = {
   muted: '#9A9A9A',
   orange: '#FF6B00',
   orangeDark: '#2D1405',
+};
+
+const OFFLINE_FALLBACK_STATE: ControllerState = {
+  serverInstanceId: 'offline-demo-mode',
+  revision: 1,
+  status: 'stopped',
+  accountType: 'Standard',
+  mode: 'DEMO',
+  connected: false,
+  lastHeartbeat: new Date().toISOString(),
+  balance: 20,
+  equity: 20,
+  sessionPnl: 0,
+  dailyPnl: 0,
+  weeklyPnl: 0,
+  drawdown: 0,
+  marginUsagePercent: 0,
+  selectedSymbols: [...ALL_SYMBOLS],
+  positions: [],
+  riskPolicy: {
+    initialBalance: 20,
+    absoluteEquityFloor: 15,
+    maximumTotalLoss: 5,
+    defaultRiskPerTrade: 0.1,
+    hardMaxRiskPerTrade: 0.2,
+    dailyLossLock: 0.4,
+    weeklyLossLock: 1,
+    maxOpenPositions: 1,
+    maxMarginUsagePercent: 20,
+  },
+  dailyLocked: false,
+  weeklyLocked: false,
+  equityFloorLocked: false,
+  activity: [
+    {
+      id: 'offline-init-01',
+      at: new Date().toISOString(),
+      kind: 'info',
+      message: 'Running in offline demo mode. Configure your host IP in Profile to connect.',
+    },
+  ],
 };
 
 function requestId(prefix: string): string {
@@ -88,8 +142,25 @@ export default function App() {
     outputRange: [0, tabWidth, tabWidth * 2, tabWidth * 3, tabWidth * 4],
   });
 
-  const load = useCallback(async (silent = false) => {
+  const [currentApiUrl, setCurrentApiUrl] = useState(() => getApiBaseUrl());
+  const [targetUrlInput, setTargetUrlInput] = useState(() => getApiBaseUrl());
+  const [probing, setProbing] = useState(false);
+
+  useEffect(() => {
+    return onApiBaseUrlChange((newUrl) => {
+      setCurrentApiUrl(newUrl);
+      setTargetUrlInput(newUrl);
+    });
+  }, []);
+
+  const load = useCallback(async (silent = false, customUrl?: string) => {
+    if (customUrl) {
+      setApiBaseUrl(customUrl);
+      setCurrentApiUrl(customUrl);
+      setTargetUrlInput(customUrl);
+    }
     if (!silent) setLoading(true);
+
     try {
       const next = await getState();
       if (!mounted.current) return;
@@ -98,14 +169,41 @@ export default function App() {
       setError(null);
     } catch (caught) {
       if (!mounted.current) return;
+
+      // Automatically attempt candidate host auto-discovery
+      setProbing(true);
+      try {
+        const workingHost = await probeCandidateUrls();
+        if (workingHost && mounted.current) {
+          setCurrentApiUrl(workingHost);
+          setTargetUrlInput(workingHost);
+          const recovered = await getState();
+          setState(recovered);
+          setOnline(true);
+          setError(null);
+          return;
+        }
+      } catch {
+        // Fallback to error UI
+      } finally {
+        if (mounted.current) setProbing(false);
+      }
+
       setOnline(false);
-      setError(caught instanceof Error ? caught.message : 'Could not reach the mock server.');
+      setError(caught instanceof Error ? caught.message : 'Could not reach the controller server.');
     } finally {
       if (mounted.current) {
         setLoading(false);
         setRefreshing(false);
       }
     }
+  }, []);
+
+  const handleLaunchOfflineDemo = useCallback(() => {
+    setState(OFFLINE_FALLBACK_STATE);
+    setOnline(false);
+    setError(null);
+    setLoading(false);
   }, []);
 
   useEffect(() => {
@@ -116,26 +214,32 @@ export default function App() {
 
     const connect = () => {
       if (disposed) return;
-      socket = new WebSocket(stateSocketUrl());
-      socket.onopen = () => mounted.current && setOnline(true);
-      socket.onmessage = (event) => {
-        try {
-          const message = JSON.parse(String(event.data)) as { type: string; state: ControllerState };
-          if (message.type === 'state' && mounted.current) {
-            setState(message.state);
-            setOnline(true);
-            setError(null);
+      try {
+        socket = new WebSocket(stateSocketUrl());
+        socket.onopen = () => mounted.current && setOnline(true);
+        socket.onmessage = (event) => {
+          try {
+            const message = JSON.parse(String(event.data)) as { type: string; state: ControllerState };
+            if (message.type === 'state' && mounted.current) {
+              setState(message.state);
+              setOnline(true);
+              setError(null);
+            }
+          } catch {
+            // Ignore malformed mock messages
           }
-        } catch {
-          // Ignore malformed mock messages
-        }
-      };
-      socket.onerror = () => mounted.current && setOnline(false);
-      socket.onclose = () => {
+        };
+        socket.onerror = () => mounted.current && setOnline(false);
+        socket.onclose = () => {
+          if (!mounted.current) return;
+          setOnline(false);
+          reconnectTimer.current = setTimeout(connect, 3000);
+        };
+      } catch {
         if (!mounted.current) return;
         setOnline(false);
-        reconnectTimer.current = setTimeout(connect, 2000);
-      };
+        reconnectTimer.current = setTimeout(connect, 3000);
+      }
     };
     connect();
 
@@ -145,7 +249,7 @@ export default function App() {
       if (reconnectTimer.current) clearTimeout(reconnectTimer.current);
       socket?.close();
     };
-  }, [load]);
+  }, [load, currentApiUrl]);
 
   const performControl = useCallback(
     async (action: ControlAction) => {
@@ -189,13 +293,98 @@ export default function App() {
     [busy, load, state]
   );
 
-  if (loading && !state) {
+  // Initial connection screen or recovery dialog if unreachable
+  if (!state) {
+    if (loading && !error && !probing) {
+      return (
+        <View style={styles.centered}>
+          <ActivityIndicator size="large" color={colors.orange} />
+          <Text style={styles.loadingTitle}>Connecting to mobile controller…</Text>
+          <Text style={styles.loadingHint}>{currentApiUrl}</Text>
+        </View>
+      );
+    }
+
     return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color={colors.orange} />
-        <Text style={styles.loadingTitle}>Connecting to mobile controller…</Text>
-        <Text style={styles.loadingHint}>{API_BASE_URL}</Text>
-      </View>
+      <SafeAreaProvider>
+        <SafeAreaView style={styles.recoverySafeArea} edges={['top', 'bottom', 'left', 'right']}>
+          <StatusBar style="light" />
+          <View style={styles.recoveryContainer}>
+            <View style={styles.recoveryHeader}>
+              <ShieldIcon size={44} color={colors.orange} />
+              <Text style={styles.recoveryTitle}>BRIDGE CONNECTION</Text>
+              <Text style={styles.recoverySubtitle}>
+                {probing
+                  ? 'Probing candidate network hosts…'
+                  : `Unable to connect to controller server at ${currentApiUrl}`}
+              </Text>
+            </View>
+
+            {error ? (
+              <View style={styles.errorBox}>
+                <Text style={styles.errorBoxText}>{error}</Text>
+              </View>
+            ) : null}
+
+            <View style={styles.recoveryCard}>
+              <Text style={styles.recoverySectionTitle}>TARGET SERVER URL</Text>
+              <TextInput
+                style={styles.recoveryInput}
+                value={targetUrlInput}
+                onChangeText={setTargetUrlInput}
+                autoCapitalize="none"
+                autoCorrect={false}
+                placeholder="http://10.186.129.215:4000"
+                placeholderTextColor={colors.muted}
+              />
+
+              <Text style={styles.quickSelectTitle}>QUICK SWITCH HOSTS</Text>
+              <View style={styles.chipsRow}>
+                {KNOWN_HOST_CANDIDATES.map((host) => (
+                  <Pressable
+                    key={host}
+                    style={[
+                      styles.chip,
+                      targetUrlInput === host && styles.chipActive,
+                    ]}
+                    onPress={() => {
+                      setTargetUrlInput(host);
+                      void load(false, host);
+                    }}
+                  >
+                    <Text
+                      style={[
+                        styles.chipText,
+                        targetUrlInput === host && styles.chipTextActive,
+                      ]}
+                    >
+                      {host.replace(/^http:\/\//, '')}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+
+              <Pressable
+                style={styles.primaryButton}
+                onPress={() => void load(false, targetUrlInput)}
+              >
+                {loading || probing ? (
+                  <ActivityIndicator size="small" color="#080808" />
+                ) : (
+                  <Text style={styles.primaryButtonText}>RECONNECT TO BRIDGE</Text>
+                )}
+              </Pressable>
+
+              <Pressable
+                style={styles.secondaryButton}
+                onPress={handleLaunchOfflineDemo}
+              >
+                <Text style={styles.secondaryButtonText}>LAUNCH OFFLINE DEMO</Text>
+              </Pressable>
+            </View>
+          </View>
+        </SafeAreaView>
+      </SafeAreaProvider>
     );
   }
 
@@ -382,5 +571,135 @@ const styles = StyleSheet.create({
     color: colors.muted,
     fontSize: 12,
     textAlign: 'center',
+  },
+
+  // ─── Connection Recovery Screen Styles ───
+  recoverySafeArea: {
+    flex: 1,
+    backgroundColor: colors.bg,
+  },
+  recoveryContainer: {
+    flex: 1,
+    padding: 24,
+    justifyContent: 'center',
+  },
+  recoveryHeader: {
+    alignItems: 'center',
+    marginBottom: 20,
+    gap: 8,
+  },
+  recoveryTitle: {
+    color: colors.text,
+    fontSize: 18,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  recoverySubtitle: {
+    color: colors.muted,
+    fontSize: 13,
+    textAlign: 'center',
+    lineHeight: 18,
+    paddingHorizontal: 16,
+  },
+  errorBox: {
+    backgroundColor: '#1E140C',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 107, 0, 0.3)',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+  },
+  errorBoxText: {
+    color: colors.orange,
+    fontSize: 12,
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    textAlign: 'center',
+  },
+  recoveryCard: {
+    backgroundColor: colors.panel,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 16,
+    padding: 20,
+    gap: 12,
+  },
+  recoverySectionTitle: {
+    color: colors.muted,
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.8,
+  },
+  recoveryInput: {
+    backgroundColor: colors.bg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    color: colors.text,
+    paddingHorizontal: 14,
+    height: 48,
+    fontSize: 13,
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+  },
+  quickSelectTitle: {
+    color: colors.muted,
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    marginTop: 4,
+  },
+  chipsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  chip: {
+    backgroundColor: colors.bg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    minHeight: 36,
+    justifyContent: 'center',
+  },
+  chipActive: {
+    borderColor: colors.orange,
+    backgroundColor: 'rgba(255, 107, 0, 0.1)',
+  },
+  chipText: {
+    color: colors.muted,
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  chipTextActive: {
+    color: colors.orange,
+  },
+  primaryButton: {
+    backgroundColor: colors.orange,
+    borderRadius: 8,
+    minHeight: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 8,
+  },
+  primaryButtonText: {
+    color: '#080808',
+    fontSize: 13,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  secondaryButton: {
+    backgroundColor: colors.panelAlt,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    minHeight: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  secondaryButtonText: {
+    color: colors.text,
+    fontSize: 12,
+    fontWeight: '700',
   },
 });

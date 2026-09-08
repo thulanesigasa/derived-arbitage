@@ -10,7 +10,13 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppHeader } from '../components/AppHeader';
-import { API_BASE_URL, authenticateBridge, setAuthCredentials } from '../api';
+import {
+  API_BASE_URL,
+  authenticateBridge,
+  getApiBaseUrl,
+  setApiBaseUrl,
+  setAuthCredentials,
+} from '../api';
 
 const colors = {
   bg: '#080808',
@@ -62,6 +68,9 @@ export function ProfileScreen() {
         if (raw) {
           const parsed = JSON.parse(raw) as ProfileConfig;
           setConfig((prev) => ({ ...prev, ...parsed }));
+          if (parsed.bridgeUrl) {
+            setApiBaseUrl(parsed.bridgeUrl);
+          }
           setAuthCredentials({
             token: parsed.authToken,
             apiKey: parsed.vpsApiKey,
@@ -76,6 +85,9 @@ export function ProfileScreen() {
 
   const saveConfig = useCallback(async () => {
     try {
+      if (config.bridgeUrl) {
+        setApiBaseUrl(config.bridgeUrl);
+      }
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(config));
       setSavedNote(true);
       setTimeout(() => setSavedNote(false), 3000);
@@ -87,7 +99,13 @@ export function ProfileScreen() {
   const testDerivConnection = useCallback(async () => {
     setTestingDeriv(true);
     try {
-      const resp = await fetch(`${API_BASE_URL}/api/profiler/status`);
+      const targetUrl = config.bridgeUrl || getApiBaseUrl();
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 3000);
+      const resp = await fetch(`${targetUrl}/api/profiler/status`, {
+        signal: controller.signal,
+      });
+      clearTimeout(timer);
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const json = (await resp.json()) as { connected: boolean; authorized: boolean };
       if (json.connected) {
@@ -103,16 +121,22 @@ export function ProfileScreen() {
     } finally {
       setTestingDeriv(false);
     }
-  }, [config.derivAppId]);
+  }, [config.derivAppId, config.bridgeUrl]);
 
   const testBridgeConnection = useCallback(async () => {
     setTestingBridge(true);
     const start = Date.now();
+    const targetUrl = config.bridgeUrl || getApiBaseUrl();
     try {
-      const resp = await fetch(`${API_BASE_URL}/health`);
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 3000);
+      const resp = await fetch(`${targetUrl}/health`, {
+        signal: controller.signal,
+      });
+      clearTimeout(timer);
       const latency = Date.now() - start;
       if (resp.ok) {
-        Alert.alert('Bridge Connected', `VPS Control Bridge responded in ${latency}ms at ${API_BASE_URL}`);
+        Alert.alert('Bridge Connected', `VPS Control Bridge responded in ${latency}ms at ${targetUrl}`);
       } else {
         Alert.alert('Bridge Error', `Server returned status ${resp.status}`);
       }
@@ -121,7 +145,7 @@ export function ProfileScreen() {
     } finally {
       setTestingBridge(false);
     }
-  }, []);
+  }, [config.bridgeUrl]);
 
   const handleAuthenticate = useCallback(async () => {
     setAuthenticating(true);
