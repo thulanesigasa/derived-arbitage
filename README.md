@@ -103,11 +103,11 @@ If you get port conflicts, run this first:
 
 ## Configuration
 
-Copy `.env.example` to `.env` and edit:
+Copy `.env.example` to `.env` and edit with your Wi-Fi IPv4 address (find with `Get-NetIPAddress -AddressFamily IPv4`):
 
 ```env
-# Your computer's LAN IP (for physical Android testing)
-EXPO_PUBLIC_API_URL=http://192.168.1.42:4000
+# Your computer's Wi-Fi LAN IP (for physical Android device connectivity)
+EXPO_PUBLIC_API_URL=http://<YOUR_WIFI_IP>:4000
 
 # Server ports
 CONTROL_SERVER_HOST=0.0.0.0
