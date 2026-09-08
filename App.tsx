@@ -16,6 +16,7 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { API_BASE_URL, getState, sendControl, stateSocketUrl, updateSymbols } from './src/api';
 import { ALL_SYMBOLS, type AutomationStatus, type ControlAction, type ControllerState, type SymbolName } from './src/types';
 import { ProfilerScreen } from './src/screens/ProfilerScreen';
+import { AppHeader } from './src/components/AppHeader';
 
 
 const colors = {
@@ -235,18 +236,13 @@ function AppContent() {
   const floorDistance = state.equity - state.riskPolicy.absoluteEquityFloor;
 
   return (
-    <ScrollView
-      contentContainerStyle={styles.content}
-      refreshControl={<RefreshControl tintColor={colors.cyan} refreshing={refreshing} onRefresh={() => { setRefreshing(true); void load(true); }} />}
-    >
-      <View style={styles.topBar}>
-        <View>
-          <Text style={styles.eyebrow}>PERSONAL CONTROLLER</Text>
-          <Text style={styles.title}>Mobile EA</Text>
-        </View>
-      </View>
-
-      <Card style={styles.heroCard}>
+    <View style={styles.screenRoot}>
+      <AppHeader eyebrow="PERSONAL CONTROLLER" title="Mobile EA" />
+      <ScrollView
+        contentContainerStyle={styles.content}
+        refreshControl={<RefreshControl tintColor={colors.cyan} refreshing={refreshing} onRefresh={() => { setRefreshing(true); void load(true); }} />}
+      >
+        <Card style={styles.heroCard}>
         <View style={styles.rowBetween}>
           <View>
             <Text style={styles.accountLabel}>STANDARD · SIMULATED</Text>
@@ -373,6 +369,7 @@ function AppContent() {
         <Text selectable style={styles.apiText}>{API_BASE_URL}</Text>
       </View>
     </ScrollView>
+    </View>
   );
 }
 
@@ -388,7 +385,7 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+      <SafeAreaView style={styles.safeArea} edges={['left', 'right']}>
         <StatusBar style="light" />
 
         {/* Screen content */}
@@ -426,6 +423,7 @@ export default function App() {
 
 const styles = StyleSheet.create({
   safeArea:        { flex: 1, backgroundColor: colors.bg },
+  screenRoot:      { flex: 1, backgroundColor: colors.bg },
   screenArea:      { flex: 1 },
   // ─── Tab bar (Rule 15: accounts for OS chrome) ─────────────────────────────
   tabBar:          {

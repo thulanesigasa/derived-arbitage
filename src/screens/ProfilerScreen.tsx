@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import type { ProfilerApiState, SymbolProfile } from '../types';
 import { API_BASE_URL } from '../api';
+import { AppHeader } from '../components/AppHeader';
 
 // ─── Design tokens (matches App.tsx palette) ─────────────────────────────────
 const C = {
@@ -163,26 +164,20 @@ export function ProfilerScreen() {
   const total      = data?.profiles.length ?? 0;
 
   return (
-    <ScrollView
-      style={styles.root}
-      contentContainerStyle={styles.content}
-      refreshControl={
-        <RefreshControl
-          tintColor={C.cyan}
-          refreshing={refreshing}
-          onRefresh={() => { setRefreshing(true); void fetchProfiler(true); }}
-        />
-      }
-    >
-      {/* Header */}
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.eyebrow}>LIVE MARKET DATA</Text>
-          <Text style={styles.title}>Profiler</Text>
-        </View>
-      </View>
-
-      {/* Summary bar */}
+    <View style={styles.screenRoot}>
+      <AppHeader eyebrow="LIVE MARKET DATA" title="Profiler" />
+      <ScrollView
+        style={styles.root}
+        contentContainerStyle={styles.content}
+        refreshControl={
+          <RefreshControl
+            tintColor={C.cyan}
+            refreshing={refreshing}
+            onRefresh={() => { setRefreshing(true); void fetchProfiler(true); }}
+          />
+        }
+      >
+        {/* Summary bar */}
       {data && (
         <View style={styles.summaryRow}>
           <View style={styles.summaryCell}>
@@ -244,17 +239,16 @@ export function ProfilerScreen() {
         <Text style={styles.footerClock}>{new Date(clock).toLocaleTimeString()}</Text>
       </View>
     </ScrollView>
+    </View>
   );
 }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
+  screenRoot:    { flex: 1, backgroundColor: C.bg },
   root:          { flex: 1, backgroundColor: C.bg },
   content:       { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 48, gap: 16 },
-  header:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
-  eyebrow:       { color: C.cyan, fontSize: 11, fontWeight: '800', letterSpacing: 2 },
-  title:         { color: C.text, fontSize: 32, lineHeight: 40, fontWeight: '800', letterSpacing: -0.8 },
 
   summaryRow:    { flexDirection: 'row', backgroundColor: C.panel, borderColor: C.border, borderWidth: 1, borderRadius: 16, overflow: 'hidden' },
   summaryCell:   { flex: 1, alignItems: 'center', paddingVertical: 12 },

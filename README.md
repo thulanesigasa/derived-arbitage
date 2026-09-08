@@ -40,6 +40,7 @@ A personal Android controller for a Deriv MT5 EA trading Volatility, Boom, Crash
 
 - **Target Platforms**: Android (first), iOS
 - **Navigation Chrome**: Bottom tab bar dynamically accounts for OS chrome (Android: 56px nav + 48px gesture bar = 104px; iOS: 56px tab bar + 34px home indicator = 90px)
+- **App Bar & Header**: Dedicated App Bar (`56px` Android / `96px` iOS) respecting device status bar height so device time and chrome never overlay header titles
 - **Grid & Spacing**: 4-column stretch layout, 16px margins & gutters, 8px grid spacing (8, 16, 24, 32, 48, 56, 64)
 - **Touch Targets**: Minimum 48×48dp (Android) / 44×44pt (iOS) across all buttons, tab items, and switches
 - **Color System**: 60% Background (`#07111F`), 30% Panel (`#0D1A2B`), 10% Accent (`#2DD4BF` Cyan)
@@ -158,6 +159,8 @@ derived_arbitage/
 ├── src/
 │   ├── api.ts                     # Mobile ↔ server REST/WS client
 │   ├── types.ts                   # Shared types (ControllerState, SymbolProfile…)
+│   ├── components/
+│   │   └── AppHeader.tsx          # Rule 15 App Bar respecting OS status bar chrome
 │   └── screens/
 │       └── ProfilerScreen.tsx     # Phase 2 live market data tab
 └── server/
