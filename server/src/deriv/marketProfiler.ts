@@ -23,9 +23,18 @@ export class MarketProfiler {
   private lastRefreshedAt:  string | null = null;
   private unsubscribers:    Array<() => void> = [];
   private refreshTimer:     ReturnType<typeof setInterval> | null = null;
+  private tickListeners:    Array<(symbolCode: string, quote: number, epoch: number, ask?: number, bid?: number) => void> = [];
 
   constructor(appId: string, token: string | null) {
     this.client = new DerivClient(appId, token);
+  }
+
+  /** Registers a listener invoked on each incoming tick for any instrument. */
+  onTick(listener: (symbolCode: string, quote: number, epoch: number, ask?: number, bid?: number) => void): () => void {
+    this.tickListeners.push(listener);
+    return () => {
+      this.tickListeners = this.tickListeners.filter((l) => l !== listener);
+    };
   }
 
   /** Start the profiler: connect, fetch symbol list, subscribe to ticks. */
@@ -166,6 +175,15 @@ export class MarketProfiler {
           quote:  tick.quote,
           spread: ask - bid,
         });
+
+        // Dispatch tick to strategy listeners
+        for (const listener of this.tickListeners) {
+          try {
+            listener(sym.code, tick.quote, tick.epoch, ask, bid);
+          } catch (err) {
+            console.error('[MarketProfiler] Error in tick listener:', err);
+          }
+        }
       });
       this.unsubscribers.push(unsub);
     }

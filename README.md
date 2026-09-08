@@ -9,10 +9,10 @@ A personal Android controller for a Deriv MT5 EA trading Volatility, Boom, Crash
 ## Project Status
 
 | Phase | Description | Status |
-|-------|-------------|--------|
+|---|---|:---:|
 | 1 | Demo mobile controller + mock server | ✅ Complete |
 | 2 | Market Profiler — live Deriv WebSocket data | ✅ Complete |
-| 3 | Strategy engine (Falcon FX / SMC signals) | 🔲 Planned |
+| 3 | Strategy engine (Falcon FX / SMC signals) | ✅ Complete |
 | 4 | MQL5 EA with independent risk engine | 🔲 Planned |
 | 5 | VPS bridge + HTTPS/WSS auth | 🔲 Planned |
 | 6 | Live activation gate (demo-proven only) | 🔲 Planned |
@@ -153,11 +153,16 @@ Android App (Expo Go / Expo React Native)
         │  HTTP REST + WebSocket (LAN)
         ▼
 Control Bridge Server (Node.js · localhost:4000)
-        │  /api/state, /api/control, /api/profiler/*
-        ├─── Mock state machine (Phase 1)
-        └─── Deriv WebSocket client (Phase 2)
-                  │  wss://ws.derivws.com
-                  └─── Live tick data, spread profiling
+        │  /api/state, /api/control, /api/profiler/*, /api/strategy/*
+        ├─── Controller Store & State Machine (Phase 1)
+        ├─── Deriv WebSocket client (Phase 2)
+        │         │  wss://api.derivws.com/trading/v1/options/ws/public
+        │         └─── Live tick data, spread profiling
+        └─── Strategy Engine (Phase 3)
+                  ├─── Candle Aggregator (M1/M5 rolling bars + dynamic ATR)
+                  ├─── SMC Pattern Detector (BOS, CHoCH, FVG, Order Blocks)
+                  ├─── Falcon FX Structure (Liquidity sweeps & continuation flags)
+                  └─── Execution Engine (Paper trades, live tick P&L, TP/SL monitoring)
 ```
 
 **Target architecture (Phase 5+):**
@@ -182,13 +187,13 @@ derived_arbitage/
 │   └── robot_hero.jpg             # Cybernetic AI robot asset for Home hero & avatar
 ├── src/
 │   ├── api.ts                     # Mobile ↔ server REST/WS client
-│   ├── types.ts                   # Shared types (ControllerState, SymbolProfile…)
+│   ├── types.ts                   # Shared types (ControllerState, StrategySignal, Candle…)
 │   ├── components/
 │   │   ├── AppHeader.tsx          # Rule 15 App Bar respecting OS status bar chrome
 │   │   ├── TabIcons.tsx           # Svgrepo SVGs for 5 tabs and robot visuals
 │   │   └── ToggleSwitch.tsx       # Uiverse.io custom animated pill switch
 │   └── screens/
-│       ├── HomeScreen.tsx         # Tab 1: Robot center, primary controls, KPIs
+│       ├── HomeScreen.tsx         # Tab 1: Robot center, primary controls, KPIs, active trade
 │       ├── ControllerScreen.tsx   # Tab 2: Risk guardrails, positions, compact instruments
 │       ├── ProfilerScreen.tsx     # Tab 3: Live Deriv market profiler
 │       ├── ActivityScreen.tsx     # Tab 4: Chronological event and audit log
@@ -196,15 +201,21 @@ derived_arbitage/
 └── server/
     ├── src/
     │   ├── index.ts               # Express server, WS broadcast, endpoints
-    │   ├── stateMachine.ts        # Control state machine, idempotency
+    │   ├── stateMachine.ts        # Control state machine, idempotency, mutators
     │   ├── risk.ts                # Trade risk assessment, lock calculation
-    │   └── deriv/                 # Phase 2: Deriv WebSocket integration
-    │       ├── derivClient.ts     # WS client, auth, reconnect, tick subs
-    │       ├── tickStore.ts       # Rolling tick buffer, spread stats
-    │       ├── symbolMap.ts       # Display name ↔ Deriv API code mapping
-    │       └── marketProfiler.ts  # Symbol profiling, affordability check
+    │   ├── deriv/                 # Phase 2: Deriv WebSocket integration
+    │   │   ├── derivClient.ts     # WS client, auth, reconnect, tick subs
+    │   │   ├── tickStore.ts       # Rolling tick buffer, spread stats
+    │   │   ├── symbolMap.ts       # Display name ↔ Deriv API code mapping
+    │   │   └── marketProfiler.ts  # Symbol profiling, affordability check, onTick emitter
+    │   └── strategy/              # Phase 3: Strategy Engine (Falcon FX / SMC Signals)
+    │       ├── candleAggregator.ts# M1/M5 candle reconstruction + dynamic ATR
+    │       ├── smcDetector.ts     # Swing fractals, BOS, CHoCH, Fair Value Gaps
+    │       ├── falconEngine.ts    # Falcon FX liquidity sweeps & continuation signals
+    │       └── executionEngine.ts # Paper execution lifecycle, live tick P&L, TP/SL
     └── test/
-        └── stateMachine.test.ts   # Automated transition tests
+        ├── stateMachine.test.ts   # Automated state machine transition tests
+        └── strategyEngine.test.ts # Strategy, candle, SMC, and execution tests
 ```
 
 ---
@@ -229,6 +240,20 @@ The profiler uses the Deriv public WebSocket API (`app_id=1089`) by default. Wit
 **To unlock full data:** create your own Deriv app at [app.deriv.com/account/api-token](https://app.deriv.com/account/api-token), set `DERIV_APP_ID` to your own ID, and optionally set `DERIV_API_TOKEN` with a **Read** scope token.
 
 Affordability assessment is indicative only. Without MT5 lot size and tick value data, we cannot compute exact dollar cost per trade. Full affordability requires Phase 4 (MQL5 EA spec collection).
+
+---
+
+## Phase 3 Notes — Strategy Engine (Falcon FX / SMC Signals)
+
+The Strategy Engine reconstructs multi-timeframe candles from the Deriv live tick stream and detects Smart Money Concepts (SMC) & Falcon FX market structures:
+
+- **Candle Aggregator (`server/src/strategy/candleAggregator.ts`)**: Ingests live ticks into rolling M1/M5 bars and computes dynamic 14-period Average True Range (ATR).
+- **SMC Pattern Detector (`server/src/strategy/smcDetector.ts`)**: Detects 5-bar swing fractals, Break of Structure (BOS), Change of Character (CHoCH), and Fair Value Gaps (FVG).
+- **Falcon Engine (`server/src/strategy/falconEngine.ts`)**: Synthesizes continuation flags, liquidity sweep reversals, dynamic ATR 1.5x stop losses, and strictly enforces a minimum **1:2.5 Risk-to-Reward ratio**.
+- **Execution Engine (`server/src/strategy/executionEngine.ts`)**: Manages simulated position lifecycles, real-time unrealized P&L tracking, automated TP (`+$0.25`) and SL (`-$0.10`) execution under our conservative **$0.10 risk** / **$15.00 equity floor** policy.
+- **REST Endpoints**:
+  - `GET /api/strategy/signals`: Active and recent high-probability signals across all selected symbols.
+  - `GET /api/strategy/candles/:code`: Recent aggregated candles (OHLCV) for chart analysis.
 
 ---
 
