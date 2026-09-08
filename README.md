@@ -14,8 +14,8 @@ A personal Android controller for a Deriv MT5 EA trading Volatility, Boom, Crash
 | 2 | Market Profiler — live Deriv WebSocket data | ✅ Complete |
 | 3 | Strategy engine (Falcon FX / SMC signals) | ✅ Complete |
 | 4 | MQL5 EA with independent risk engine | ✅ Complete |
-| 5 | VPS bridge + HTTPS/WSS auth | 🔲 Planned |
-| 6 | Live activation gate (demo-proven only) | 🔲 Planned |
+| 5 | VPS bridge + HTTPS/WSS auth | ✅ Complete |
+| 6 | Live activation gate (demo-proven only) | ✅ Complete |
 
 ---
 
@@ -151,34 +151,22 @@ To get real symbol data (spot prices, pip sizes), create a **Read-only** API tok
 
 ```
 Android App (Expo Go / Expo React Native)
-        │  HTTP REST + WebSocket (LAN)
+        │  HTTPS REST + Authenticated WSS (Bearer JWT / API Key)
         ▼
-Control Bridge Server (Node.js · localhost:4000)
-        │  /api/state, /api/control, /api/profiler/*, /api/strategy/*, /api/mt5/*
-        ├─── Controller Store & State Machine (Phase 1)
-        ├─── Deriv WebSocket client (Phase 2)
-        │         │  wss://api.derivws.com/trading/v1/options/ws/public
-        │         └─── Live tick data, spread profiling
-        ├─── Strategy Engine (Phase 3)
-        │         ├─── Candle Aggregator (M1/M5 rolling bars + dynamic ATR)
-        │         ├─── SMC Pattern Detector (BOS, CHoCH, FVG, Order Blocks)
-        │         ├─── Falcon FX Structure (Liquidity sweeps & continuation flags)
-        │         └─── Execution Engine (Paper trades, live tick P&L, TP/SL monitoring)
-        └─── MT5 Server Bridge (Phase 4)
-                  │  HTTP WebRequest (telemetry, commands, order-results)
+VPS Control Bridge Server (Node.js · VPS / Host:4000)
+        │  /api/auth/*, /api/gates/*, /api/state, /api/control, /api/profiler/*, /api/mt5/*
+        ├─── Security & Auth Manager (Phase 5: JWT, API Key, Device Binding, Rate Limiting)
+        ├─── Live Activation Gate Engine (Phase 6: 5 Non-Negotiable Quantitative Gates)
+        ├─── Controller Store & State Machine (Phase 1: Invariant Guardrails & State Locks)
+        ├─── Deriv WebSocket Client (Phase 2: Live ticks, median/P95 spread profiling)
+        ├─── Strategy Engine (Phase 3: Candle aggregation, SMC BOS/CHoCH/FVG, Falcon sweeps)
+        └─── MT5 Server Bridge (Phase 4: Telemetry ingestion, command queueing, watchdog)
+                  │  HTTP WebRequest (x-api-key authenticated)
                   ▼
 MetaTrader 5 Terminal (DerivSVG-Server-03)
-        └─── FalconEA.mq5 (MQL5 Expert Advisor)
-                  ├─── RiskEngine.mqh (Client-side $15 floor & $0.40 daily loss lock)
-                  └─── BridgeClient.mqh (HTTP WebRequest client)
-```
-
-**Target architecture (Phase 5+):**
-```
-Android App → Authenticated HTTPS/WSS Bridge (VPS)
-                       → MT5 Terminal
-                       → MQL5 EA
-                       → DerivSVG-Server-03 (live)
+        └─── FalconEA.mq5 (MQL5 Expert Advisor with On-Chart HUD)
+                  ├─── RiskEngine.mqh (1,243-Line Client-Side Invariant Suite)
+                  └─── BridgeClient.mqh (HTTP WebRequest Client with Idempotency)
 ```
 
 ---
@@ -200,24 +188,29 @@ derived_arbitage/
 │       ├── RiskEngine.mqh         # Independent native risk engine ($15 floor, $0.40 loss lock)
 │       └── BridgeClient.mqh       # MQL5 WebRequest HTTP client for server bridge communication
 ├── src/
-│   ├── api.ts                     # Mobile ↔ server REST/WS client
-│   ├── types.ts                   # Shared types (ControllerState, StrategySignal, Candle, Mt5…)
+│   ├── api.ts                     # Mobile ↔ server REST/WS client with Bearer JWT injection
+│   ├── types.ts                   # Shared types (ControllerState, StrategySignal, Gate, Auth…)
 │   ├── components/
 │   │   ├── AppHeader.tsx          # Rule 15 App Bar respecting OS status bar chrome
+│   │   ├── LiveActivationModal.tsx# Phase 6: Live activation gate inspection & transition modal
 │   │   ├── SmcStructureModal.tsx  # Market structure modal with SVG candle sparklines
-│   │   ├── TabIcons.tsx           # Svgrepo SVGs for 5 tabs and robot visuals
+│   │   ├── TabIcons.tsx           # Svgrepo SVGs for tabs, status indicators, and robot visuals
 │   │   └── ToggleSwitch.tsx       # Uiverse.io custom animated pill switch
 │   └── screens/
 │       ├── HomeScreen.tsx         # Tab 1: Robot center, primary controls, KPIs, active trade
-│       ├── ControllerScreen.tsx   # Tab 2: Risk guardrails, positions, compact instruments
-│       ├── ProfilerScreen.tsx     # Tab 3: Live Deriv market profiler
+│       ├── ControllerScreen.tsx   # Tab 2: Risk guardrails, positions, Live Activation Gate
+│       ├── ProfilerScreen.tsx     # Tab 3: Live Deriv market profiler & SMC signals
 │       ├── ActivityScreen.tsx     # Tab 4: Chronological event and audit log
-│       └── ProfileScreen.tsx      # Tab 5: Account & MT5 VPS connectivity hub
+│       └── ProfileScreen.tsx      # Tab 5: VPS bridge auth & account connectivity hub
 └── server/
     ├── src/
     │   ├── index.ts               # Express server, WS broadcast, REST endpoints
-    │   ├── stateMachine.ts        # Control state machine, idempotency, mutators
+    │   ├── stateMachine.ts        # Control state machine, idempotency, live mode transition
     │   ├── risk.ts                # Trade risk assessment, lock calculation
+    │   ├── auth/                  # Phase 5: VPS Bridge Security & Auth
+    │   │   └── authMiddleware.ts  # Bearer JWT, constant-time API key, device binding, rate limit
+    │   ├── gates/                 # Phase 6: Live Activation Gate Engine
+    │   │   └── activationGate.ts  # 5 Non-negotiable gates, Monte Carlo simulation, soak records
     │   ├── deriv/                 # Phase 2: Deriv WebSocket integration
     │   │   ├── derivClient.ts     # WS client, auth, reconnect, tick subs
     │   │   ├── tickStore.ts       # Rolling tick buffer, spread stats
@@ -233,7 +226,9 @@ derived_arbitage/
     └── test/
         ├── stateMachine.test.ts   # Automated state machine transition tests
         ├── strategyEngine.test.ts # Strategy, candle, SMC, and execution tests
-        └── mt5Bridge.test.ts      # MT5 bridge telemetry, queueing, and watchdog tests
+        ├── mt5Bridge.test.ts      # MT5 bridge telemetry, queueing, and watchdog tests
+        ├── authBridge.test.ts     # Phase 5: JWT, API key, device binding, rate limiter tests
+        └── activationGate.test.ts # Phase 6: 5-gate validation & Monte Carlo drawdown tests
 ```
 
 ---
@@ -318,27 +313,35 @@ Phase 4 implements a native, enterprise-grade MetaTrader 5 Expert Advisor and cl
 
 ---
 
-## Production Roadmap (Gated)
+## Phase 5 Notes — VPS Bridge + HTTPS/WSS Auth
 
-```
-Android app (Expo Go / standalone APK)
-  → HTTPS/WSS bridge with mutual auth (VPS)
-  → MT5 terminal (DerivSVG-Server-03)
-  → MQL5 EA with independent risk guard
-  → Deriv demo account soak test (8–12 weeks)
-  → Live activation gate (all gates must pass)
-  → Minimum-size live trading (one symbol, reviewed)
-```
+Phase 5 establishes a hardened security perimeter for remote VPS deployments:
 
-**Live activation gate (non-negotiable):**
-- Profit factor ≥ 1.20 at normal costs, > 1.00 at 2× costs
-- Max drawdown < $3 in Monte Carlo (95th percentile)
-- No dependency on ≤ 5 lucky trades
-- No martingale, grid, or recovery sizing anywhere
-- 8+ week demo forward-test within backtest range
+- **Cryptographic Bearer JWT Tokens**: Mobile clients exchange a master API key and unique device identifier for 24-hour signed HMAC-SHA256 JWT tokens via `POST /api/auth/token`.
+- **Constant-Time API Key Verification**: Uses `crypto.timingSafeEqual` to eliminate timing side-channel attacks on header authentication (`x-api-key`).
+- **Device ID Binding**: Mobile requests are bound to enrolled device identifiers (`x-device-id`), preventing token sharing or unauthorized device access.
+- **Token-Bucket Rate Limiting**: In-memory rate limiting shields control endpoints from brute-force attempts.
+- **Authenticated WebSocket Streams**: WebSocket connections (`/ws`) require a valid JWT token query parameter (`/ws?token=...`) or API key to subscribe to real-time state broadcasts.
+- **REST Endpoints**:
+  - `POST /api/auth/token`: Exchanges API key + device ID for signed Bearer JWT.
+  - `POST /api/auth/device/register`: Registers a new mobile device.
+  - `GET /api/auth/devices`: Lists enrolled authorized devices.
 
 ---
 
-## Security (Production)
+## Phase 6 Notes — Live Activation Gate (Demo-Proven Only)
 
-Before any live phase: mutual TLS, short-lived JWT auth, device binding, encrypted audit logs, command reconciliation, reconnect watchdogs, external kill switch, and broker-state verification. Deriv credentials must stay inside the MT5 terminal on the VPS — never in the app, source code, `.env` committed to Git, or mobile storage.
+Phase 6 implements a strict, non-negotiable verification engine that locks live capital trading until a strategy proves its statistical edge under real forward-testing conditions:
+
+- **The 5 Non-Negotiable Gates (`server/src/gates/activationGate.ts`)**:
+  1. **Profit Factor Gate**: Profit Factor ($\text{Gross Profit} / \text{Gross Loss}$) must be $\ge 1.20$, and must remain positive under a **2x cost stress test** (simulating spread expansions and commissions).
+  2. **Monte Carlo 95th Percentile Drawdown Gate**: Executes 1,000 bootstrap resamplings over historical trade returns; the 95th percentile simulated max drawdown must be $< \$3.00$.
+  3. **Outlier Independence Gate**: Net profit excluding the top 5 largest winning trades must remain $> \$0.00$ (ensuring profitability stems from consistent edge rather than lucky windfall spikes).
+  4. **Strict Sizing Discipline Gate**: Verifies zero Martingale, grid, or recovery sizing. Risk per trade must never exceed $\$0.20$, and position size must never increase following a loss.
+  5. **Demo Soak Period Gate**: Forward-test demo record must span at least 8 weeks (56 days) with a minimum of 80+ completed trades.
+- **State Machine Mode Lock (`server/src/stateMachine.ts`)**:
+  - The controller mode is locked to `DEMO` by default.
+  - Calling `POST /api/gates/activate-live` runs the quantitative verification engine. If **any** gate fails, transition is strictly rejected with HTTP 403 (`ACTIVATION_GATE_LOCKED`).
+- **Mobile Inspection Modal (`LiveActivationModal.tsx`)**:
+  - Accessible via Controller tab.
+  - Displays audit status, total demo trades evaluated, soak test duration, 95% Monte Carlo drawdown, and individual checkmarks for each mandatory gate adhering strictly to Rule 1 and Rule 16.

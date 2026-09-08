@@ -155,3 +155,54 @@ export function QuotesIcon({ size = 20, color = '#FFFFFF' }: IconProps) {
     </Svg>
   );
 }
+
+export function CheckIcon({ size = 18, color = '#FF6B00' }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M5 13l4 4L19 7"
+        stroke={color}
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
+export function CrossIcon({ size = 18, color = '#9A9A9A' }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M18 6L6 18M6 6l12 12"
+        stroke={color}
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
+export function ShieldIcon({ size = 20, color = '#FF6B00' }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M12 3l8 4v6c0 5.25-3.5 10-8 11-4.5-1-8-5.75-8-11V7l8-4z"
+        stroke={color}
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
+export function LockIcon({ size = 18, color = '#FF6B00' }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Rect x="5" y="11" width="14" height="10" rx="2" stroke={color} strokeWidth="2" />
+      <Path d="M8 11V7a4 4 0 0 1 8 0v4" stroke={color} strokeWidth="2" strokeLinecap="round" />
+    </Svg>
+  );
+}

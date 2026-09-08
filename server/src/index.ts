@@ -8,6 +8,8 @@ import { ControllerStore, TransitionError } from './stateMachine.js';
 import { MarketProfiler } from './deriv/marketProfiler.js';
 import { ExecutionEngine } from './strategy/executionEngine.js';
 import { Mt5Bridge } from './mt5/mt5Bridge.js';
+import { securityManager, requireAuth, rateLimiter, AuthError } from './auth/authMiddleware.js';
+import { activationGateEngine } from './gates/activationGate.js';
 
 const port       = Number(process.env.CONTROL_SERVER_PORT ?? 4000);
 const host       = process.env.CONTROL_SERVER_HOST ?? '0.0.0.0';
@@ -29,10 +31,75 @@ const app      = express();
 app.use(cors());
 app.use(express.json({ limit: '32kb' }));
 
+// ─── Phase 5: Auth Endpoints ────────────────────────────────────────────────
+
+/** Exchange VPS bridge API Key + Device ID for signed Bearer JWT */
+app.post('/api/auth/token', rateLimiter(20), (req, res, next) => {
+  try {
+    const { apiKey, deviceId } = req.body as { apiKey?: string; deviceId?: string };
+    if (!apiKey || !deviceId) {
+      throw new AuthError('apiKey and deviceId are required.', 'INVALID_PARAMS', 400);
+    }
+    const tokenData = securityManager.issueToken(apiKey, deviceId);
+    res.json(tokenData);
+  } catch (error) { next(error); }
+});
+
+/** Register a new authorized device */
+app.post('/api/auth/device/register', rateLimiter(10), (req, res, next) => {
+  try {
+    const { apiKey, deviceId, label } = req.body as { apiKey?: string; deviceId?: string; label?: string };
+    if (!apiKey || !deviceId) {
+      throw new AuthError('apiKey and deviceId are required.', 'INVALID_PARAMS', 400);
+    }
+    if (!securityManager.verifyApiKey(apiKey)) {
+      throw new AuthError('Invalid API key for device registration.', 'INVALID_API_KEY', 403);
+    }
+    const device = securityManager.enrollDevice(deviceId, label);
+    res.json({ ok: true, device });
+  } catch (error) { next(error); }
+});
+
+/** List registered devices (requires auth) */
+app.get('/api/auth/devices', requireAuth, (_req, res) => {
+  res.json({ devices: securityManager.listDevices() });
+});
+
+// ─── Phase 6: Live Activation Gate Endpoints ────────────────────────────────
+
+/** Full evaluation of all 5 non-negotiable gates */
+app.get('/api/gates/status', (_req, res) => {
+  res.json(activationGateEngine.evaluateGates());
+});
+
+/** Run on-demand Monte Carlo stress simulation */
+app.post('/api/gates/simulate', (req, res) => {
+  const { iterations = 1000, confidence = 0.95 } = req.body as { iterations?: number; confidence?: number };
+  const mc = activationGateEngine.runMonteCarlo(activationGateEngine.getTrades(), iterations, confidence);
+  res.json(mc);
+});
+
+/** Transition system from DEMO to LIVE mode (guarded by gates) */
+app.post('/api/gates/activate-live', rateLimiter(10), (req, res, next) => {
+  try {
+    const { expectedRevision, requestId } = req.body as { expectedRevision?: number; requestId?: string };
+    validateEnvelope(expectedRevision, requestId);
+
+    const report = activationGateEngine.evaluateGates();
+    const updatedState = store.activateLiveMode(
+      expectedRevision as number,
+      requestId as string,
+      report.eligibleForLive
+    );
+
+    res.json({ ok: true, state: updatedState, report });
+  } catch (error) { next(error); }
+});
+
 // ─── Controller endpoints ────────────────────────────────────────────────────
 
 app.get('/health', (_req, res) =>
-  res.json({ ok: true, mode: 'DEMO', simulated: true, instanceId: store.snapshot.serverInstanceId }),
+  res.json({ ok: true, mode: store.snapshot.mode, simulated: store.snapshot.mode === 'DEMO', instanceId: store.snapshot.serverInstanceId }),
 );
 
 app.get('/api/state', (_req, res) => res.json(store.snapshot));
@@ -138,8 +205,13 @@ app.post('/api/mt5/flatten', (_req, res) => {
 // ─── Error handler ───────────────────────────────────────────────────────────
 
 app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
+  if (error instanceof AuthError) {
+    res.status(error.statusCode).json({ error: error.message, code: error.code });
+    return;
+  }
   const known = error instanceof TransitionError;
-  res.status(known && error.code === 'REVISION_CONFLICT' ? 409 : 400).json({
+  const status = known && error.code === 'REVISION_CONFLICT' ? 409 : (known && error.code === 'ACTIVATION_GATE_LOCKED' ? 403 : 400);
+  res.status(status).json({
     error: error instanceof Error ? error.message : 'Unexpected error.',
     code:  known ? error.code : 'UNKNOWN',
     state: store.snapshot,

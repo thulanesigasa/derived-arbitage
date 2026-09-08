@@ -196,6 +196,7 @@ class CBridgeClient
   {
 private:
    string            m_base_url;              // Server bridge base URL (e.g. "http://localhost:4000")
+   string            m_api_key;               // VPS Bridge API key for authentication
    int               m_timeout_ms;            // WebRequest timeout in ms (default: 3000ms)
    bool              m_is_online;             // Whether bridge is actively reachable
    datetime          m_last_sync_time;        // Last successful sync timestamp
@@ -213,7 +214,7 @@ private:
    int               ExecuteRequest(const string method, const string endpoint, const string post_body, string &response_text)
      {
       string url = m_base_url + endpoint;
-      string headers = "Content-Type: application/json\r\nAccept: application/json\r\nUser-Agent: FalconEA-MT5/2.0\r\n";
+      string headers = StringFormat("Content-Type: application/json\r\nAccept: application/json\r\nUser-Agent: FalconEA-MT5/2.0\r\nx-api-key: %s\r\n", m_api_key);
       char post_data[];
       char result_data[];
       string result_headers;
@@ -266,9 +267,11 @@ public:
                     ~CBridgeClient(void);
 
    //--- Initialization & Configuration
-   void              Init(string base_url = "http://localhost:4000", int timeout_ms = 3000);
+   void              Init(string base_url = "http://localhost:4000", int timeout_ms = 3000, string api_key = "falcon-vps-key-2026");
    void              SetBaseUrl(string base_url);
    string            GetBaseUrl() const { return m_base_url; }
+   void              SetApiKey(string api_key) { m_api_key = api_key; }
+   string            GetApiKey() const { return m_api_key; }
 
    //--- Bridge Telemetry & Commands
    bool              SendTelemetry(const string json_payload);
@@ -293,6 +296,7 @@ public:
 //+------------------------------------------------------------------+
 CBridgeClient::CBridgeClient(void)
   : m_base_url("http://localhost:4000"),
+    m_api_key("falcon-vps-key-2026"),
     m_timeout_ms(3000),
     m_is_online(false),
     m_last_sync_time(0),
@@ -316,9 +320,10 @@ CBridgeClient::~CBridgeClient(void)
 //+------------------------------------------------------------------+
 //| Initialize Bridge Client Configuration                           |
 //+------------------------------------------------------------------+
-void CBridgeClient::Init(string base_url = "http://localhost:4000", int timeout_ms = 3000)
+void CBridgeClient::Init(string base_url = "http://localhost:4000", int timeout_ms = 3000, string api_key = "falcon-vps-key-2026")
   {
    SetBaseUrl(base_url);
+   m_api_key = api_key;
    m_timeout_ms = timeout_ms;
    m_is_online = false;
    m_last_sync_time = 0;
@@ -327,7 +332,7 @@ void CBridgeClient::Init(string base_url = "http://localhost:4000", int timeout_
    m_total_requests_sent = 0;
    m_total_requests_failed = 0;
 
-   PrintFormat("[BridgeClient] Initialized: Base URL=%s, Timeout=%d ms", m_base_url, m_timeout_ms);
+   PrintFormat("[BridgeClient] Initialized: Base URL=%s, Timeout=%d ms, Auth=Enabled", m_base_url, m_timeout_ms);
   }
 
 //+------------------------------------------------------------------+

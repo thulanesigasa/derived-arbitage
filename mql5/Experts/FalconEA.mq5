@@ -20,6 +20,7 @@
 //+------------------------------------------------------------------+
 input group "=== Server Bridge Connection ==="
 input string   InpBridgeUrl            = "http://localhost:4000"; // Server Bridge Base URL
+input string   InpBridgeApiKey         = "falcon-vps-key-2026";  // VPS Bridge API Key
 input int      InpSyncIntervalSec      = 1;                      // Sync & Polling Interval (seconds)
 input ulong    InpMagicNumber          = 20260908;               // Expert Magic Number
 
@@ -353,8 +354,8 @@ int OnInit()
 
    g_risk.Init(config);
 
-   // Configure Bridge Client
-   g_bridge.Init(InpBridgeUrl, 3000);
+   // Configure Bridge Client with API Key Authentication
+   g_bridge.Init(InpBridgeUrl, 3000, InpBridgeApiKey);
 
    // Establish High-Resolution Sync Timer
    if(!EventSetTimer(InpSyncIntervalSec))

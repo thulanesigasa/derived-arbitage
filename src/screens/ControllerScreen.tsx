@@ -1,3 +1,4 @@
+import React, { useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -10,6 +11,7 @@ import {
 } from 'react-native';
 import { AppHeader } from '../components/AppHeader';
 import { ToggleSwitch } from '../components/ToggleSwitch';
+import { LiveActivationModal } from '../components/LiveActivationModal';
 import { ALL_SYMBOLS, type ControlAction, type ControllerState, type SymbolName } from '../types';
 
 interface ControllerScreenProps {
@@ -46,6 +48,8 @@ export function ControllerScreen({
   onControl,
   onChangeSymbol,
 }: ControllerScreenProps) {
+  const [gateModalVisible, setGateModalVisible] = useState(false);
+
   if (!state) {
     return (
       <View style={styles.screenRoot}>
@@ -58,6 +62,17 @@ export function ControllerScreen({
       </View>
     );
   }
+
+  const confirmEmergency = () => {
+    Alert.alert(
+      'Emergency Exit?',
+      'Immediately flattens all simulated positions and halts robot automation.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Exit All', style: 'destructive', onPress: () => onControl('emergencyExit') },
+      ]
+    );
+  };
 
   const floorDistance = state.equity - state.riskPolicy.absoluteEquityFloor;
 
@@ -180,6 +195,22 @@ export function ControllerScreen({
           )}
         </View>
 
+        {/* Live Activation Gate Card (Phase 6) */}
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>LIVE ACTIVATION GATE</Text>
+          <Text style={styles.activationDesc}>
+            Non-negotiable verification suite enforcing 5 quantitative risk gates (PF ≥ 1.20, Monte Carlo DD &lt; $3.00, outlier independence, anti-martingale sizing, and 8-week soak testing) before live capital deployment.
+          </Text>
+
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => setGateModalVisible(true)}
+            style={({ pressed }) => [styles.gateBtn, pressed && styles.pressedBtn]}
+          >
+            <Text style={styles.gateBtnText}>Inspect 5 Activation Gates</Text>
+          </Pressable>
+        </View>
+
         {/* Emergency Stop Action */}
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>SAFETY INTERVENTION</Text>
@@ -187,16 +218,7 @@ export function ControllerScreen({
             accessibilityRole="button"
             accessibilityLabel="Emergency Exit"
             disabled={busy || !online || state.status === 'stopped'}
-            onPress={() =>
-              Alert.alert(
-                'Emergency Exit?',
-                'Immediately flattens all simulated positions and halts robot automation.',
-                [
-                  { text: 'Cancel', style: 'cancel' },
-                  { text: 'Exit All', style: 'destructive', onPress: () => onControl('emergencyExit') },
-                ]
-              )
-            }
+            onPress={confirmEmergency}
             style={({ pressed }) => [
               styles.emergencyBtn,
               (busy || !online || state.status === 'stopped') && styles.disabledBtn,
@@ -206,6 +228,14 @@ export function ControllerScreen({
             <Text style={styles.emergencyBtnText}>Emergency Exit</Text>
           </Pressable>
         </View>
+
+        {/* Live Activation Gate Modal */}
+        <LiveActivationModal
+          visible={gateModalVisible}
+          onClose={() => setGateModalVisible(false)}
+          controllerState={state}
+          onActivated={() => onRefresh()}
+        />
       </ScrollView>
     </View>
   );
@@ -367,6 +397,27 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   posPnl: {
+    fontSize: 14,
+    fontWeight: '800',
+  },
+
+  activationDesc: {
+    color: colors.muted,
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  gateBtn: {
+    minHeight: 48,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.orange,
+    backgroundColor: '#1E1E1E',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 4,
+  },
+  gateBtnText: {
+    color: colors.orange,
     fontSize: 14,
     fontWeight: '800',
   },
