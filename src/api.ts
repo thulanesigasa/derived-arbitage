@@ -53,6 +53,16 @@ export function updateSymbols(
   });
 }
 
+export function getStrategySignals(): Promise<import('./types').StrategyApiState> {
+  return request<import('./types').StrategyApiState>('/api/strategy/signals');
+}
+
+export function getMarketStructure(
+  code: string,
+): Promise<import('./types').InstrumentStructureResponse> {
+  return request<import('./types').InstrumentStructureResponse>(`/api/strategy/structure/${code}`);
+}
+
 export function stateSocketUrl(): string {
   return `${API_BASE_URL.replace(/^http/, 'ws')}/ws`;
 }

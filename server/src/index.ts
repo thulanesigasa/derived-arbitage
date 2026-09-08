@@ -90,6 +90,15 @@ app.get('/api/strategy/candles/:code', (req, res) => {
   res.json({ code, count: n, candles: executionEngine.getCandles(code, n) });
 });
 
+/** Live Smart Money Concepts (SMC) market structure telemetry and ATR for an instrument code. */
+app.get('/api/strategy/structure/:code', (req, res) => {
+  const code      = req.params['code'] ?? '';
+  const candles   = executionEngine.getCandles(code, 40);
+  const structure = executionEngine.getMarketStructure(code);
+  const atr       = executionEngine.getAggregator().getATR(code);
+  res.json({ code, atr, candles, structure });
+});
+
 // ─── Error handler ───────────────────────────────────────────────────────────
 
 app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
