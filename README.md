@@ -173,6 +173,18 @@ DERIV_API_TOKEN=            # Optional read-only token for full symbol data
 
 To get real symbol data (spot prices, pip sizes), create a **Read-only** API token at [app.deriv.com/account/api-token](https://app.deriv.com/account/api-token) and set `DERIV_API_TOKEN` in `.env`. **Never** set a write-access or trading token here.
 
+### Understanding Broker Credentials & Identifiers
+
+A common point of confusion when configuring the Profile screen or MT5 bridge is distinguishing between **Deriv App ID**, **MetaQuotes ID**, and **MT5 Trading Account Credentials**:
+
+| Credential / Identifier | Default / Example | Where It Is Found | What It Is Used For |
+|---|---|---|---|
+| **Deriv App ID** | `1089` *(Default)* | Pre-filled by default. Optional: [app.deriv.com/account/api-token](https://app.deriv.com/account/api-token) | Deriv's universal public WebSocket gateway identifier for market data & tick feeds. **No user registration required — keep `1089` as-is.** |
+| **MetaQuotes ID (MQID)** | `8-character alphanumeric` (e.g., `A1B2C3D4`) | MT5 Mobile App: *Settings* $\rightarrow$ *Messages* (or MT5 Desktop: *Tools* $\rightarrow$ *Options* $\rightarrow$ *Notifications*) | Used **strictly** by MetaTrader for mobile push notifications to your smartphone. It is **not** an API identifier and cannot connect to WebSocket feeds. |
+| **MT5 Account Login** | `10293847` *(Numeric)* | [Deriv Trader's Hub](https://app.deriv.com) under *CFDs* $\rightarrow$ *Deriv MT5* | Your actual MetaTrader 5 trading account number. Used for logging into the MT5 terminal and configured under `ACCOUNT IDENTIFIER` in the Profile tab. |
+| **Deriv MT5 Server** | `DerivSVG-Server-03` or `Deriv-Demo` | [Deriv Trader's Hub](https://app.deriv.com) under *CFDs* $\rightarrow$ *Deriv MT5* | The broker trade server assigned to your account. Configured under `MT5 SERVER` in the Profile tab. |
+| **Deriv API Token** | *(Optional)* | [app.deriv.com/account/api-token](https://app.deriv.com/account/api-token) | Optional **Read-only** token to unlock expanded symbol lists. Never create or paste a write-scope token here. |
+
 ---
 
 ## Risk Policy (Demo)
