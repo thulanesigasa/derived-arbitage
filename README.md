@@ -373,12 +373,17 @@ Phase 4 implements a native, enterprise-grade MetaTrader 5 Expert Advisor and cl
   - `OnTradeTransaction()`: Real-time closed deal detection (`TRADE_TRANSACTION_DEAL_ADD`) updating win/loss streaks and audit metrics instantly upon trade completion.
 
 - **Server MT5 Bridge (`server/src/mt5/mt5Bridge.ts`)**:
+  - **Bidirectional Real-Time Position Synchronization**:
+    - **MT5-to-Mobile Instant Sync**: When any trade is closed on MetaTrader 5 (desktop or mobile app, or triggered by broker TP/SL/Trailing Stop), the 1-second telemetry heartbeat automatically reconciles `state.positions`, purges closed tickets, recalculates margin usage %, and broadcasts the clean state to the mobile controller via WebSocket.
+    - **Mobile-to-MT5 Remote Close**: Allows closing any active trade directly from `ControllerScreen` via `POST /api/mt5/positions/:ticket/close`, queueing a `CLOSE_POSITION` command executed natively by `FalconEA.mq5`.
   - Endpoints:
     - `POST /api/mt5/telemetry`: Real-time telemetry ingestion reconciling live MT5 balance, equity, margin, daily PnL, open positions, and lock states into `ControllerStore`.
     - `GET /api/mt5/commands`: Terminal command polling endpoint.
     - `POST /api/mt5/order-result`: Ingests fills, slippage, and rejections from MT5.
     - `GET /api/mt5/status`: Live bridge connection status with a 10-second watchdog timeout.
     - `POST /api/mt5/flatten`: Remote emergency flatten kill switch.
+    - `POST /api/mt5/positions/:ticket/close`: Closes a specific live MT5 position by ticket.
+    - `POST /api/positions/:id/close`: Generic close position endpoint for both live MT5 and paper modes.
 
 ---
 

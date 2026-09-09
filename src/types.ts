@@ -44,7 +44,7 @@ export interface SimulatedPosition {
   marginUsed: number;
   unrealizedPnl: number;
   openedAt: string;
-  simulated: true;
+  simulated: boolean;
   entryPrice?: number;
   stopLoss?: number;
   takeProfit?: number;

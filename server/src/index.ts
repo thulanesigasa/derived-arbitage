@@ -4,7 +4,7 @@ import cors from 'cors';
 import express, { type NextFunction, type Request, type Response } from 'express';
 import { WebSocketServer, WebSocket } from 'ws';
 import { ALL_SYMBOLS, type ControlAction, type SymbolName } from '../../src/types.js';
-import { ControllerStore, TransitionError } from './stateMachine.js';
+import { ControllerStore, TransitionError, log } from './stateMachine.js';
 import { MarketProfiler } from './deriv/marketProfiler.js';
 import { ExecutionEngine } from './strategy/executionEngine.js';
 import { Mt5Bridge } from './mt5/mt5Bridge.js';
@@ -200,6 +200,39 @@ app.get('/api/mt5/status', (_req, res) => {
 app.post('/api/mt5/flatten', (_req, res) => {
   const command = mt5Bridge.triggerEmergencyFlatten();
   res.json({ ok: true, command });
+});
+
+/** Close specific MT5 position by ticket */
+app.post('/api/mt5/positions/:ticket/close', (req, res) => {
+  const ticket = Number(req.params.ticket);
+  if (isNaN(ticket) || ticket <= 0) {
+    res.status(400).json({ error: 'Invalid ticket number' });
+    return;
+  }
+  const command = mt5Bridge.closePosition(ticket);
+  res.json({ ok: true, command });
+});
+
+/** Generic close position endpoint (supports both MT5 live ticket and simulated position id) */
+app.post('/api/positions/:id/close', (req, res) => {
+  const id = req.params.id;
+  const ticket = Number(id);
+  if (!isNaN(ticket) && ticket > 0 && mt5Bridge.isConnected()) {
+    const command = mt5Bridge.closePosition(ticket);
+    res.json({ ok: true, command });
+    return;
+  }
+
+  // Remove from store for paper simulated mode
+  store.mutate((s) => {
+    const pos = s.positions.find((p) => p.id === id);
+    s.positions = s.positions.filter((p) => p.id !== id);
+    s.marginUsagePercent = s.positions.length > 0 ? 5 : 0;
+    if (pos) {
+      log(s, 'info', `[MANUAL EXIT] Closed position ${pos.side} on ${pos.symbol} (#${id})`);
+    }
+  });
+  res.json({ ok: true });
 });
 
 // ─── Error handler ───────────────────────────────────────────────────────────
