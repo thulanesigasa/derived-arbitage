@@ -444,6 +444,12 @@ export function activateLiveMode(expectedRevision: number, requestId: string): P
   });
 }
 
+export function closePosition(idOrTicket: string | number): Promise<{ ok: boolean }> {
+  return request<{ ok: boolean }>(`/api/positions/${idOrTicket}/close`, {
+    method: 'POST',
+  });
+}
+
 export function stateSocketUrl(): string {
   const wsBase = API_BASE_URL.replace(/^http/, 'ws');
   return activeAuthToken ? `${wsBase}/ws?token=${activeAuthToken}` : `${wsBase}/ws?apiKey=${activeApiKey}`;

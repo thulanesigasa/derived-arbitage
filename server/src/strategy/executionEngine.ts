@@ -155,7 +155,7 @@ export class ExecutionEngine {
   private evaluatePositionExit(symbol: SymbolName, currentPrice: number, posIndex: number): void {
     this.store.mutate((s) => {
       const pos = s.positions[posIndex];
-      if (!pos || !pos.entryPrice || !pos.stopLoss || !pos.takeProfit) return;
+      if (!pos || pos.simulated === false || !pos.entryPrice || !pos.stopLoss || !pos.takeProfit) return;
 
       const slDistance = Math.abs(pos.entryPrice - pos.stopLoss);
       if (slDistance <= 0) return;

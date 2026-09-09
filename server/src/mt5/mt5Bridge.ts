@@ -4,7 +4,9 @@ import type {
   Mt5Command,
   Mt5Position,
   Mt5TelemetryPayload,
+  SimulatedPosition,
   StrategySignal,
+  SymbolName,
 } from '../../../src/types.js';
 import { ControllerStore, log } from '../stateMachine.js';
 
@@ -89,9 +91,50 @@ export class Mt5Bridge {
         }
       }
 
+      // Real-time Position Reconciliation with MT5 (Desktop & Mobile)
+      const previousPositions = state.positions;
+      const incomingPositions = payload.openPositions ?? [];
+
+      // Detect closed positions (positions previously tracked in controller that are no longer in MT5 telemetry)
+      const incomingTickets = new Set(incomingPositions.map((p) => String(p.ticket)));
+      const incomingSymbols = new Set(incomingPositions.map((p) => p.symbol));
+
+      for (const prev of previousPositions) {
+        const stillOpen = incomingTickets.has(prev.id) || incomingSymbols.has(prev.symbol);
+        if (!stillOpen) {
+          log(
+            state,
+            'info',
+            `[MT5 POSITION CLOSED] ${prev.side} on ${prev.symbol} (ID #${prev.id}) closed on MetaTrader. Controller state synced.`
+          );
+        }
+      }
+
+      // Synchronize controller positions with live MT5 positions
+      state.positions = incomingPositions.map((mt5Pos) => {
+        const existing = previousPositions.find(
+          (p) => p.id === String(mt5Pos.ticket) || p.symbol === mt5Pos.symbol
+        );
+        return {
+          id: String(mt5Pos.ticket),
+          symbol: mt5Pos.symbol as SymbolName,
+          side: mt5Pos.type,
+          risk: existing?.risk ?? state.riskPolicy.defaultRiskPerTrade,
+          marginUsed: Math.round(mt5Pos.lots * 100) / 100,
+          unrealizedPnl: Math.round(mt5Pos.profitUsd * 100) / 100,
+          openedAt: mt5Pos.openTime || new Date().toISOString(),
+          simulated: false,
+          entryPrice: mt5Pos.openPrice,
+          stopLoss: mt5Pos.stopLoss,
+          takeProfit: mt5Pos.takeProfit,
+          setupName: existing?.setupName ?? 'MT5 Synced Trade',
+          rrRatio: existing?.rrRatio ?? 2.5,
+        };
+      });
+
       if (payload.balance > 0 && payload.margin > 0) {
         state.marginUsagePercent = Math.min(100, Math.round((payload.margin / payload.balance) * 100));
-      } else if ((payload.openPositions?.length ?? 0) === 0) {
+      } else if (incomingPositions.length === 0) {
         state.marginUsagePercent = 0;
       }
 

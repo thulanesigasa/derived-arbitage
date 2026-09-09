@@ -13,7 +13,7 @@ import { AppHeader } from '../components/AppHeader';
 import { ToggleSwitch } from '../components/ToggleSwitch';
 import { LiveActivationModal } from '../components/LiveActivationModal';
 import { ALL_SYMBOLS, type ControlAction, type ControllerState, type SymbolName } from '../types';
-import { OFFLINE_FALLBACK_STATE } from '../api';
+import { OFFLINE_FALLBACK_STATE, closePosition } from '../api';
 
 interface ControllerScreenProps {
   state: ControllerState | null;
@@ -50,7 +50,33 @@ export function ControllerScreen({
   onChangeSymbol,
 }: ControllerScreenProps) {
   const [gateModalVisible, setGateModalVisible] = useState(false);
+  const [closingId, setClosingId] = useState<string | null>(null);
   const activeState = state ?? OFFLINE_FALLBACK_STATE;
+
+  const handleClosePosition = (id: string, symbol: string) => {
+    Alert.alert(
+      'Close Position',
+      `Close ${symbol} trade (#${id})? This will exit the position immediately.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Close Trade',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setClosingId(id);
+              await closePosition(id);
+              onRefresh();
+            } catch (err: unknown) {
+              Alert.alert('Error', err instanceof Error ? err.message : 'Failed to close position.');
+            } finally {
+              setClosingId(null);
+            }
+          },
+        },
+      ]
+    );
+  };
 
   const confirmEmergency = () => {
     Alert.alert(
@@ -184,7 +210,9 @@ export function ControllerScreen({
 
         {/* Positions Section */}
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>SIMULATED POSITIONS ({activeState.positions.length})</Text>
+          <Text style={styles.sectionTitle}>
+            {activeState.connected ? 'LIVE METATRADER POSITIONS' : 'OPEN POSITIONS'} ({activeState.positions.length})
+          </Text>
           {activeState.positions.length === 0 ? (
             <View style={styles.emptyState}>
               <Text style={styles.emptyTitle}>No active positions</Text>
@@ -201,9 +229,26 @@ export function ControllerScreen({
                     {pos.takeProfit ? ` · TP ${pos.takeProfit.toFixed(2)}` : ''}
                   </Text>
                 </View>
-                <Text style={[styles.posPnl, { color: pos.unrealizedPnl >= 0 ? colors.orange : colors.muted }]}>
-                  {pos.unrealizedPnl >= 0 ? '+' : ''}${pos.unrealizedPnl.toFixed(2)}
-                </Text>
+                <View style={styles.posRightCol}>
+                  <Text style={[styles.posPnl, { color: pos.unrealizedPnl >= 0 ? colors.orange : colors.muted }]}>
+                    {pos.unrealizedPnl >= 0 ? '+' : ''}${pos.unrealizedPnl.toFixed(2)}
+                  </Text>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={`Close position ${pos.symbol}`}
+                    disabled={busy || closingId === pos.id}
+                    onPress={() => handleClosePosition(pos.id, pos.symbol)}
+                    style={({ pressed }) => [
+                      styles.closePosBtn,
+                      (busy || closingId === pos.id) && styles.disabledBtn,
+                      pressed && styles.pressedBtn,
+                    ]}
+                  >
+                    <Text style={styles.closePosBtnText}>
+                      {closingId === pos.id ? 'Closing…' : 'Close'}
+                    </Text>
+                  </Pressable>
+                </View>
               </View>
             ))
           )}
@@ -413,6 +458,27 @@ const styles = StyleSheet.create({
   posPnl: {
     fontSize: 14,
     fontWeight: '800',
+  },
+  posRightCol: {
+    alignItems: 'flex-end',
+    gap: 6,
+  },
+  closePosBtn: {
+    backgroundColor: '#1E1E1E',
+    borderWidth: 1,
+    borderColor: '#282828',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    minHeight: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  closePosBtnText: {
+    color: colors.orange,
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.5,
   },
 
   activationDesc: {

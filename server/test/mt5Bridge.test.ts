@@ -273,4 +273,79 @@ describe('Mt5Bridge Server Layer', () => {
 
     expect(s.activity.some((a) => a.message.includes('Adaptive Risk Policy scaled for $10000'))).toBe(true);
   });
+
+  it('reconciles open positions from MT5 telemetry into controller store and synchronizes when closed on MT5', () => {
+    const store = new ControllerStore();
+    const bridge = new Mt5Bridge(store);
+
+    // 1. Initial telemetry with an open MT5 position
+    bridge.handleTelemetry({
+      account: 9918231,
+      balance: 10000.0,
+      equity: 10025.50,
+      margin: 25.0,
+      freeMargin: 10000.50,
+      dailyPnlUsd: 25.50,
+      openPositions: [
+        {
+          ticket: 771122,
+          symbol: 'Volatility 75 Index',
+          type: 'BUY',
+          lots: 0.05,
+          openPrice: 428100.0,
+          currentPrice: 428610.0,
+          stopLoss: 426000.0,
+          takeProfit: 433000.0,
+          profitUsd: 25.50,
+          openTime: '2026-09-09 09:15:00',
+        },
+      ],
+      riskLocked: false,
+      equityFloorLocked: false,
+      terminalTime: '2026-09-09 09:15:00',
+    });
+
+    expect(store.snapshot.positions).toHaveLength(1);
+    expect(store.snapshot.positions[0]!.id).toBe('771122');
+    expect(store.snapshot.positions[0]!.symbol).toBe('Volatility 75 Index');
+    expect(store.snapshot.positions[0]!.unrealizedPnl).toBe(25.50);
+    expect(store.snapshot.positions[0]!.simulated).toBe(false);
+
+    // 2. User closes the trade on MT5 (desktop or mobile) -> next heartbeat has empty openPositions
+    bridge.handleTelemetry({
+      account: 9918231,
+      balance: 10025.50,
+      equity: 10025.50,
+      margin: 0,
+      freeMargin: 10025.50,
+      dailyPnlUsd: 25.50,
+      openPositions: [],
+      riskLocked: false,
+      equityFloorLocked: false,
+      terminalTime: '2026-09-09 09:15:01',
+    });
+
+    // Positions in store should immediately be empty and in sync!
+    expect(store.snapshot.positions).toHaveLength(0);
+    expect(store.snapshot.marginUsagePercent).toBe(0);
+    expect(
+      store.snapshot.activity.some(
+        (a) => a.message.includes('[MT5 POSITION CLOSED]') && a.message.includes('771122')
+      )
+    ).toBe(true);
+  });
+
+  it('queues CLOSE_POSITION command when closePosition is triggered', () => {
+    const store = new ControllerStore();
+    const bridge = new Mt5Bridge(store);
+
+    const cmd = bridge.closePosition(882233);
+    expect(cmd.type).toBe('CLOSE_POSITION');
+    expect(cmd.ticket).toBe(882233);
+
+    const polled = bridge.pollCommands();
+    expect(polled).toHaveLength(1);
+    expect(polled[0]!.type).toBe('CLOSE_POSITION');
+    expect(polled[0]!.ticket).toBe(882233);
+  });
 });
