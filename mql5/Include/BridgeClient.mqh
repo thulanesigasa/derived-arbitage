@@ -206,6 +206,7 @@ private:
    int               m_consecutive_errors;    // Consecutive connection failure counter
    ulong             m_total_requests_sent;   // Cumulative HTTP requests sent
    ulong             m_total_requests_failed; // Cumulative failed HTTP requests
+   int               m_last_error;            // Last WebRequest error code
 
    //--- Idempotency buffer: tracks last 64 processed command IDs
    string            m_processed_command_ids[IDEMPOTENCY_CACHE_SIZE];
@@ -234,15 +235,25 @@ private:
       if(status_code == -1)
         {
          int err = GetLastError();
+         m_last_error = err;
          m_consecutive_errors++;
          m_total_requests_failed++;
          m_is_online = false;
 
-         PrintFormat("[BridgeClient] %s request to %s failed! Error: %d (Consecutive failures: %d)",
-                     method, url, err, m_consecutive_errors);
+         if(err == 4014)
+           {
+            PrintFormat("[BridgeClient] ERROR 4014: URL '%s' is BLOCKED by MT5 sandbox!", url);
+            Print("[BridgeClient] ACTION REQUIRED: Press Ctrl+O -> Expert Advisors tab -> Check 'Allow WebRequest for listed URL' -> Add: http://localhost:4000");
+           }
+         else
+           {
+            PrintFormat("[BridgeClient] %s request to %s failed! Error: %d (Consecutive failures: %d)",
+                        method, url, err, m_consecutive_errors);
+           }
          return -1;
         }
 
+      m_last_error = 0;
       response_text = CharArrayToString(result_data, 0, WHOLE_ARRAY);
       bool success = (status_code >= 200 && status_code < 300);
 
@@ -288,6 +299,7 @@ public:
    datetime          GetLastSyncTime() const { return m_last_sync_time; }
    uint              GetLatencyMs() const { return m_last_latency_ms; }
    int               GetConsecutiveErrors() const { return m_consecutive_errors; }
+   int               GetLastErrorCode() const { return m_last_error; }
    double            GetSuccessRate() const;
    string            GetDiagnosticsSummary();
   };
@@ -305,6 +317,7 @@ CBridgeClient::CBridgeClient(void)
     m_consecutive_errors(0),
     m_total_requests_sent(0),
     m_total_requests_failed(0),
+    m_last_error(0),
     m_processed_head(0)
   {
    for(int i = 0; i < IDEMPOTENCY_CACHE_SIZE; i++)

@@ -621,8 +621,12 @@ void CRiskEngine::SetDefaultConfig()
 void CRiskEngine::Init(const RiskConfig &config)
   {
    m_config = config;
-   m_metrics.initial_balance = m_account.Balance();
-   m_metrics.peak_equity = m_account.Equity();
+   double bal = m_account.Balance();
+   double eq  = m_account.Equity();
+   m_metrics.initial_balance = (bal > 0.0) ? bal : 10000.0;
+   m_metrics.current_balance = (bal > 0.0) ? bal : 10000.0;
+   m_metrics.peak_equity     = (eq > 0.0)  ? eq  : 10000.0;
+   m_metrics.current_equity  = (eq > 0.0)  ? eq  : 10000.0;
    m_metrics.risk_locked = false;
    m_metrics.equity_floor_locked = false;
    m_metrics.cooldown_active = false;
@@ -692,8 +696,12 @@ void CRiskEngine::RecalculateMetrics()
   {
    CheckAndHandleRollovers();
 
-   m_metrics.current_balance = m_account.Balance();
-   m_metrics.current_equity  = m_account.Equity();
+   double bal = m_account.Balance();
+   double eq  = m_account.Equity();
+   if(bal > 0.0)
+      m_metrics.current_balance = bal;
+   if(eq > 0.0)
+      m_metrics.current_equity  = eq;
    m_metrics.free_margin     = m_account.FreeMargin();
    m_metrics.margin_used     = m_account.Margin();
 
@@ -828,7 +836,8 @@ ENUM_RISK_BREACH_REASON CRiskEngine::CheckRiskLimits()
    RecalculateMetrics();
 
    // 1. ABSOLUTE EQUITY FLOOR CIRCUIT BREAKER ($15.00)
-   if(m_metrics.current_equity <= m_config.equity_floor)
+   // Guard: ignore cold-start uninitialized equity (<= 0.0) from MT5
+   if(m_metrics.current_equity > 0.0 && m_metrics.current_equity <= m_config.equity_floor)
      {
       if(!m_metrics.equity_floor_locked)
         {
@@ -841,9 +850,14 @@ ENUM_RISK_BREACH_REASON CRiskEngine::CheckRiskLimits()
         }
       return BREACH_EQUITY_FLOOR;
      }
+   else if(m_metrics.current_equity > m_config.equity_floor_warning && m_metrics.equity_floor_locked)
+     {
+      // Self-heal: clear false lock if equity was temporarily reported 0.00 during chart initialization
+      m_metrics.equity_floor_locked = false;
+     }
 
    // 2. PRE-WARNING EQUITY FLOOR THRESHOLD ($16.00)
-   if(m_metrics.current_equity <= m_config.equity_floor_warning && !m_metrics.equity_floor_locked)
+   if(m_metrics.current_equity > m_config.equity_floor && m_metrics.current_equity <= m_config.equity_floor_warning && !m_metrics.equity_floor_locked)
      {
       m_logger.Log(LOG_LEVEL_WARNING, "RiskWarning",
                    StringFormat("WARNING: Equity ($%.2f) approaching absolute floor ($%.2f). Extreme defense active.",

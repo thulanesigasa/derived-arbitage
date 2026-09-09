@@ -130,6 +130,12 @@ void UpdateChartHUD()
 
    RiskMetrics m = g_risk.GetMetrics();
 
+   string bridge_conn = "OFFLINE (WAITING)";
+   if(g_bridge.IsOnline())
+      bridge_conn = "ONLINE (CONNECTED)";
+   else if(g_bridge.GetLastErrorCode() == 4014)
+      bridge_conn = "BLOCKED BY MT5 (Add http://localhost:4000 to Options->Expert Advisors)";
+
    string hud = StringFormat(
       "==========================================================\n"
       "   FALCON FX · SMC EXECUTION EA (DERIV SVG-SERVER-03)     \n"
@@ -163,7 +169,7 @@ void UpdateChartHUD()
       m.consecutive_losses, InpMaxLossStreak,
       m.cooldown_active ? StringFormat("[ACTIVE until %s]", TimeToString(m.cooldown_expiry)) : "[OFF]",
       PositionsTotal(), InpMaxPositions,
-      g_bridge.IsOnline() ? "ONLINE (CONNECTED)" : "OFFLINE (WAITING)",
+      bridge_conn,
       g_bridge.GetLatencyMs(), g_bridge.GetConsecutiveErrors(),
       (g_bridge.GetLastSyncTime() > 0) ? TimeToString(g_bridge.GetLastSyncTime(), TIME_DATE|TIME_SECONDS) : "NEVER"
    );
