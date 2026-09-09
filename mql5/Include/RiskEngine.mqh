@@ -536,6 +536,7 @@ public:
 
    //--- Lifecycle & Configuration
    void                       Init(const RiskConfig &config);
+   void                       UpdateConfig(const RiskConfig &config);
    void                       SetDefaultConfig();
    RiskConfig                 GetConfig() const { return m_config; }
    RiskMetrics                GetMetrics() const { return m_metrics; }
@@ -637,6 +638,15 @@ void CRiskEngine::Init(const RiskConfig &config)
                 StringFormat("Initialized: Floor=$%.2f, MaxDailyLoss=$%.2f, MaxWeeklyLoss=$%.2f, MaxPos=%d",
                              m_config.equity_floor, m_config.max_daily_loss, m_config.max_weekly_loss, m_config.max_open_positions),
                 m_metrics.current_equity, m_metrics.current_balance, m_metrics.daily_net_pnl);
+  }
+
+//+------------------------------------------------------------------+
+//| Update Configuration Dynamically (Adaptive Scaling)             |
+//+------------------------------------------------------------------+
+void CRiskEngine::UpdateConfig(const RiskConfig &config)
+  {
+   m_config = config;
+   RecalculateMetrics();
   }
 
 //+------------------------------------------------------------------+

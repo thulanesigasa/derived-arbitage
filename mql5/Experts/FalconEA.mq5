@@ -24,17 +24,27 @@ input string   InpBridgeApiKey         = "falcon-vps-key-2026";  // VPS Bridge A
 input int      InpSyncIntervalSec      = 1;                      // Sync & Polling Interval (seconds)
 input ulong    InpMagicNumber          = 20260908;               // Expert Magic Number
 
-input group "=== Absolute Capital Preservation Limits ==="
-input double   InpEquityFloor          = 8500.00;                // Absolute Equity Floor ($8,500 on $10k)
-input double   InpEquityFloorWarning   = 9000.00;                // Pre-warning Threshold ($9,000 on $10k)
-input double   InpMaxDailyLoss         = 100.00;                 // Maximum Daily Loss ($100 on $10k)
-input double   InpMaxWeeklyLoss        = 300.00;                 // Maximum Weekly Loss ($300 on $10k)
-input double   InpMaxTotalLoss         = 1500.00;                // Maximum Cumulative Loss ($1,500 on $10k)
+input group "=== Adaptive Portfolio Risk Mode ==="
+input bool     InpAutoDynamicRisk      = true;                   // Auto-scale risk dynamically to current balance
+input double   InpEquityFloorPercent   = 85.0;                   // Absolute Equity Floor (% of balance, e.g. 85%)
+input double   InpEquityFloorWarnPct   = 90.0;                   // Equity Warning Threshold (% of balance, e.g. 90%)
+input double   InpMaxDailyLossPercent  = 1.0;                    // Maximum Daily Loss (% of balance, e.g. 1.0%)
+input double   InpMaxWeeklyLossPercent = 3.0;                    // Maximum Weekly Loss (% of balance, e.g. 3.0%)
+input double   InpMaxTotalLossPercent  = 10.0;                   // Maximum Total Drawdown (% of balance, e.g. 10.0%)
+input double   InpRiskPerTradePercent  = 0.1;                    // Target Risk Per Trade (% of balance, e.g. 0.1%)
+input double   InpHardRiskTradePercent = 0.2;                    // Hard Max Risk Per Trade (% of balance, e.g. 0.2%)
 input int      InpMaxPositions         = 5;                      // Max Simultaneous Positions (5)
 
-input group "=== Trade Risk & Lot Sizing Model ==="
-input double   InpTargetRiskPerTrade   = 10.00;                  // Target Risk per Trade ($10 on $10k)
-input double   InpHardMaxRiskPerTrade  = 20.00;                  // Hard Max Risk per Trade ($20 on $10k)
+input group "=== Manual Override Limits (if Dynamic Mode = false) ==="
+input double   InpEquityFloor          = 8500.00;                // Manual Equity Floor ($)
+input double   InpEquityFloorWarning   = 9000.00;                // Manual Warning Threshold ($)
+input double   InpMaxDailyLoss         = 100.00;                 // Manual Maximum Daily Loss ($)
+input double   InpMaxWeeklyLoss        = 300.00;                 // Manual Maximum Weekly Loss ($)
+input double   InpMaxTotalLoss         = 1000.00;                // Manual Maximum Cumulative Loss ($)
+input double   InpTargetRiskPerTrade   = 10.00;                  // Manual Target Risk per Trade ($)
+input double   InpHardMaxRiskPerTrade  = 20.00;                  // Manual Hard Max Risk per Trade ($)
+
+input group "=== Trade Risk & Execution Guardrails ==="
 input double   InpMaxMarginPercent     = 20.0;                   // Margin Usage Ceiling (%)
 input double   InpMaxSpreadPoints      = 600.0;                  // Max Allowable Spread (points)
 input int      InpMaxLossStreak        = 3;                      // Consecutive Loss Circuit Breaker
@@ -140,6 +150,11 @@ void UpdateChartHUD()
    string server_name = AccountInfoString(ACCOUNT_SERVER);
    if(server_name == "") server_name = "DEMO TESTING";
 
+   double floor_pct = (m.current_balance > 0.0) ? (c.equity_floor / m.current_balance * 100.0) : 0.0;
+   double daily_pct = (m.current_balance > 0.0) ? (c.max_daily_loss / m.current_balance * 100.0) : 0.0;
+   double weekly_pct = (m.current_balance > 0.0) ? (c.max_weekly_loss / m.current_balance * 100.0) : 0.0;
+   double total_pct = (m.current_balance > 0.0) ? (c.max_total_loss / m.current_balance * 100.0) : 0.0;
+
    string hud = StringFormat(
       "==========================================================\n"
       "   FALCON FX · SMC EXECUTION EA (%s)                      \n"
@@ -150,10 +165,10 @@ void UpdateChartHUD()
       "    • Margin Usage: %.1f%% | Peak Equity: $%.2f\n"
       "----------------------------------------------------------\n"
       "  INDEPENDENT RISK ENGINE (1000-LINE NATIVE SUITE):\n"
-      "    • Equity Floor ($%.2f): %s ($%.2f)\n"
-      "    • Daily Loss Lock ($%.2f): %s (Today: $%.2f)\n"
-      "    • Weekly P&L ($%.2f Limit): $%.2f\n"
-      "    • Cumulative Drawdown ($%.2f Limit): $%.2f\n"
+      "    • Equity Floor ($%.2f | %.0f%%): %s ($%.2f)\n"
+      "    • Daily Loss Lock ($%.2f | %.1f%%): %s (Today: $%.2f)\n"
+      "    • Weekly P&L ($%.2f | %.1f%% Limit): $%.2f\n"
+      "    • Cumulative Drawdown ($%.2f | %.0f%% Limit): $%.2f\n"
       "    • Loss Streak: %d / %d | Cooldown: %s\n"
       "    • Open Positions: %d / %d\n"
       "----------------------------------------------------------\n"
@@ -167,10 +182,10 @@ void UpdateChartHUD()
       AccountInfoString(ACCOUNT_SERVER),
       m.current_equity, m.current_balance, m.free_margin,
       m.margin_usage_percent, m.peak_equity,
-      c.equity_floor, m.equity_floor_locked ? "[TRIPPED / LOCKED]" : "[NORMAL / UNLOCKED]", m.current_equity,
-      c.max_daily_loss, m.risk_locked ? "[TRIPPED / LOCKED]" : "[NORMAL / UNLOCKED]", m.daily_net_pnl,
-      c.max_weekly_loss, m.weekly_net_pnl,
-      c.max_total_loss, m.current_drawdown,
+      c.equity_floor, floor_pct, m.equity_floor_locked ? "[TRIPPED / LOCKED]" : "[NORMAL / UNLOCKED]", m.current_equity,
+      c.max_daily_loss, daily_pct, m.risk_locked ? "[TRIPPED / LOCKED]" : "[NORMAL / UNLOCKED]", m.daily_net_pnl,
+      c.max_weekly_loss, weekly_pct, m.weekly_net_pnl,
+      c.max_total_loss, total_pct, m.current_drawdown,
       m.consecutive_losses, InpMaxLossStreak,
       m.cooldown_active ? StringFormat("[ACTIVE until %s]", TimeToString(m.cooldown_expiry)) : "[OFF]",
       PositionsTotal(), c.max_open_positions,
@@ -326,6 +341,64 @@ void ProcessBridgeCommand(const BridgeCommand &cmd)
   }
 
 //+------------------------------------------------------------------+
+//| Dynamic Real-Time Adaptive Risk Scaling                          |
+//+------------------------------------------------------------------+
+void CheckAndApplyDynamicRisk(bool force = false)
+  {
+   static double s_last_scaled_balance = -1.0;
+   double cur_bal = AccountInfoDouble(ACCOUNT_BALANCE);
+   if(cur_bal <= 0.0)
+      cur_bal = AccountInfoDouble(ACCOUNT_EQUITY);
+   if(cur_bal <= 0.0) return;
+
+   // Re-scale if forced or if balance shifted by more than 0.5%
+   if(!force && s_last_scaled_balance > 0.0 && MathAbs(cur_bal - s_last_scaled_balance) / s_last_scaled_balance < 0.005)
+      return;
+
+   RiskConfig config = g_risk.GetConfig();
+
+   if(InpAutoDynamicRisk)
+     {
+      config.equity_floor            = NormalizeDouble(cur_bal * (InpEquityFloorPercent / 100.0), 2);
+      config.equity_floor_warning    = NormalizeDouble(cur_bal * (InpEquityFloorWarnPct / 100.0), 2);
+      config.max_daily_loss          = NormalizeDouble(cur_bal * (InpMaxDailyLossPercent / 100.0), 2);
+      config.max_weekly_loss         = NormalizeDouble(cur_bal * (InpMaxWeeklyLossPercent / 100.0), 2);
+      config.max_total_loss          = NormalizeDouble(cur_bal * (InpMaxTotalLossPercent / 100.0), 2);
+      config.default_risk_per_trade  = NormalizeDouble(cur_bal * (InpRiskPerTradePercent / 100.0), 2);
+      config.hard_max_risk_per_trade = NormalizeDouble(cur_bal * (InpHardRiskTradePercent / 100.0), 2);
+      config.max_open_positions      = InpMaxPositions;
+     }
+   else
+     {
+      config.equity_floor            = InpEquityFloor;
+      config.equity_floor_warning    = InpEquityFloorWarning;
+      config.max_daily_loss          = InpMaxDailyLoss;
+      config.max_weekly_loss         = InpMaxWeeklyLoss;
+      config.max_total_loss          = InpMaxTotalLoss;
+      config.default_risk_per_trade  = InpTargetRiskPerTrade;
+      config.hard_max_risk_per_trade = InpHardMaxRiskPerTrade;
+      config.max_open_positions      = InpMaxPositions;
+     }
+
+   // Safety minimums for synthetic index tick & pip sizes
+   if(config.max_daily_loss < 0.20) config.max_daily_loss = 0.20;
+   if(config.default_risk_per_trade < 0.05) config.default_risk_per_trade = 0.05;
+   if(config.hard_max_risk_per_trade < 0.10) config.hard_max_risk_per_trade = 0.10;
+   if(config.max_open_positions < 1) config.max_open_positions = 1;
+
+   g_risk.UpdateConfig(config);
+   s_last_scaled_balance = cur_bal;
+
+   PrintFormat("[FalconEA] Dynamic Risk Scaled for Balance $%.2f: Floor=$%.2f (%.0f%%), DailyLossLimit=$%.2f (%.1f%%), WeeklyLimit=$%.2f (%.1f%%), TotalLossLimit=$%.2f (%.0f%%), Risk/Trade=$%.2f (%.1f%%), MaxPos=%d",
+               cur_bal, config.equity_floor, InpEquityFloorPercent,
+               config.max_daily_loss, InpMaxDailyLossPercent,
+               config.max_weekly_loss, InpMaxWeeklyLossPercent,
+               config.max_total_loss, InpMaxTotalLossPercent,
+               config.default_risk_per_trade, InpRiskPerTradePercent,
+               config.max_open_positions);
+  }
+
+//+------------------------------------------------------------------+
 //| Expert Initialization Function                                   |
 //+------------------------------------------------------------------+
 int OnInit()
@@ -339,46 +412,16 @@ int OnInit()
    g_trade.SetDeviationInPoints(20);
    g_trade.SetTypeFilling(ORDER_FILLING_IOC);
 
-   // Dynamic adaptive risk scaling based on current balance
-   double cur_bal = AccountInfoDouble(ACCOUNT_BALANCE);
-   if(cur_bal <= 0.0)
-      cur_bal = AccountInfoDouble(ACCOUNT_EQUITY);
-
-   double eq_floor    = InpEquityFloor;
-   double eq_warning  = InpEquityFloorWarning;
-   double daily_loss  = InpMaxDailyLoss;
-   double weekly_loss = InpMaxWeeklyLoss;
-   double total_loss  = InpMaxTotalLoss;
-   double target_risk = InpTargetRiskPerTrade;
-   double hard_risk   = InpHardMaxRiskPerTrade;
-   int    max_pos     = InpMaxPositions;
-
-   if(cur_bal >= 1000.0)
-     {
-      // Auto-scale if inputs were left at micro/unscaled levels
-      if(eq_floor <= 100.0)       eq_floor    = cur_bal * 0.85;  // $8,500 on $10k
-      if(eq_warning <= 150.0)     eq_warning  = cur_bal * 0.90;  // $9,000 on $10k
-      if(daily_loss <= 10.0)      daily_loss  = cur_bal * 0.01;  // $100 on $10k
-      if(weekly_loss <= 25.0)     weekly_loss = cur_bal * 0.03;  // $300 on $10k
-      if(total_loss <= 50.0)      total_loss  = cur_bal * 0.15;  // $1,500 on $10k
-      if(target_risk <= 1.0)      target_risk = cur_bal * 0.001; // $10 on $10k
-      if(hard_risk <= 2.0)        hard_risk   = cur_bal * 0.002; // $20 on $10k
-      if(max_pos < 5)             max_pos     = 5;               // Scale up to 5 concurrent positions
-
-      PrintFormat("[FalconEA] Adaptive Risk Auto-Scaling engaged for balance $%.2f: TargetRisk=$%.2f, MaxPos=%d, DailyLossLimit=$%.2f, EquityFloor=$%.2f",
-                  cur_bal, target_risk, max_pos, daily_loss, eq_floor);
-     }
-
    // Configure RiskEngine with user guardrails
    RiskConfig config;
-   config.equity_floor               = eq_floor;
-   config.equity_floor_warning       = eq_warning;
-   config.max_daily_loss             = daily_loss;
-   config.max_weekly_loss            = weekly_loss;
-   config.max_total_loss             = total_loss;
-   config.default_risk_per_trade     = target_risk;
-   config.hard_max_risk_per_trade    = hard_risk;
-   config.max_open_positions         = max_pos;
+   config.equity_floor               = 0.0;
+   config.equity_floor_warning       = 0.0;
+   config.max_daily_loss             = 0.0;
+   config.max_weekly_loss            = 0.0;
+   config.max_total_loss             = 0.0;
+   config.default_risk_per_trade     = 0.0;
+   config.hard_max_risk_per_trade    = 0.0;
+   config.max_open_positions         = InpMaxPositions;
    config.max_margin_usage_percent   = InpMaxMarginPercent;
    config.max_spread_points          = InpMaxSpreadPoints;
    config.max_consecutive_losses     = InpMaxLossStreak;
@@ -394,6 +437,9 @@ int OnInit()
    config.emergency_flatten_retries  = 5;
 
    g_risk.Init(config);
+
+   // Dynamically scale risk limits immediately to live account balance
+   CheckAndApplyDynamicRisk(true);
 
    // Configure Bridge Client with API Key Authentication
    g_bridge.Init(InpBridgeUrl, 3000, InpBridgeApiKey);
@@ -426,10 +472,13 @@ void OnDeinit(const int reason)
 //+------------------------------------------------------------------+
 void OnTick()
   {
-   // Invariant check on every single incoming price tick
+   // 0. Recalculate dynamic risk on tick if balance changed
+   CheckAndApplyDynamicRisk(false);
+
+   // 1. Invariant check on every single incoming price tick
    g_risk.CheckRiskLimits();
 
-   // Dynamic active position defense (Break-Even & Trailing SL)
+   // 2. Dynamic active position defense (Break-Even & Trailing SL)
    g_risk.RunPositionDefense();
   }
 
@@ -439,6 +488,9 @@ void OnTick()
 //+------------------------------------------------------------------+
 void OnTimer()
   {
+   // 0. Maintain real-time balance scaling
+   CheckAndApplyDynamicRisk(false);
+
    // 1. Maintain invariant limits
    g_risk.CheckRiskLimits();
 
