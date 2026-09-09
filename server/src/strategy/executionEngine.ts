@@ -100,6 +100,9 @@ export class ExecutionEngine {
     const signal = FalconEngine.evaluate(sym.display, sym.code, candles, atr, quote);
     if (!signal) return;
 
+    // Adapt trade risk to active account risk policy ($10 on $10k, $0.10 on $20)
+    signal.riskUsd = state.riskPolicy.defaultRiskPerTrade;
+
     // 4. Pre-trade Risk Gate Validation
     const decision = assessNewTrade(state, { risk: signal.riskUsd, marginUsagePercent: 5 });
     if (!decision.allowed) {

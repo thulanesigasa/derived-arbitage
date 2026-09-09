@@ -65,11 +65,29 @@ export class Mt5Bridge {
 
     // Reconcile MT5 telemetry with controller store
     this.store.mutate((state) => {
+      // Reconcile MT5 telemetry with controller store
       state.connected = true;
       state.lastHeartbeat = new Date(now).toISOString();
       state.balance = payload.balance;
       state.equity = payload.equity;
       state.dailyPnl = payload.dailyPnlUsd;
+
+      // Dynamic scaling for standard/demo accounts ($1,000 - $10,000+)
+      if (payload.balance >= 1000) {
+        const firstScale = state.riskPolicy.maxOpenPositions !== 5;
+        state.accountType = 'Standard';
+        state.riskPolicy.initialBalance = payload.balance;
+        state.riskPolicy.absoluteEquityFloor = Math.round(payload.balance * 0.85); // 85% equity floor ($8,500 on $10k)
+        state.riskPolicy.maximumTotalLoss = Math.round(payload.balance * 0.15);    // 15% max total loss ($1,500 on $10k)
+        state.riskPolicy.defaultRiskPerTrade = Math.round(payload.balance * 0.001); // 0.1% ($10 on $10k)
+        state.riskPolicy.hardMaxRiskPerTrade = Math.round(payload.balance * 0.002); // 0.2% ($20 on $10k)
+        state.riskPolicy.dailyLossLock = Math.round(payload.balance * 0.01);       // 1.0% ($100 on $10k)
+        state.riskPolicy.weeklyLossLock = Math.round(payload.balance * 0.03);      // 3.0% ($300 on $10k)
+        state.riskPolicy.maxOpenPositions = 5;                                     // Up to 5 concurrent positions
+        if (firstScale) {
+          log(state, 'info', `[MT5 BRIDGE] Adaptive Risk Policy scaled for $${payload.balance.toFixed(0)} balance: 5 max positions, $${state.riskPolicy.defaultRiskPerTrade} risk per trade, $${state.riskPolicy.dailyLossLock} daily lock`);
+        }
+      }
 
       if (payload.balance > 0 && payload.margin > 0) {
         state.marginUsagePercent = Math.min(100, Math.round((payload.margin / payload.balance) * 100));
@@ -79,12 +97,12 @@ export class Mt5Bridge {
 
       if (payload.riskLocked && !state.dailyLocked) {
         state.dailyLocked = true;
-        log(state, 'danger', `[MT5 RISK LOCK] Terminal tripped daily loss lock ($0.40 limit). Trading suspended.`);
+        log(state, 'danger', `[MT5 RISK LOCK] Terminal tripped daily loss lock ($${state.riskPolicy.dailyLossLock.toFixed(2)} limit). Trading suspended.`);
       }
 
       if (payload.equityFloorLocked && !state.equityFloorLocked) {
         state.equityFloorLocked = true;
-        log(state, 'danger', `[MT5 RISK LOCK] Terminal tripped absolute equity floor ($15.00 limit). Trading locked.`);
+        log(state, 'danger', `[MT5 RISK LOCK] Terminal tripped absolute equity floor ($${state.riskPolicy.absoluteEquityFloor.toFixed(2)} limit). Trading locked.`);
       }
     });
 
@@ -130,7 +148,7 @@ export class Mt5Bridge {
       type: 'EXECUTE_ORDER',
       symbol: signal.symbol,
       direction: signal.side,
-      lots: 0.20, // Min lot standard
+      lots: 0, // 0 triggers FalconEA dynamic sizing (min lot clamped, scaled to dollar risk)
       stopLoss: signal.stopLoss,
       takeProfit: signal.takeProfit,
     });

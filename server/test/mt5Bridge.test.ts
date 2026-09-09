@@ -235,4 +235,42 @@ describe('Mt5Bridge Server Layer', () => {
     expect(cmd?.symbol).toBe('Crash 500 Index');
     expect(cmd?.direction).toBe('SELL');
   });
+
+  it('dynamically auto-scales risk policy and increases maxOpenPositions to 5 on $10,000 balance', () => {
+    const store = new ControllerStore();
+    const bridge = new Mt5Bridge(store);
+
+    // Initial micro-account default
+    expect(store.snapshot.riskPolicy.maxOpenPositions).toBe(1);
+    expect(store.snapshot.riskPolicy.defaultRiskPerTrade).toBe(0.1);
+
+    // Receive live telemetry from $10,000 demo/standard account
+    bridge.handleTelemetry({
+      account: 9918231,
+      balance: 10000.0,
+      equity: 10000.0,
+      margin: 0,
+      freeMargin: 10000.0,
+      dailyPnlUsd: 0,
+      openPositions: [],
+      riskLocked: false,
+      equityFloorLocked: false,
+      terminalTime: '2026-09-09 09:00:00',
+    });
+
+    const s = store.snapshot;
+    expect(s.accountType).toBe('Standard');
+    expect(s.balance).toBe(10000.0);
+    expect(s.equity).toBe(10000.0);
+    expect(s.riskPolicy.initialBalance).toBe(10000.0);
+    expect(s.riskPolicy.maxOpenPositions).toBe(5);
+    expect(s.riskPolicy.defaultRiskPerTrade).toBe(10.0); // 0.1% of $10,000
+    expect(s.riskPolicy.hardMaxRiskPerTrade).toBe(20.0); // 0.2% of $10,000
+    expect(s.riskPolicy.absoluteEquityFloor).toBe(8500.0); // 85% of $10,000
+    expect(s.riskPolicy.dailyLossLock).toBe(100.0); // 1% of $10,000
+    expect(s.riskPolicy.weeklyLossLock).toBe(300.0); // 3% of $10,000
+    expect(s.riskPolicy.maximumTotalLoss).toBe(1500.0); // 15% of $10,000
+
+    expect(s.activity.some((a) => a.message.includes('Adaptive Risk Policy scaled for $10000'))).toBe(true);
+  });
 });
