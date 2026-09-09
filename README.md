@@ -535,3 +535,28 @@ When you want your EA and bridge server running 24 hours a day without keeping y
      - Set **API KEY** to `falcon-vps-key-2026`.
      - Tap **TEST BRIDGE PING**. Once connected, your phone monitors the 24/7 cloud robot anywhere in the world!
 
+---
+
+### 5. MT5 WebRequest Configuration & Telemetry Status Guide
+
+#### Resolving "Bridge Connection: BLOCKED BY MT5" (Error 4014 / Heartbeat NEVER)
+By default, MetaTrader 5 blocks all outgoing HTTP requests from Expert Advisors as a sandbox security measure. Until permitted, MT5 will fail all calls with `Error 4014` and HUD telemetry will show `Last Heartbeat: NEVER`.
+
+To permit bridge communication:
+1. In MT5, open **Tools** $\rightarrow$ **Options** (or press `Ctrl + O`).
+2. Click the **Expert Advisors** tab.
+3. Check the box: **Allow WebRequest for listed URL**.
+4. Double-click the list and add:
+   - `http://localhost:4000`
+   - `http://127.0.0.1:4000`
+5. Click **OK**.
+6. The HUD will immediately transition to `ONLINE (CONNECTED)` with live round-trip latency (`Ping: 1~3ms`) and live heartbeats.
+
+#### Understanding HUD Circuit Breaker Status: `[NORMAL / UNLOCKED]`
+In earlier versions, the HUD displayed `[ACTIVE / PROTECTED]` next to Equity Floor and Daily Loss Lock.
+- **What this means**: The risk protection guards (circuit breakers) are **active and healthy**, actively safeguarding your account balance against unexpected slippage or sudden drawdowns.
+- **Is trading blocked?**: **No.** As long as the account has not breached the risk limit (e.g. daily loss limit or equity floor), the account is in a normal state and trading is completely unlocked.
+- **Updated Display**: To eliminate ambiguity, the HUD now explicitly displays `[NORMAL / UNLOCKED]` when within safe parameters, and transitions to `[TRIPPED / LOCKED]` only if a hard risk limit is reached.
+- **Dynamic Server Display**: The HUD header automatically displays the active server name (e.g., `DERIV-DEMO` during demo testing or `DERIV-SERVER-02` / `DERIV-SERVER-03` on live accounts) retrieved via `AccountInfoString(ACCOUNT_SERVER)`.
+
+
