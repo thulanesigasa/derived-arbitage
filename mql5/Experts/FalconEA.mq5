@@ -135,11 +135,14 @@ void UpdateChartHUD()
    if(g_bridge.IsOnline())
       bridge_conn = "ONLINE (CONNECTED)";
    else if(g_bridge.GetLastErrorCode() == 4014)
-      bridge_conn = "BLOCKED BY MT5 (Add http://localhost:4000 to Options->Expert Advisors)";
+      bridge_conn = StringFormat("BLOCKED BY MT5 (Add %s to Options->Expert Advisors)", InpBridgeUrl);
+
+   string server_name = AccountInfoString(ACCOUNT_SERVER);
+   if(server_name == "") server_name = "DEMO TESTING";
 
    string hud = StringFormat(
       "==========================================================\n"
-      "   FALCON FX · SMC EXECUTION EA (DERIV SVG-SERVER-03)     \n"
+      "   FALCON FX · SMC EXECUTION EA (%s)                      \n"
       "==========================================================\n"
       "  ACCOUNT TELEMETRY:\n"
       "    • Account: #%I64d | Server: %s\n"
@@ -159,12 +162,13 @@ void UpdateChartHUD()
       "    • Round-Trip Latency: %u ms | Failures: %d\n"
       "    • Last Heartbeat: %s\n"
       "==========================================================\n",
+      server_name,
       g_account.Login(),
       AccountInfoString(ACCOUNT_SERVER),
       m.current_equity, m.current_balance, m.free_margin,
       m.margin_usage_percent, m.peak_equity,
-      c.equity_floor, m.equity_floor_locked ? "[TRIPPED / LOCKED]" : "[ACTIVE / PROTECTED]", m.current_equity,
-      c.max_daily_loss, m.risk_locked ? "[TRIPPED / LOCKED]" : "[ACTIVE / PROTECTED]", m.daily_net_pnl,
+      c.equity_floor, m.equity_floor_locked ? "[TRIPPED / LOCKED]" : "[NORMAL / UNLOCKED]", m.current_equity,
+      c.max_daily_loss, m.risk_locked ? "[TRIPPED / LOCKED]" : "[NORMAL / UNLOCKED]", m.daily_net_pnl,
       c.max_weekly_loss, m.weekly_net_pnl,
       c.max_total_loss, m.current_drawdown,
       m.consecutive_losses, InpMaxLossStreak,
@@ -327,7 +331,7 @@ void ProcessBridgeCommand(const BridgeCommand &cmd)
 int OnInit()
   {
    Print("=================================================");
-   Print("       FALCON EA · DERIV SVG MT5 BRIDGE          ");
+   PrintFormat("       FALCON EA · %s BRIDGE          ", AccountInfoString(ACCOUNT_SERVER));
    Print("=================================================");
 
    // Configure CTrade execution properties
