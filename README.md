@@ -402,3 +402,119 @@ Phase 6 implements a strict, non-negotiable verification engine that locks live 
 - **Mobile Inspection Modal (`LiveActivationModal.tsx`)**:
   - Accessible via Controller tab.
   - Displays audit status, total demo trades evaluated, soak test duration, 95% Monte Carlo drawdown, and individual checkmarks for each mandatory gate adhering strictly to Rule 1 and Rule 16.
+
+---
+
+## Demo Testing & Free VPS Deployment Guide
+
+### 1. What You Need to Start Demo Testing (Checklist)
+
+You do **not** need a VPS right away to start testing! Because your development machine is a Windows PC, you can run the complete end-to-end system (Mobile Controller + Node Bridge Server + MetaTrader 5 EA) locally right now for **$0**.
+
+| Item | Description | Where to Get / Status |
+|---|---|---|
+| **1. Deriv Demo MT5 Account** | Free virtual account with synthetic indices support (`Deriv-Demo`). | [Deriv Trader's Hub](https://app.deriv.com) $\rightarrow$ *CFDs* $\rightarrow$ *Deriv MT5* (Demo). |
+| **2. Deriv MT5 Desktop Terminal** | Official MetaTrader 5 terminal pre-configured with Deriv synthetic symbols. | Download from Deriv Trader's Hub or [deriv.com/dmt5](https://deriv.com/dmt5). |
+| **3. Node.js Bridge Server** | Express/WebSocket bridge linking MT5 with the mobile app. | Runs locally via `npm run dev` or `npm run server:dev` on port `4000`. |
+| **4. Mobile Controller App** | Android Expo app providing cybernetic command center & telemetry. | Runs locally on port `8082` (view via Expo Go on phone or web browser). |
+| **5. Falcon MQL5 EA** | `FalconEA.mq5` + `RiskEngine.mqh` + `BridgeClient.mqh`. | Located in the [mql5/](file:///d:/deployment_2026/derived_arbitage/mql5/) directory of this repo. |
+
+---
+
+### 2. Local Windows Demo Testing Setup (Step-by-Step)
+
+#### Step 1: Install & Login to Deriv MT5
+1. Install MetaTrader 5 on your Windows machine.
+2. Open MT5 $\rightarrow$ *File* $\rightarrow$ *Login to Trade Account*.
+3. Enter your Deriv Demo MT5 account number, password, and select server **`Deriv-Demo`**.
+
+#### Step 2: Copy MQL5 Files to MT5
+1. In MT5, click **File** $\rightarrow$ **Open Data Folder**.
+2. Navigate to `MQL5/Include/` and copy:
+   - `mql5/Include/RiskEngine.mqh`
+   - `mql5/Include/BridgeClient.mqh`
+3. Navigate to `MQL5/Experts/` and copy:
+   - `mql5/Experts/FalconEA.mq5`
+
+#### Step 3: Compile the Expert Advisor
+1. In MT5, press **F4** to launch the MetaEditor IDE.
+2. In the Navigator pane, open *Experts* $\rightarrow$ double-click `FalconEA.mq5`.
+3. Click **Compile** (or press **F7**). Verify output says: `0 errors, 0 warnings`.
+
+#### Step 4: Configure MT5 WebRequest Permissions (CRITICAL)
+By default, MT5 blocks EAs from making network requests. You must whitelist the bridge URL:
+1. In MT5, press **Ctrl + O** (or *Tools* $\rightarrow$ *Options*).
+2. Switch to the **Expert Advisors** tab.
+3. Check **"Allow algorithmic trading"**.
+4. Check **"Allow WebRequest for listed URL"**.
+5. Click the green `+` icon and add:
+   - `http://localhost:4000`
+   - `http://127.0.0.1:4000`
+   - *(If testing via Wi-Fi LAN IP, also add `http://10.186.129.215:4000`)*
+6. Click **OK**.
+7. On the main MT5 top toolbar, ensure the **Algo Trading** button is clicked **ON** (green play icon).
+
+#### Step 5: Attach Falcon EA to a Synthetic Chart
+1. In MT5 Market Watch, open a synthetic index chart (e.g., `Volatility 75 Index` or `Crash 500 Index`).
+2. Set timeframe to **M1** or **M5**.
+3. Drag `FalconEA` from Navigator $\rightarrow$ *Experts* onto the chart.
+4. In the inputs dialog:
+   - `InpBridgeUrl`: `http://localhost:4000`
+   - `InpBridgeApiKey`: `falcon-vps-key-2026`
+   - Click **OK**.
+5. The on-chart **Falcon Heads-Up Display (HUD)** will appear in orange/monospace, displaying live equity, risk invariants, and bridge connection latency (`Ping: ~1ms`).
+6. In your mobile app (or browser at `http://localhost:8082`), the Controller tab will instantly reflect live MT5 telemetry!
+
+---
+
+### 3. Free VPS Sign-Up Options (for 24/7 Cloud Unattended Execution)
+
+When you want your EA and bridge server running 24 hours a day without keeping your home computer on, you can deploy to a cloud VPS. The top free VPS options capable of running MT5:
+
+| Provider | Free Tier Offer | OS / Specs | MT5 Compatibility | Recommended For | Signup Link |
+|---|---|---|:---:|---|---|
+| **AWS (Amazon Web Services)** | **12 Months Free** (750 hrs/month) | Windows Server 2022 Base<br>1 vCPU · 1 GB RAM · 30 GB SSD (`t2.micro` / `t3.micro`) | Native (100%) | **Top pick for beginners.** Direct Windows RDP desktop, zero emulation needed. | [aws.amazon.com/free](https://aws.amazon.com/free) |
+| **Google Cloud Platform (GCP)** | **$300 Free Credits** (90 days) | Windows Server 2022<br>2 vCPU · 4–8 GB RAM (`e2-medium` / `e2-standard-2`) | Native (100%) | **Highest performance.** Plenty of RAM/CPU for instant tick execution & backtesting. | [cloud.google.com/free](https://cloud.google.com/free) |
+| **Oracle Cloud (OCI)** | **Always Free** (Never expires) | Ubuntu Linux 22.04 LTS<br>4 ARM OCPUs · 24 GB RAM · 200 GB Storage | Via Wine or Docker | **Best permanent free tier.** Massive 24GB RAM, but requires running MT5 via Wine/Docker. | [oracle.com/cloud/free](https://oracle.com/cloud/free) |
+| **Microsoft Azure** | **$200 Credit** (30 days) + 12 Months Free | Windows Server 2022<br>1 vCPU · 1 GB RAM · 64 GB SSD (`B1s`) | Native (100%) | Reliable Microsoft Windows cloud infrastructure with direct RDP. | [azure.microsoft.com/free](https://azure.microsoft.com/free) |
+
+---
+
+### 4. Step-by-Step AWS Free Tier Windows VPS Deployment (Recommended)
+
+1. **Create AWS Account**:
+   - Go to [aws.amazon.com/free](https://aws.amazon.com/free) and sign up (credit card required for identity verification, $0 charged within free tier).
+2. **Launch Windows Server EC2 Instance**:
+   - Go to **EC2 Console** $\rightarrow$ Click **Launch Instance**.
+   - **Name**: `Deriv-Falcon-VPS`.
+   - **OS Image**: Select **Microsoft Windows Server 2022 Base** (*Free tier eligible*).
+   - **Instance Type**: Select `t2.micro` (or `t3.micro` depending on region, marked *Free tier eligible*).
+   - **Key Pair**: Create a new key pair (e.g., `falcon-key.pem`), download and save it safely.
+   - **Network / Security Group**:
+     - Allow **RDP (port 3389)** from *My IP* (or Anywhere `0.0.0.0/0` if your home IP is dynamic).
+     - Add Custom TCP rule: Port `4000` from `0.0.0.0/0` (for mobile app bridge communication).
+   - Click **Launch Instance**.
+3. **Connect via Windows Remote Desktop (RDP)**:
+   - In EC2 Console, select your instance $\rightarrow$ Click **Connect** $\rightarrow$ **RDP Client**.
+   - Click **Get Password**, upload your `falcon-key.pem` file, and click **Decrypt Password**.
+   - Download the Remote Desktop file (`.rdp`) and open it on your Windows computer.
+   - Enter username `Administrator` and your decrypted password.
+4. **Setup on VPS**:
+   - Inside the remote Windows desktop:
+     - Download and install **Node.js LTS** from [nodejs.org](https://nodejs.org).
+     - Download and install **Deriv MetaTrader 5**.
+     - Copy the `derived_arbitage` project files to `C:\derived_arbitage`.
+     - In PowerShell inside the VPS, run:
+       ```powershell
+       cd C:\derived_arbitage
+       npm install
+       npx pm2 start npm --name "deriv-bridge" -- run server:dev
+       ```
+     - Open MT5, login to Deriv Demo, add WebRequest `http://localhost:4000`, and attach `FalconEA.mq5`.
+5. **Connect Mobile Controller to Cloud VPS**:
+   - Open the mobile app on your phone.
+   - In the **Profile** tab:
+     - Set **BRIDGE URL** to `http://<YOUR_AWS_PUBLIC_IP>:4000`.
+     - Set **API KEY** to `falcon-vps-key-2026`.
+     - Tap **TEST BRIDGE PING**. Once connected, your phone monitors the 24/7 cloud robot anywhere in the world!
+
