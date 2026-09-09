@@ -192,6 +192,8 @@ public:
 //| Production HTTP bridge client for MetaTrader 5 Expert Advisors.  |
 //| Features retry logic, latency measurement, and idempotency.      |
 //+------------------------------------------------------------------+
+#define IDEMPOTENCY_CACHE_SIZE 64
+
 class CBridgeClient
   {
 private:
@@ -206,8 +208,7 @@ private:
    ulong             m_total_requests_failed; // Cumulative failed HTTP requests
 
    //--- Idempotency buffer: tracks last 64 processed command IDs
-   static const int  IDEMPOTENCY_CACHE_SIZE = 64;
-   string            m_processed_command_ids[64];
+   string            m_processed_command_ids[IDEMPOTENCY_CACHE_SIZE];
    int               m_processed_head;
 
    //--- Core WebRequest wrapper with latency calculation

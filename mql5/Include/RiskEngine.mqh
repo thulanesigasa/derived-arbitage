@@ -121,11 +121,12 @@ struct RiskAuditEntry
 //| Class CRiskAuditLogger                                           |
 //| Flight-recorder audit logger writing to disk & in-memory buffer. |
 //+------------------------------------------------------------------+
+#define RING_BUFFER_SIZE 64
+
 class CRiskAuditLogger
   {
 private:
-   static const int  RING_BUFFER_SIZE = 64;
-   RiskAuditEntry    m_ring_buffer[64];
+   RiskAuditEntry    m_ring_buffer[RING_BUFFER_SIZE];
    int               m_ring_head;
    int               m_total_entries;
    string            m_log_filename;
