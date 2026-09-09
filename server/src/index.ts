@@ -19,7 +19,7 @@ const derivToken = process.env.DERIV_API_TOKEN ?? null; // optional read-only to
 const store           = new ControllerStore();
 const mt5Bridge       = new Mt5Bridge(store);
 const profiler        = new MarketProfiler(derivAppId, derivToken);
-const executionEngine = new ExecutionEngine(store);
+const executionEngine = new ExecutionEngine(store, mt5Bridge);
 
 // Connect real-time tick stream to strategy execution engine
 profiler.onTick((symbolCode, quote, epoch, ask, bid) => {

@@ -7,6 +7,7 @@ import type {
   SymbolName,
 } from '../../../src/types.js';
 import { SYMBOL_MAP } from '../deriv/symbolMap.js';
+import type { Mt5Bridge } from '../mt5/mt5Bridge.js';
 import { assessNewTrade } from '../risk.js';
 import { ControllerStore, log } from '../stateMachine.js';
 import { CandleAggregator } from './candleAggregator.js';
@@ -15,14 +16,24 @@ import { SMCDetector, type SMCStructureAnalysis } from './smcDetector.js';
 
 export class ExecutionEngine {
   private store: ControllerStore;
+  private mt5Bridge?: Mt5Bridge;
   private aggregator = new CandleAggregator(60); // 1-minute bars
   private recentSignals: StrategySignal[] = [];
   private lastEntryTime = 0;
   /** Cooldown in ms between trades to prevent immediate duplicate executions */
   private readonly entryCooldownMs = 15_000;
 
-  constructor(store: ControllerStore) {
+  constructor(store: ControllerStore, mt5Bridge?: Mt5Bridge) {
     this.store = store;
+    this.mt5Bridge = mt5Bridge;
+  }
+
+  setMt5Bridge(bridge: Mt5Bridge): void {
+    this.mt5Bridge = bridge;
+  }
+
+  getMt5Bridge(): Mt5Bridge | undefined {
+    return this.mt5Bridge;
   }
 
   getAggregator(): CandleAggregator {
@@ -128,6 +139,11 @@ export class ExecutionEngine {
         `[SMC ENGINE] Opened ${signal.side} on ${signal.symbol} @ ${signal.entryPrice.toFixed(2)} · SL: ${signal.stopLoss.toFixed(2)} · TP: ${signal.takeProfit.toFixed(2)} · Target: 1:${signal.rrRatio} R:R`
       );
     });
+
+    // 6. Forward signal execution to MT5 terminal if bridge is actively connected
+    if (this.mt5Bridge && this.mt5Bridge.isConnected()) {
+      this.mt5Bridge.queueSignalExecution(signal);
+    }
   }
 
   /**

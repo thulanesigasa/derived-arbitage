@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { Candle } from '../../src/types.js';
+import { Mt5Bridge } from '../src/mt5/mt5Bridge.js';
 import { ControllerStore, createInitialState } from '../src/stateMachine.js';
 import { CandleAggregator } from '../src/strategy/candleAggregator.js';
+import { ExecutionEngine } from '../src/strategy/executionEngine.js';
 import { FalconEngine } from '../src/strategy/falconEngine.js';
 import { SMCDetector } from '../src/strategy/smcDetector.js';
-import { ExecutionEngine } from '../src/strategy/executionEngine.js';
 
 describe('CandleAggregator', () => {
   it('aggregates ticks in the same minute into a single candle', () => {
@@ -187,5 +188,46 @@ describe('ExecutionEngine', () => {
     expect(store.snapshot.positions).toHaveLength(0);
     expect(store.snapshot.balance).toBeLessThan(initial.balance);
     expect(store.snapshot.sessionPnl).toBeLessThan(0);
+  });
+
+  it('forwards signal execution to Mt5Bridge when bridge is connected', () => {
+    const initial = createInitialState();
+    initial.status = 'running';
+    const store = new ControllerStore(initial);
+    const bridge = new Mt5Bridge(store);
+    bridge.handleTelemetry({
+      account: 6048573,
+      balance: 10000,
+      equity: 10000,
+      freeMargin: 10000,
+      margin: 0,
+      dailyPnlUsd: 0,
+      openPositions: [],
+      riskLocked: false,
+      equityFloorLocked: false,
+      terminalTime: new Date().toISOString(),
+    });
+    expect(bridge.isConnected()).toBe(true);
+
+    const engine = new ExecutionEngine(store, bridge);
+
+    const candles: Candle[] = [
+      { timestamp: 1000, open: 100, high: 105, low: 95, close: 102, volume: 5 },
+      { timestamp: 2000, open: 102, high: 110, low: 100, close: 108, volume: 5 },
+      { timestamp: 3000, open: 108, high: 125, low: 107, close: 120, volume: 5 },
+      { timestamp: 4000, open: 120, high: 118, low: 112, close: 115, volume: 5 },
+      { timestamp: 5000, open: 115, high: 114, low: 108, close: 110, volume: 5 },
+      { timestamp: 6000, open: 110, high: 130, low: 109, close: 128, volume: 5 },
+    ];
+    engine.getAggregator().seedCandles('R_75', candles);
+
+    engine.handleTick('R_75', 130, 1700000000);
+
+    const commands = bridge.pollCommands();
+    expect(commands).toHaveLength(1);
+    expect(commands[0]!.type).toBe('EXECUTE_ORDER');
+    expect(commands[0]!.symbol).toBe('Volatility 75 Index');
+    expect(commands[0]!.direction).toBe('BUY');
+    expect(commands[0]!.lots).toBe(0.2);
   });
 });
