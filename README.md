@@ -318,7 +318,7 @@ The Strategy Engine reconstructs multi-timeframe candles from the Deriv live tic
 - **Candle Aggregator (`server/src/strategy/candleAggregator.ts`)**: Ingests live ticks into rolling M1/M5 bars and computes dynamic 14-period Average True Range (ATR).
 - **SMC Pattern Detector (`server/src/strategy/smcDetector.ts`)**: Detects 5-bar swing fractals, Break of Structure (BOS), Change of Character (CHoCH), and Fair Value Gaps (FVG).
 - **Falcon Engine (`server/src/strategy/falconEngine.ts`)**: Synthesizes continuation flags, liquidity sweep reversals, dynamic ATR 1.5x stop losses, and strictly enforces a minimum **1:2.5 Risk-to-Reward ratio**.
-- **Execution Engine (`server/src/strategy/executionEngine.ts`)**: Manages simulated position lifecycles, real-time unrealized P&L tracking, automated TP (`+$0.25`) and SL (`-$0.10`) execution under our conservative **$0.10 risk** / **$15.00 equity floor** policy.
+- **Execution Engine (`server/src/strategy/executionEngine.ts`)**: Manages paper execution lifecycles, real-time unrealized P&L tracking, and automatically dispatches live `EXECUTE_ORDER` commands to `Mt5Bridge` whenever the MT5 terminal is connected.
 - **REST Endpoints**:
   - `GET /api/strategy/signals`: Active and recent high-probability signals across all selected symbols.
   - `GET /api/strategy/candles/:code`: Recent aggregated candles (OHLCV) for chart analysis.
