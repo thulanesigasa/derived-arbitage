@@ -25,16 +25,16 @@ input int      InpSyncIntervalSec      = 1;                      // Sync & Polli
 input ulong    InpMagicNumber          = 20260908;               // Expert Magic Number
 
 input group "=== Absolute Capital Preservation Limits ==="
-input double   InpEquityFloor          = 15.00;                  // Absolute Equity Floor ($15.00)
-input double   InpEquityFloorWarning   = 16.00;                  // Pre-warning Threshold ($16.00)
-input double   InpMaxDailyLoss         = 0.40;                   // Maximum Daily Loss ($0.40)
-input double   InpMaxWeeklyLoss        = 1.00;                   // Maximum Weekly Loss ($1.00)
-input double   InpMaxTotalLoss         = 5.00;                   // Maximum Cumulative Loss ($5.00)
-input int      InpMaxPositions         = 1;                      // Max Simultaneous Positions (1)
+input double   InpEquityFloor          = 8500.00;                // Absolute Equity Floor ($8,500 on $10k)
+input double   InpEquityFloorWarning   = 9000.00;                // Pre-warning Threshold ($9,000 on $10k)
+input double   InpMaxDailyLoss         = 100.00;                 // Maximum Daily Loss ($100 on $10k)
+input double   InpMaxWeeklyLoss        = 300.00;                 // Maximum Weekly Loss ($300 on $10k)
+input double   InpMaxTotalLoss         = 1500.00;                // Maximum Cumulative Loss ($1,500 on $10k)
+input int      InpMaxPositions         = 5;                      // Max Simultaneous Positions (5)
 
 input group "=== Trade Risk & Lot Sizing Model ==="
-input double   InpTargetRiskPerTrade   = 0.10;                   // Target Risk per Trade ($0.10)
-input double   InpHardMaxRiskPerTrade  = 0.20;                   // Hard Max Risk per Trade ($0.20)
+input double   InpTargetRiskPerTrade   = 10.00;                  // Target Risk per Trade ($10 on $10k)
+input double   InpHardMaxRiskPerTrade  = 20.00;                  // Hard Max Risk per Trade ($20 on $10k)
 input double   InpMaxMarginPercent     = 20.0;                   // Margin Usage Ceiling (%)
 input double   InpMaxSpreadPoints      = 600.0;                  // Max Allowable Spread (points)
 input int      InpMaxLossStreak        = 3;                      // Consecutive Loss Circuit Breaker
@@ -129,6 +129,7 @@ void UpdateChartHUD()
      }
 
    RiskMetrics m = g_risk.GetMetrics();
+   RiskConfig  c = g_risk.GetConfig();
 
    string bridge_conn = "OFFLINE (WAITING)";
    if(g_bridge.IsOnline())
@@ -146,10 +147,10 @@ void UpdateChartHUD()
       "    • Margin Usage: %.1f%% | Peak Equity: $%.2f\n"
       "----------------------------------------------------------\n"
       "  INDEPENDENT RISK ENGINE (1000-LINE NATIVE SUITE):\n"
-      "    • Equity Floor ($15.00): %s ($%.2f)\n"
-      "    • Daily Loss Lock ($0.40): %s (Today: $%.2f)\n"
-      "    • Weekly P&L ($1.00 Limit): $%.2f\n"
-      "    • Cumulative Drawdown ($5.00 Limit): $%.2f\n"
+      "    • Equity Floor ($%.2f): %s ($%.2f)\n"
+      "    • Daily Loss Lock ($%.2f): %s (Today: $%.2f)\n"
+      "    • Weekly P&L ($%.2f Limit): $%.2f\n"
+      "    • Cumulative Drawdown ($%.2f Limit): $%.2f\n"
       "    • Loss Streak: %d / %d | Cooldown: %s\n"
       "    • Open Positions: %d / %d\n"
       "----------------------------------------------------------\n"
@@ -162,13 +163,13 @@ void UpdateChartHUD()
       AccountInfoString(ACCOUNT_SERVER),
       m.current_equity, m.current_balance, m.free_margin,
       m.margin_usage_percent, m.peak_equity,
-      m.equity_floor_locked ? "[TRIPPED / LOCKED]" : "[ACTIVE / PROTECTED]", m.current_equity,
-      m.risk_locked ? "[TRIPPED / LOCKED]" : "[ACTIVE / PROTECTED]", m.daily_net_pnl,
-      m.weekly_net_pnl,
-      m.current_drawdown,
+      c.equity_floor, m.equity_floor_locked ? "[TRIPPED / LOCKED]" : "[ACTIVE / PROTECTED]", m.current_equity,
+      c.max_daily_loss, m.risk_locked ? "[TRIPPED / LOCKED]" : "[ACTIVE / PROTECTED]", m.daily_net_pnl,
+      c.max_weekly_loss, m.weekly_net_pnl,
+      c.max_total_loss, m.current_drawdown,
       m.consecutive_losses, InpMaxLossStreak,
       m.cooldown_active ? StringFormat("[ACTIVE until %s]", TimeToString(m.cooldown_expiry)) : "[OFF]",
-      PositionsTotal(), InpMaxPositions,
+      PositionsTotal(), c.max_open_positions,
       bridge_conn,
       g_bridge.GetLatencyMs(), g_bridge.GetConsecutiveErrors(),
       (g_bridge.GetLastSyncTime() > 0) ? TimeToString(g_bridge.GetLastSyncTime(), TIME_DATE|TIME_SECONDS) : "NEVER"
@@ -269,7 +270,7 @@ void ProcessBridgeCommand(const BridgeCommand &cmd)
       double calculated_lots = cmd.lots;
       if(calculated_lots <= 0.0)
         {
-         calculated_lots = g_risk.CalculateLots(symbol, InpTargetRiskPerTrade, price, sl);
+         calculated_lots = g_risk.CalculateLots(symbol, g_risk.GetConfig().default_risk_per_trade, price, sl);
         }
 
       // Pre-trade Invariant & Circuit Breaker Validation
@@ -334,16 +335,46 @@ int OnInit()
    g_trade.SetDeviationInPoints(20);
    g_trade.SetTypeFilling(ORDER_FILLING_IOC);
 
+   // Dynamic adaptive risk scaling based on current balance
+   double cur_bal = AccountInfoDouble(ACCOUNT_BALANCE);
+   if(cur_bal <= 0.0)
+      cur_bal = AccountInfoDouble(ACCOUNT_EQUITY);
+
+   double eq_floor    = InpEquityFloor;
+   double eq_warning  = InpEquityFloorWarning;
+   double daily_loss  = InpMaxDailyLoss;
+   double weekly_loss = InpMaxWeeklyLoss;
+   double total_loss  = InpMaxTotalLoss;
+   double target_risk = InpTargetRiskPerTrade;
+   double hard_risk   = InpHardMaxRiskPerTrade;
+   int    max_pos     = InpMaxPositions;
+
+   if(cur_bal >= 1000.0)
+     {
+      // Auto-scale if inputs were left at micro/unscaled levels
+      if(eq_floor <= 100.0)       eq_floor    = cur_bal * 0.85;  // $8,500 on $10k
+      if(eq_warning <= 150.0)     eq_warning  = cur_bal * 0.90;  // $9,000 on $10k
+      if(daily_loss <= 10.0)      daily_loss  = cur_bal * 0.01;  // $100 on $10k
+      if(weekly_loss <= 25.0)     weekly_loss = cur_bal * 0.03;  // $300 on $10k
+      if(total_loss <= 50.0)      total_loss  = cur_bal * 0.15;  // $1,500 on $10k
+      if(target_risk <= 1.0)      target_risk = cur_bal * 0.001; // $10 on $10k
+      if(hard_risk <= 2.0)        hard_risk   = cur_bal * 0.002; // $20 on $10k
+      if(max_pos < 5)             max_pos     = 5;               // Scale up to 5 concurrent positions
+
+      PrintFormat("[FalconEA] Adaptive Risk Auto-Scaling engaged for balance $%.2f: TargetRisk=$%.2f, MaxPos=%d, DailyLossLimit=$%.2f, EquityFloor=$%.2f",
+                  cur_bal, target_risk, max_pos, daily_loss, eq_floor);
+     }
+
    // Configure RiskEngine with user guardrails
    RiskConfig config;
-   config.equity_floor               = InpEquityFloor;
-   config.equity_floor_warning       = InpEquityFloorWarning;
-   config.max_daily_loss             = InpMaxDailyLoss;
-   config.max_weekly_loss            = InpMaxWeeklyLoss;
-   config.max_total_loss             = InpMaxTotalLoss;
-   config.default_risk_per_trade     = InpTargetRiskPerTrade;
-   config.hard_max_risk_per_trade    = InpHardMaxRiskPerTrade;
-   config.max_open_positions         = InpMaxPositions;
+   config.equity_floor               = eq_floor;
+   config.equity_floor_warning       = eq_warning;
+   config.max_daily_loss             = daily_loss;
+   config.max_weekly_loss            = weekly_loss;
+   config.max_total_loss             = total_loss;
+   config.default_risk_per_trade     = target_risk;
+   config.hard_max_risk_per_trade    = hard_risk;
+   config.max_open_positions         = max_pos;
    config.max_margin_usage_percent   = InpMaxMarginPercent;
    config.max_spread_points          = InpMaxSpreadPoints;
    config.max_consecutive_losses     = InpMaxLossStreak;

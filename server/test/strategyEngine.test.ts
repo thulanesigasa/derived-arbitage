@@ -228,6 +228,6 @@ describe('ExecutionEngine', () => {
     expect(commands[0]!.type).toBe('EXECUTE_ORDER');
     expect(commands[0]!.symbol).toBe('Volatility 75 Index');
     expect(commands[0]!.direction).toBe('BUY');
-    expect(commands[0]!.lots).toBe(0.2);
+    expect(commands[0]!.lots).toBe(0);
   });
 });

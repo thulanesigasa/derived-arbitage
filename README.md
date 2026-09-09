@@ -348,6 +348,18 @@ Phase 4 implements a native, enterprise-grade MetaTrader 5 Expert Advisor and cl
     - Persistent CSV disk logging (`MQL5/Files/falcon_risk_audit_YYYYMMDD.csv`) recording every tick check, order validation, rejection code, and financial metric.
     - In-memory ring buffer (64 entries) for instant querying and HUD visualization.
 
+- **Adaptive Account Scaling ($10,000 Demo / Standard Tier)**:
+  - **Automatic Tier Detection**: When MT5 sends telemetry with balance $\ge \$1,000.00$ (or on a $\$10,000.00$ demo account), both the Node.js bridge and the native MQL5 Risk Engine automatically upgrade from the micro-account baseline to the standard/demo institutional risk profile.
+  - **Expanded Concurrency (Up to 5 Trades)**: Increases `maxOpenPositions` from 1 to **5 concurrent trades**, enabling the EA and SMC strategy engine to trade multiple uncorrelated synthetic instruments simultaneously.
+  - **Broker-Accurate Smallest Lot Sizing**: Automatically sizes positions based on the scaled dollar risk ($\$10.00$ default = 0.1% of $\$10,000$) and clamps dynamically to the broker's minimum lot specification (`m_symbol.LotsMin()`), guaranteeing micro-risk footprint even on volatile synthetic pairs.
+  - **Scaled Guardrails**:
+    - **Absolute Equity Floor**: 85% ($\$8,500.00$ on $\$10,000$).
+    - **Daily Loss Lock**: 1.0% ($\$100.00$ on $\$10,000$).
+    - **Weekly Loss Lock**: 3.0% ($\$300.00$ on $\$10,000$).
+    - **Cumulative Loss Limit**: 15.0% ($\$1,500.00$ on $\$10,000$).
+    - **Dynamic Chart HUD**: Automatically displays exact live scaled dollar limits on the MT5 terminal chart.
+
+
 - **Resilient Bridge Client (`mql5/Include/BridgeClient.mqh` — 450 lines)**:
   - Native MQL5 JSON parser (`CSimpleJsonParser`) handling unquoted literals, string properties, numbers, booleans, and command array deserialization without external libraries.
   - Asynchronous HTTP `WebRequest()` client with round-trip latency tracking (`PingMs`), consecutive error detection, and success rate metrics.
