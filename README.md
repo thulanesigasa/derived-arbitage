@@ -559,4 +559,21 @@ In earlier versions, the HUD displayed `[ACTIVE / PROTECTED]` next to Equity Flo
 - **Updated Display**: To eliminate ambiguity, the HUD now explicitly displays `[NORMAL / UNLOCKED]` when within safe parameters, and transitions to `[TRIPPED / LOCKED]` only if a hard risk limit is reached.
 - **Dynamic Server Display**: The HUD header automatically displays the active server name (e.g., `DERIV-DEMO` during demo testing or `DERIV-SERVER-02` / `DERIV-SERVER-03` on live accounts) retrieved via `AccountInfoString(ACCOUNT_SERVER)`.
 
+#### Dynamic Portfolio-Adaptive Risk Auto-Scaling (Any Balance from $20 to $10,000+)
+The Risk Engine is fully adaptive and auto-scales risk parameters based on the current account balance:
+* **`InpAutoDynamicRisk = true`**: Automatically calculates exact dollar limits dynamically on every timer tick and tick event:
+  - **Equity Floor**: `85%` of balance (e.g., `$8,500.00` on `$10,000.00` demo balance; `$17.00` on `$20.00` micro balance).
+  - **Daily Loss Limit**: `1.0%` of balance (e.g., `$100.00` on `$10,000.00`; `$0.20` on `$20.00`).
+  - **Weekly Loss Limit**: `3.0%` of balance (e.g., `$300.00` on `$10,000.00`; `$0.60` on `$20.00`).
+  - **Cumulative Drawdown Limit**: `10.0%` of balance (e.g., `$1,000.00` on `$10,000.00`; `$2.00` on `$20.00`).
+  - **Target Risk Per Trade**: `0.1%` of balance (e.g., `$10.00` on `$10,000.00`; `$0.05` on `$20.00`).
+  - **Max Concurrent Positions**: Scaled up to **`5` positions**!
+* **How to Refresh EA on an Active MT5 Chart**:
+  Because MT5 keeps running whatever EA was attached to the chart until reloaded:
+  1. On your active chart, press **`F7`** (EA Properties).
+  2. Click **Reset** (to load the latest percentage-based inputs) and click **OK**.
+  3. Alternatively, right-click the chart $\rightarrow$ **Expert List** $\rightarrow$ **Remove**, then drag `FalconEA` from Navigator back onto the chart.
+  The HUD will immediately display the scaled $10,000 limits with active percentage indicators!
+
+
 
