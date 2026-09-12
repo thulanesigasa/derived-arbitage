@@ -21,8 +21,11 @@ const mt5Bridge       = new Mt5Bridge(store);
 const profiler        = new MarketProfiler(derivAppId, derivToken);
 const executionEngine = new ExecutionEngine(store, mt5Bridge);
 
-// Connect real-time tick stream to strategy execution engine
+// Connect real-time tick stream to strategy execution engine (both Deriv WS and MT5 live terminal feed)
 profiler.onTick((symbolCode, quote, epoch, ask, bid) => {
+  executionEngine.handleTick(symbolCode, quote, epoch, ask, bid);
+});
+mt5Bridge.onTick((symbolCode, quote, epoch, ask, bid) => {
   executionEngine.handleTick(symbolCode, quote, epoch, ask, bid);
 });
 
@@ -199,6 +202,18 @@ app.get('/api/mt5/status', (_req, res) => {
 /** Manual emergency flatten kill switch */
 app.post('/api/mt5/flatten', (_req, res) => {
   const command = mt5Bridge.triggerEmergencyFlatten();
+  res.json({ ok: true, command });
+});
+
+/** Execute a test/manual order to verify MT5 end-to-end execution */
+app.post('/api/mt5/execute-test-order', (req, res) => {
+  const { symbol = 'Volatility 100 Index', direction = 'BUY', lots = 0 } = req.body ?? {};
+  const command = mt5Bridge.queueCommand({
+    type: 'EXECUTE_ORDER',
+    symbol,
+    direction,
+    lots,
+  });
   res.json({ ok: true, command });
 });
 

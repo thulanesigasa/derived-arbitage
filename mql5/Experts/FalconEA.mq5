@@ -19,7 +19,7 @@
 //| EA Inputs & User Configuration                                   |
 //+------------------------------------------------------------------+
 input group "=== Server Bridge Connection ==="
-input string   InpBridgeUrl            = "http://localhost:4000"; // Server Bridge Base URL
+input string   InpBridgeUrl            = "http://127.0.0.1:4000"; // Server Bridge Base URL
 input string   InpBridgeApiKey         = "falcon-vps-key-2026";  // VPS Bridge API Key
 input int      InpSyncIntervalSec      = 1;                      // Sync & Polling Interval (seconds)
 input ulong    InpMagicNumber          = 20260908;               // Expert Magic Number
@@ -110,8 +110,12 @@ string BuildFullTelemetryJson()
      }
    positions_json += "]";
 
+   double bid   = SymbolInfoDouble(_Symbol, SYMBOL_BID);
+   double ask   = SymbolInfoDouble(_Symbol, SYMBOL_ASK);
+   double quote = (bid > 0.0) ? bid : SymbolInfoDouble(_Symbol, SYMBOL_LAST);
+
    string json = StringFormat(
-      "{\"account\":%I64d,\"balance\":%.2f,\"equity\":%.2f,\"margin\":%.2f,\"freeMargin\":%.2f,\"openPositions\":%s,\"dailyPnlUsd\":%.2f,\"riskLocked\":%s,\"equityFloorLocked\":%s,\"terminalTime\":\"%s\"}",
+      "{\"account\":%I64d,\"balance\":%.2f,\"equity\":%.2f,\"margin\":%.2f,\"freeMargin\":%.2f,\"openPositions\":%s,\"dailyPnlUsd\":%.2f,\"riskLocked\":%s,\"equityFloorLocked\":%s,\"terminalTime\":\"%s\",\"chartSymbol\":\"%s\",\"bid\":%.5f,\"ask\":%.5f,\"quote\":%.5f}",
       g_account.Login(),
       m.current_balance,
       m.current_equity,
@@ -121,7 +125,11 @@ string BuildFullTelemetryJson()
       m.daily_net_pnl,
       m.risk_locked ? "true" : "false",
       m.equity_floor_locked ? "true" : "false",
-      TimeToString(TimeCurrent(), TIME_DATE|TIME_SECONDS)
+      TimeToString(TimeCurrent(), TIME_DATE|TIME_SECONDS),
+      _Symbol,
+      bid,
+      ask,
+      quote
    );
 
    return json;

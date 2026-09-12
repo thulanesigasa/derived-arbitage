@@ -284,6 +284,8 @@ export const DEFAULT_PROFILER_SNAPSHOT: ProfilerApiState = {
 };
 
 export const KNOWN_HOST_CANDIDATES = [
+  'http://100.65.195.233:4000',
+  'http://10.48.65.119:4000',
   'http://10.186.129.215:4000',
   'http://localhost:4000',
   'http://127.0.0.1:4000',
