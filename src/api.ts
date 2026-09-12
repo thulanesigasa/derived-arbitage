@@ -14,12 +14,6 @@ export function normalizeBaseUrl(value: string): string {
 }
 
 function deriveApiUrl(): string {
-  const g = globalThis as unknown as {
-    process?: { env?: Record<string, string> };
-  };
-  const configured = g.process?.env?.EXPO_PUBLIC_API_URL;
-  if (configured) return normalizeBaseUrl(configured);
-
   // If running in a web browser, use the exact hostname serving the app
   if (typeof window !== 'undefined' && window.location?.hostname) {
     const webHost = window.location.hostname;
@@ -28,13 +22,22 @@ function deriveApiUrl(): string {
     }
   }
 
+  // Check Expo hostUri FIRST (dynamic IP from Metro development server)
   const hostUri = Constants.expoConfig?.hostUri ?? Constants.expoGoConfig?.debuggerHost;
   const host = hostUri?.replace(/^https?:\/\//, '').split(':')[0];
-  // Guard against stale cached LAN IP from previous network sessions
-  if (host && host !== '192.168.1.42' && host !== '127.0.0.1' && host !== 'localhost') {
+  if (host && host !== '127.0.0.1' && host !== 'localhost') {
     return `http://${host}:4000`;
   }
-  return 'http://10.186.129.215:4000';
+
+  const g = globalThis as unknown as {
+    process?: { env?: Record<string, string> };
+  };
+  const configured = g.process?.env?.EXPO_PUBLIC_API_URL;
+  if (configured && !configured.includes('10.186.129.215') && !configured.includes('192.168.1.42')) {
+    return normalizeBaseUrl(configured);
+  }
+
+  return 'http://10.229.19.215:4000';
 }
 
 export let API_BASE_URL = deriveApiUrl();
@@ -44,8 +47,8 @@ const urlChangeListeners = new Set<(url: string) => void>();
 export function setApiBaseUrl(url: string): void {
   let normalized = normalizeBaseUrl(url);
   // Guard against stale cached LAN IP from previous network sessions
-  if (normalized.includes('192.168.1.42')) {
-    normalized = 'http://10.186.129.215:4000';
+  if (normalized.includes('192.168.1.42') || normalized.includes('10.186.129.215')) {
+    normalized = 'http://10.229.19.215:4000';
   }
   if (normalized !== API_BASE_URL) {
     API_BASE_URL = normalized;
@@ -72,8 +75,8 @@ export const OFFLINE_FALLBACK_STATE: ControllerState = {
   mode: 'DEMO',
   connected: false,
   lastHeartbeat: new Date().toISOString(),
-  balance: 20,
-  equity: 20,
+  balance: 10000,
+  equity: 10000,
   sessionPnl: 0,
   dailyPnl: 0,
   weeklyPnl: 0,
@@ -82,14 +85,14 @@ export const OFFLINE_FALLBACK_STATE: ControllerState = {
   selectedSymbols: [...ALL_SYMBOLS],
   positions: [],
   riskPolicy: {
-    initialBalance: 20,
-    absoluteEquityFloor: 15,
-    maximumTotalLoss: 5,
-    defaultRiskPerTrade: 0.1,
-    hardMaxRiskPerTrade: 0.2,
-    dailyLossLock: 0.4,
-    weeklyLossLock: 1,
-    maxOpenPositions: 1,
+    initialBalance: 10000,
+    absoluteEquityFloor: 8500,
+    maximumTotalLoss: 1500,
+    defaultRiskPerTrade: 10,
+    hardMaxRiskPerTrade: 20,
+    dailyLossLock: 100,
+    weeklyLossLock: 300,
+    maxOpenPositions: 5,
     maxMarginUsagePercent: 20,
   },
   dailyLocked: false,
@@ -100,7 +103,7 @@ export const OFFLINE_FALLBACK_STATE: ControllerState = {
       id: 'offline-init-01',
       at: new Date().toISOString(),
       kind: 'info',
-      message: 'Running in offline demo mode. Pull to refresh or check connection in Profile.',
+      message: 'Awaiting bridge connection. Tap SYNC or configure host in Profile.',
     },
   ],
 };
@@ -284,7 +287,10 @@ export const DEFAULT_PROFILER_SNAPSHOT: ProfilerApiState = {
 };
 
 export const KNOWN_HOST_CANDIDATES = [
-  'http://10.186.129.215:4000',
+  'http://10.229.19.215:4000',
+  'http://10.48.71.23:4000',
+  'http://100.65.195.233:4000',
+  'http://10.48.65.119:4000',
   'http://localhost:4000',
   'http://127.0.0.1:4000',
   'http://10.0.2.2:4000',
@@ -295,9 +301,19 @@ export const KNOWN_HOST_CANDIDATES = [
  * Resolves within milliseconds to the first responding host.
  */
 export async function probeCandidateUrls(customCandidates?: string[]): Promise<string | null> {
+  const hostUri = Constants.expoConfig?.hostUri ?? Constants.expoGoConfig?.debuggerHost;
+  const expoHost = hostUri?.replace(/^https?:\/\//, '').split(':')[0];
+  const dynamicCandidates: string[] = [];
+  if (expoHost && expoHost !== 'localhost' && expoHost !== '127.0.0.1') {
+    dynamicCandidates.push(`http://${expoHost}:4000`);
+  }
+
   const candidates = Array.from(
     new Set([
-      'http://10.186.129.215:4000',
+      ...dynamicCandidates,
+      'http://10.229.19.215:4000',
+      'http://10.48.71.23:4000',
+      'http://100.65.195.233:4000',
       'http://localhost:4000',
       'http://127.0.0.1:4000',
       API_BASE_URL,

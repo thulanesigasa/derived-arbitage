@@ -225,6 +225,11 @@ export interface Mt5TelemetryPayload {
   riskLocked: boolean;
   equityFloorLocked: boolean;
   terminalTime: string;
+  chartSymbol?: string;
+  bid?: number;
+  ask?: number;
+  quote?: number;
+  brokerConnected?: boolean;
 }
 
 export interface Mt5Command {

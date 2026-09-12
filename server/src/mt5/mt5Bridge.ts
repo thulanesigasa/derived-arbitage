@@ -9,6 +9,7 @@ import type {
   SymbolName,
 } from '../../../src/types.js';
 import { ControllerStore, log } from '../stateMachine.js';
+import { DISPLAY_TO_CODE } from '../deriv/symbolMap.js';
 
 export interface OrderResultPayload {
   ticket: number;
@@ -25,6 +26,7 @@ export class Mt5Bridge {
   private recentOrderResults: OrderResultPayload[] = [];
   private lastHeartbeatTime: number = 0;
   private readonly heartbeatTimeoutMs: number = 10_000; // 10s watchdog timeout
+  private tickListener?: (symbolCode: string, quote: number, epoch: number, ask?: number, bid?: number) => void;
 
   private status: Mt5BridgeStatus = {
     connected: false,
@@ -42,6 +44,13 @@ export class Mt5Bridge {
 
   constructor(store: ControllerStore) {
     this.store = store;
+  }
+
+  /**
+   * Register a listener for real-time live price ticks forwarded by MT5.
+   */
+  onTick(listener: (symbolCode: string, quote: number, epoch: number, ask?: number, bid?: number) => void): void {
+    this.tickListener = listener;
   }
 
   /**
@@ -64,6 +73,17 @@ export class Mt5Bridge {
       equityFloorLocked: Boolean(payload.equityFloorLocked),
       pendingCommandsCount: this.pendingCommands.length,
     };
+
+    // Dispatch live broker tick forwarded by MT5 terminal to strategy execution engine
+    if (payload.chartSymbol && payload.quote && payload.quote > 0 && this.tickListener) {
+      const code = DISPLAY_TO_CODE.get(payload.chartSymbol as SymbolName) ?? payload.chartSymbol;
+      const epoch = Math.floor(now / 1000);
+      try {
+        this.tickListener(code, payload.quote, epoch, payload.ask ?? payload.quote, payload.bid ?? payload.quote);
+      } catch (err) {
+        console.error('[MT5 Bridge] Error dispatching tick to execution engine:', err);
+      }
+    }
 
     // Reconcile MT5 telemetry with controller store
     this.store.mutate((state) => {

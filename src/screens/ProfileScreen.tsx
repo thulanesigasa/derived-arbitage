@@ -45,7 +45,7 @@ interface ProfileConfig {
 const DEFAULT_CONFIG: ProfileConfig = {
   derivAppId: '1089',
   derivToken: '',
-  mt5Server: 'DerivSVG-Server-03',
+  mt5Server: 'Deriv-Demo',
   mt5Account: 'Demo/Live Standard',
   bridgeUrl: API_BASE_URL,
   vpsApiKey: 'falcon-vps-key-2026',
@@ -67,8 +67,12 @@ export function ProfileScreen() {
         const raw = await AsyncStorage.getItem(STORAGE_KEY);
         if (raw) {
           const parsed = JSON.parse(raw) as ProfileConfig;
-          if (parsed.bridgeUrl && parsed.bridgeUrl.includes('192.168.1.42')) {
-            parsed.bridgeUrl = 'http://10.186.129.215:4000';
+          if (parsed.bridgeUrl && (parsed.bridgeUrl.includes('192.168.1.42') || parsed.bridgeUrl.includes('10.186.129.215'))) {
+            parsed.bridgeUrl = 'http://10.229.19.215:4000';
+            await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
+          }
+          if (parsed.mt5Server && parsed.mt5Server.includes('Server-03')) {
+            parsed.mt5Server = 'Deriv-Demo';
             await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
           }
           setConfig((prev) => ({ ...prev, ...parsed }));

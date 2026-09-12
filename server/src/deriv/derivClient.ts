@@ -32,9 +32,7 @@ export class DerivClient {
   constructor(
     private readonly appId: string,
     private readonly token: string | null,
-    private readonly wsUrl = appId && appId !== '1089'
-      ? `wss://ws.derivws.com/websockets/v3?app_id=${appId}`
-      : 'wss://api.derivws.com/trading/v1/options/ws/public',
+    private readonly wsUrl = `wss://ws.derivws.com/websockets/v3?app_id=${appId || '1089'}`,
   ) {}
 
   get connected()  { return this._connected; }

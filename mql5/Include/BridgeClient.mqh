@@ -212,7 +212,7 @@ private:
    string            m_processed_command_ids[IDEMPOTENCY_CACHE_SIZE];
    int               m_processed_head;
 
-   //--- Core WebRequest wrapper with latency calculation
+   //--- Core WebRequest wrapper with latency calculation and auto-fallback
    int               ExecuteRequest(const string method, const string endpoint, const string post_body, string &response_text)
      {
       string url = m_base_url + endpoint;
@@ -229,6 +229,32 @@ private:
 
       int status_code = WebRequest(method, url, headers, m_timeout_ms, post_data, result_data, result_headers);
       uint end_tick = GetTickCount();
+
+      // Seamless auto-fallback if MT5 sandbox blocked this specific URL alias (Error 4014)
+      if(status_code == -1 && GetLastError() == 4014)
+        {
+         string alt_base = m_base_url;
+         if(StringFind(alt_base, "localhost") >= 0)
+            StringReplace(alt_base, "localhost", "127.0.0.1");
+         else if(StringFind(alt_base, "127.0.0.1") >= 0)
+            StringReplace(alt_base, "127.0.0.1", "localhost");
+
+         if(alt_base != m_base_url)
+           {
+            string alt_url = alt_base + endpoint;
+            ResetLastError();
+            int alt_status = WebRequest(method, alt_url, headers, m_timeout_ms, post_data, result_data, result_headers);
+            end_tick = GetTickCount();
+            if(alt_status != -1)
+              {
+               m_base_url = alt_base;
+               url = alt_url;
+               status_code = alt_status;
+               PrintFormat("[BridgeClient] Auto-fallback engaged: switched to permitted URL %s", m_base_url);
+              }
+           }
+        }
+
       m_last_latency_ms = (end_tick >= start_tick) ? (end_tick - start_tick) : 0;
       m_total_requests_sent++;
 
@@ -243,7 +269,7 @@ private:
          if(err == 4014)
            {
             PrintFormat("[BridgeClient] ERROR 4014: URL '%s' is BLOCKED by MT5 sandbox!", url);
-            Print("[BridgeClient] ACTION REQUIRED: Press Ctrl+O -> Expert Advisors tab -> Check 'Allow WebRequest for listed URL' -> Add: http://localhost:4000");
+            Print("[BridgeClient] ACTION REQUIRED: Press Ctrl+O -> Expert Advisors tab -> Check 'Allow WebRequest for listed URL' -> Add: http://127.0.0.1:4000 and http://localhost:4000");
            }
          else
            {

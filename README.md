@@ -568,12 +568,85 @@ The Risk Engine is fully adaptive and auto-scales risk parameters based on the c
   - **Cumulative Drawdown Limit**: `10.0%` of balance (e.g., `$1,000.00` on `$10,000.00`; `$2.00` on `$20.00`).
   - **Target Risk Per Trade**: `0.1%` of balance (e.g., `$10.00` on `$10,000.00`; `$0.05` on `$20.00`).
   - **Max Concurrent Positions**: Scaled up to **`5` positions**!
-* **How to Refresh EA on an Active MT5 Chart**:
-  Because MT5 keeps running whatever EA was attached to the chart until reloaded:
-  1. On your active chart, press **`F7`** (EA Properties).
-  2. Click **Reset** (to load the latest percentage-based inputs) and click **OK**.
-  3. Alternatively, right-click the chart $\rightarrow$ **Expert List** $\rightarrow$ **Remove**, then drag `FalconEA` from Navigator back onto the chart.
-  The HUD will immediately display the scaled $10,000 limits with active percentage indicators!
+* **Cold-Start Safe Initialization & Self-Healing**:
+  When attaching `FalconEA` to newly opened market charts before price ticks are established, the engine automatically defaults to a safe non-zero baseline ($8,500.00 floor, $100.00 daily loss) and self-heals transient circuit breaker states, ensuring zero-limit edge cases can never trigger false risk locks.
 
+---
 
+### 6. Mobile Execution Pipeline: How Starting Trading Works from Mobile
 
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Trader as Mobile User (Phone / Web)
+    participant UI as Mobile Controller (Expo)
+    participant Bridge as Node.js Bridge Server (:4000)
+    participant Engine as Strategy & Risk Engine
+    participant FalconEA as MT5 FalconEA (:127.0.0.1)
+    participant Broker as Deriv Broker Terminal
+
+    Note over Trader,Broker: Step 1: Mobile Start Command
+    Trader->>UI: Taps "START" on Home Screen
+    UI->>Bridge: POST /api/control { action: 'start' }
+    Bridge->>Engine: Transition state to RUNNING
+
+    Note over Trader,Broker: Step 2: Live Market Ticks & Setup Detection
+    FalconEA->>Bridge: POST /api/mt5/telemetry (Live Chart Quote + Metrics)
+    Bridge->>Engine: Stream live ticks (e.g. Volatility 100 Index)
+    Engine->>Engine: Evaluate SMC Setups (FVG, Order Blocks, Liquidity Sweeps)
+
+    Note over Trader,Broker: Step 3: Order Queuing & Execution
+    Engine->>Bridge: queueSignalExecution(signal) -> EXECUTE_ORDER
+    FalconEA->>Bridge: GET /api/mt5/commands (1-second timer poll)
+    Bridge-->>FalconEA: Dispatches EXECUTE_ORDER command
+    FalconEA->>FalconEA: Validate risk against $10,000 balance ($10 risk, 5 max pos)
+    FalconEA->>Broker: g_trade.Buy() / g_trade.Sell()
+    Broker-->>FalconEA: Trade Executed! Ticket #123456789
+
+    Note over Trader,Broker: Step 4: Bidirectional Reconciliation
+    FalconEA->>Bridge: POST /api/mt5/telemetry (Open Positions with Ticket #)
+    Bridge->>UI: Push state update via WebSocket / Polling
+    UI-->>Trader: Live position displayed with floating P&L, SL, and TP!
+```
+
+#### Step-by-Step Mobile Trading Flow:
+1. **Open Mobile Controller**:
+   - Access the Mobile Controller from your phone via Expo Go or mobile browser (pointing to `http://<PC_LAN_IP>:8082`, e.g., `http://100.65.195.233:8082` or `http://10.48.65.119:8082`).
+   - The app's `probeCandidateUrls` will automatically discover and pair with the PC's bridge server on port `4000`.
+2. **Ensure MetaTrader 5 on PC is Running**:
+   - `FalconEA` attached to `Volatility 100 Index, M1` with **Algo Trading enabled** (smiling icon).
+   - HUD confirms `Bridge Connection: ONLINE (CONNECTED)` with `Ping: 0-2ms`.
+3. **Tap "START" on Mobile**:
+   - The primary action button transitions status to **`RUNNING`**.
+   - The strategy engine begins real-time evaluation across synthetic feeds.
+4. **Automated Trade Execution in MT5**:
+   - When a setup qualifies (e.g. SMC Liquidity Sweep, Fair Value Gap Retest, or BOS Continuation), the order is sent to MT5 within 1 second.
+   - `FalconEA` dynamically sizes the position (clamped to broker minimum lot size and proportional to account balance) and executes the trade.
+   - The trade immediately appears in your **MetaTrader 5 Mobile app**, **MetaTrader 5 PC terminal**, and the **Mobile EA Controller screen** simultaneously!
+5. **Full Position Lifecycle & Sync**:
+   - If you close the trade manually on your phone in MetaTrader 5 or desktop MT5, the controller reconciles the closure within 1 second.
+   - If Take-Profit or Stop-Loss is hit, both MT5 and the Mobile Controller record the realized P&L and update daily drawdown metrics in real time.
+
+---
+
+### 7. Multi-Symbol Master Gateway: Single Chart vs. Multiple Charts
+
+#### Do I Need to Open Multiple Charts for Multiple Instruments?
+**NO. You only need ONE SINGLE CHART open with FalconEA.**
+
+* **How It Works**:
+  In MetaTrader 5, the execution engine (`CTrade`) and market inspector (`CSymbolInfo`) are **not locked** to the chart they are attached to.
+  When the strategy engine in the Mobile Controller identifies a trading setup on `Volatility 75 Index`, `Boom 1000 Index`, `Crash 500 Index`, or `Step Index`, it transmits an `EXECUTE_ORDER` command containing the target `symbol` to the bridge.
+  The single instance of `FalconEA` running on your `Volatility 100 Index, M1` chart polls that order, selects the requested symbol dynamically, validates portfolio risk, and executes the trade directly via `g_trade.Buy(lots, symbol, ...)` or `g_trade.Sell(lots, symbol, ...)`.
+
+* **The Single Requirement**:
+  The only requirement in MetaTrader 5 is that your desired synthetic instruments are visible in the **Market Watch** window:
+  1. In MT5, press `Ctrl + M` to open **Market Watch**.
+  2. Right-click anywhere in the symbol list and click **"Show All"**.
+  3. That's it! FalconEA can now trade any of those instruments.
+
+* **Why You Should NOT Attach FalconEA to Multiple Charts**:
+  If you were to attach `FalconEA` to 5 or 10 different charts simultaneously:
+  - All 10 charts would poll `/api/mt5/commands` every 1 second, flooding the bridge with redundant requests.
+  - Multiple charts could race to execute the exact same order command, causing unintended duplicate entries.
+  - To prevent this, `FalconEA` includes built-in **Master Gateway Singleton Protection** (`GlobalVariable` guard) that automatically detects if another chart already has `FalconEA` running and safely deinitializes any duplicate instance with a helpful notice in the Experts log.

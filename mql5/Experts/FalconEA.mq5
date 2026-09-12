@@ -19,7 +19,7 @@
 //| EA Inputs & User Configuration                                   |
 //+------------------------------------------------------------------+
 input group "=== Server Bridge Connection ==="
-input string   InpBridgeUrl            = "http://localhost:4000"; // Server Bridge Base URL
+input string   InpBridgeUrl            = "http://127.0.0.1:4000"; // Server Bridge Base URL
 input string   InpBridgeApiKey         = "falcon-vps-key-2026";  // VPS Bridge API Key
 input int      InpSyncIntervalSec      = 1;                      // Sync & Polling Interval (seconds)
 input ulong    InpMagicNumber          = 20260908;               // Expert Magic Number
@@ -110,8 +110,13 @@ string BuildFullTelemetryJson()
      }
    positions_json += "]";
 
+   double bid   = SymbolInfoDouble(_Symbol, SYMBOL_BID);
+   double ask   = SymbolInfoDouble(_Symbol, SYMBOL_ASK);
+   double quote = (bid > 0.0) ? bid : SymbolInfoDouble(_Symbol, SYMBOL_LAST);
+   bool broker_connected = (bool)TerminalInfoInteger(TERMINAL_CONNECTED);
+
    string json = StringFormat(
-      "{\"account\":%I64d,\"balance\":%.2f,\"equity\":%.2f,\"margin\":%.2f,\"freeMargin\":%.2f,\"openPositions\":%s,\"dailyPnlUsd\":%.2f,\"riskLocked\":%s,\"equityFloorLocked\":%s,\"terminalTime\":\"%s\"}",
+      "{\"account\":%I64d,\"balance\":%.2f,\"equity\":%.2f,\"margin\":%.2f,\"freeMargin\":%.2f,\"openPositions\":%s,\"dailyPnlUsd\":%.2f,\"riskLocked\":%s,\"equityFloorLocked\":%s,\"terminalTime\":\"%s\",\"chartSymbol\":\"%s\",\"bid\":%.5f,\"ask\":%.5f,\"quote\":%.5f,\"brokerConnected\":%s}",
       g_account.Login(),
       m.current_balance,
       m.current_equity,
@@ -121,7 +126,12 @@ string BuildFullTelemetryJson()
       m.daily_net_pnl,
       m.risk_locked ? "true" : "false",
       m.equity_floor_locked ? "true" : "false",
-      TimeToString(TimeCurrent(), TIME_DATE|TIME_SECONDS)
+      TimeToString(TimeCurrent(), TIME_DATE|TIME_SECONDS),
+      _Symbol,
+      bid,
+      ask,
+      quote,
+      broker_connected ? "true" : "false"
    );
 
    return json;
@@ -155,10 +165,14 @@ void UpdateChartHUD()
    double weekly_pct = (m.current_balance > 0.0) ? (c.max_weekly_loss / m.current_balance * 100.0) : 0.0;
    double total_pct = (m.current_balance > 0.0) ? (c.max_total_loss / m.current_balance * 100.0) : 0.0;
 
+   bool broker_connected = (bool)TerminalInfoInteger(TERMINAL_CONNECTED);
+   string broker_conn_str = broker_connected ? "ONLINE (CONNECTED)" : "DISCONNECTED (CHECK MT5 IN BOTTOM-RIGHT)";
+
    string hud = StringFormat(
       "==========================================================\n"
       "   FALCON FX · SMC EXECUTION EA (%s)                      \n"
       "==========================================================\n"
+      "  MODE: MULTI-SYMBOL MASTER (Trades all pairs from 1 chart)\n"
       "  ACCOUNT TELEMETRY:\n"
       "    • Account: #%I64d | Server: %s\n"
       "    • Equity: $%.2f | Balance: $%.2f | Free Margin: $%.2f\n"
@@ -172,7 +186,8 @@ void UpdateChartHUD()
       "    • Loss Streak: %d / %d | Cooldown: %s\n"
       "    • Open Positions: %d / %d\n"
       "----------------------------------------------------------\n"
-      "  BRIDGE TELEMETRY:\n"
+      "  NETWORK & BROKER STATUS:\n"
+      "    • Deriv Trade Server: %s\n"
       "    • Bridge Connection: %s\n"
       "    • Round-Trip Latency: %u ms | Failures: %d\n"
       "    • Last Heartbeat: %s\n"
@@ -189,6 +204,7 @@ void UpdateChartHUD()
       m.consecutive_losses, InpMaxLossStreak,
       m.cooldown_active ? StringFormat("[ACTIVE until %s]", TimeToString(m.cooldown_expiry)) : "[OFF]",
       PositionsTotal(), c.max_open_positions,
+      broker_conn_str,
       bridge_conn,
       g_bridge.GetLatencyMs(), g_bridge.GetConsecutiveErrors(),
       (g_bridge.GetLastSyncTime() > 0) ? TimeToString(g_bridge.GetLastSyncTime(), TIME_DATE|TIME_SECONDS) : "NEVER"
@@ -264,6 +280,16 @@ void ProcessBridgeCommand(const BridgeCommand &cmd)
          return;
         }
 
+      // Pre-execution Broker Connection Validation
+      if(!TerminalInfoInteger(TERMINAL_CONNECTED))
+        {
+         string no_conn_msg = "MT5 terminal has no network connection to Deriv broker server. Check MT5 connection in bottom-right corner or File -> Login.";
+         PrintFormat("[FalconEA] Execution rejected: %s", no_conn_msg);
+         g_bridge.MarkCommandAsProcessed(cmd.id);
+         g_bridge.SendOrderResult(0, cmd.id, false, no_conn_msg, 0.0);
+         return;
+        }
+
       g_symbol.RefreshRates();
       ENUM_ORDER_TYPE order_type;
       double price = 0.0;
@@ -283,6 +309,54 @@ void ProcessBridgeCommand(const BridgeCommand &cmd)
          g_bridge.MarkCommandAsProcessed(cmd.id);
          g_bridge.SendOrderResult(0, cmd.id, false, "Invalid order direction", 0.0);
          return;
+        }
+
+      // Ensure SL distance satisfies broker stops_level & freeze_level
+      double stops_level = (double)g_symbol.StopsLevel() * g_symbol.Point();
+      double freeze_level = (double)g_symbol.FreezeLevel() * g_symbol.Point();
+      double min_dist = MathMax(stops_level, freeze_level);
+      double buffer = 5.0 * g_symbol.Point();
+      double required_min_dist = min_dist + buffer;
+
+      // If no SL provided (e.g. test or manual execution), generate default SL and TP
+      if(sl <= 0.0)
+        {
+         double default_dist = MathMax(required_min_dist, 250.0 * g_symbol.Point());
+         if(order_type == ORDER_TYPE_BUY)
+           {
+            sl = price - default_dist;
+            if(tp <= 0.0) tp = price + (default_dist * 2.5);
+           }
+         else if(order_type == ORDER_TYPE_SELL)
+           {
+            sl = price + default_dist;
+            if(tp <= 0.0) tp = price - (default_dist * 2.5);
+           }
+         PrintFormat("[FalconEA] Generated default SL/TP for order: SL=%.5f, TP=%.5f (Dist: %.5f)", sl, tp, default_dist);
+        }
+      else if(required_min_dist > 0.0)
+        {
+         double current_sl_dist = MathAbs(price - sl);
+         if(current_sl_dist < required_min_dist)
+           {
+            double original_rr = 2.5;
+            if(current_sl_dist > 0.0 && tp > 0.0)
+               original_rr = MathAbs(tp - price) / current_sl_dist;
+
+            if(order_type == ORDER_TYPE_BUY)
+              {
+               sl = price - required_min_dist;
+               if(tp > 0.0) tp = price + (required_min_dist * original_rr);
+              }
+            else if(order_type == ORDER_TYPE_SELL)
+              {
+               sl = price + required_min_dist;
+               if(tp > 0.0) tp = price - (required_min_dist * original_rr);
+              }
+
+            PrintFormat("[FalconEA] Auto-adjusted SL/TP to meet broker minimum stops: SL Dist %.5f -> %.5f pts (Req Min: %.5f)",
+                        current_sl_dist, required_min_dist, min_dist);
+           }
         }
 
       // Dynamic Fractional Lot Sizing Calculation
@@ -340,22 +414,25 @@ void ProcessBridgeCommand(const BridgeCommand &cmd)
      }
   }
 
+double g_last_scaled_balance = -1.0;
+
 //+------------------------------------------------------------------+
 //| Dynamic Real-Time Adaptive Risk Scaling                          |
 //+------------------------------------------------------------------+
 void CheckAndApplyDynamicRisk(bool force = false)
   {
-   static double s_last_scaled_balance = -1.0;
    double cur_bal = AccountInfoDouble(ACCOUNT_BALANCE);
    if(cur_bal <= 0.0)
       cur_bal = AccountInfoDouble(ACCOUNT_EQUITY);
-   if(cur_bal <= 0.0) return;
-
-   // Re-scale if forced or if balance shifted by more than 0.5%
-   if(!force && s_last_scaled_balance > 0.0 && MathAbs(cur_bal - s_last_scaled_balance) / s_last_scaled_balance < 0.005)
-      return;
+   if(cur_bal <= 0.0)
+      cur_bal = 10000.0; // Safe fallback baseline if terminal has not ticked yet
 
    RiskConfig config = g_risk.GetConfig();
+   bool needs_scale = force || (config.max_daily_loss <= 0.0) || (config.equity_floor <= 0.0);
+
+   // Re-scale if forced, unconfigured, or if balance shifted by more than 0.5%
+   if(!needs_scale && g_last_scaled_balance > 0.0 && MathAbs(cur_bal - g_last_scaled_balance) / g_last_scaled_balance < 0.005)
+      return;
 
    if(InpAutoDynamicRisk)
      {
@@ -387,7 +464,7 @@ void CheckAndApplyDynamicRisk(bool force = false)
    if(config.max_open_positions < 1) config.max_open_positions = 1;
 
    g_risk.UpdateConfig(config);
-   s_last_scaled_balance = cur_bal;
+   g_last_scaled_balance = cur_bal;
 
    PrintFormat("[FalconEA] Dynamic Risk Scaled for Balance $%.2f: Floor=$%.2f (%.0f%%), DailyLossLimit=$%.2f (%.1f%%), WeeklyLimit=$%.2f (%.1f%%), TotalLossLimit=$%.2f (%.0f%%), Risk/Trade=$%.2f (%.1f%%), MaxPos=%d",
                cur_bal, config.equity_floor, InpEquityFloorPercent,
@@ -407,20 +484,59 @@ int OnInit()
    PrintFormat("       FALCON EA · %s BRIDGE          ", AccountInfoString(ACCOUNT_SERVER));
    Print("=================================================");
 
+   // Enforce single master gateway instance across terminal charts
+   string singleton_var = "FalconEA_MasterGateway";
+   long current_chart = ChartID();
+   if(GlobalVariableCheck(singleton_var))
+     {
+      long existing_chart = (long)GlobalVariableGet(singleton_var);
+      if(existing_chart != 0 && existing_chart != current_chart)
+        {
+         if(ChartSymbol(existing_chart) != "")
+           {
+            PrintFormat("[FalconEA] NOTICE: FalconEA is already active as Master Gateway on Chart ID %I64d (%s).",
+                        existing_chart, ChartSymbol(existing_chart));
+            Print("[FalconEA] FalconEA trades ALL 10 synthetic instruments from a SINGLE chart. Opening multiple charts with FalconEA is not needed.");
+            return INIT_FAILED;
+           }
+        }
+     }
+   GlobalVariableSet(singleton_var, (double)current_chart);
+
    // Configure CTrade execution properties
    g_trade.SetExpertMagicNumber(InpMagicNumber);
    g_trade.SetDeviationInPoints(20);
    g_trade.SetTypeFilling(ORDER_FILLING_IOC);
 
+   g_last_scaled_balance = -1.0;
+
+   double init_bal = AccountInfoDouble(ACCOUNT_BALANCE);
+   if(init_bal <= 0.0) init_bal = AccountInfoDouble(ACCOUNT_EQUITY);
+   if(init_bal <= 0.0) init_bal = 10000.0;
+
    // Configure RiskEngine with user guardrails
    RiskConfig config;
-   config.equity_floor               = 0.0;
-   config.equity_floor_warning       = 0.0;
-   config.max_daily_loss             = 0.0;
-   config.max_weekly_loss            = 0.0;
-   config.max_total_loss             = 0.0;
-   config.default_risk_per_trade     = 0.0;
-   config.hard_max_risk_per_trade    = 0.0;
+   if(InpAutoDynamicRisk)
+     {
+      config.equity_floor            = NormalizeDouble(init_bal * (InpEquityFloorPercent / 100.0), 2);
+      config.equity_floor_warning    = NormalizeDouble(init_bal * (InpEquityFloorWarnPct / 100.0), 2);
+      config.max_daily_loss          = NormalizeDouble(init_bal * (InpMaxDailyLossPercent / 100.0), 2);
+      config.max_weekly_loss         = NormalizeDouble(init_bal * (InpMaxWeeklyLossPercent / 100.0), 2);
+      config.max_total_loss          = NormalizeDouble(init_bal * (InpMaxTotalLossPercent / 100.0), 2);
+      config.default_risk_per_trade  = NormalizeDouble(init_bal * (InpRiskPerTradePercent / 100.0), 2);
+      config.hard_max_risk_per_trade = NormalizeDouble(init_bal * (InpHardRiskTradePercent / 100.0), 2);
+     }
+   else
+     {
+      config.equity_floor            = InpEquityFloor;
+      config.equity_floor_warning    = InpEquityFloorWarning;
+      config.max_daily_loss          = InpMaxDailyLoss;
+      config.max_weekly_loss         = InpMaxWeeklyLoss;
+      config.max_total_loss          = InpMaxTotalLoss;
+      config.default_risk_per_trade  = InpTargetRiskPerTrade;
+      config.hard_max_risk_per_trade = InpHardMaxRiskPerTrade;
+     }
+
    config.max_open_positions         = InpMaxPositions;
    config.max_margin_usage_percent   = InpMaxMarginPercent;
    config.max_spread_points          = InpMaxSpreadPoints;
@@ -437,6 +553,7 @@ int OnInit()
    config.emergency_flatten_retries  = 5;
 
    g_risk.Init(config);
+   g_last_scaled_balance = init_bal;
 
    // Dynamically scale risk limits immediately to live account balance
    CheckAndApplyDynamicRisk(true);
@@ -463,6 +580,12 @@ void OnDeinit(const int reason)
   {
    EventKillTimer();
    Comment("");
+   string singleton_var = "FalconEA_MasterGateway";
+   if(GlobalVariableCheck(singleton_var))
+     {
+      if((long)GlobalVariableGet(singleton_var) == ChartID())
+         GlobalVariableDel(singleton_var);
+     }
    PrintFormat("[FalconEA] Deinitialized safely. Reason code: %d", reason);
   }
 
