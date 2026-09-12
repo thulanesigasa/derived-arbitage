@@ -96,18 +96,18 @@ export class Mt5Bridge {
 
       // Dynamic scaling for standard/demo accounts ($1,000 - $10,000+)
       if (payload.balance >= 1000) {
-        const firstScale = state.riskPolicy.maxOpenPositions !== 5;
+        const firstScale = state.riskPolicy.maxOpenPositions !== 15;
         state.accountType = 'Standard';
         state.riskPolicy.initialBalance = payload.balance;
         state.riskPolicy.absoluteEquityFloor = Math.round(payload.balance * 0.85); // 85% equity floor ($8,500 on $10k)
         state.riskPolicy.maximumTotalLoss = Math.round(payload.balance * 0.15);    // 15% max total loss ($1,500 on $10k)
-        state.riskPolicy.defaultRiskPerTrade = Math.round(payload.balance * 0.001); // 0.1% ($10 on $10k)
+        state.riskPolicy.defaultRiskPerTrade = Math.round(payload.balance * 0.002); // 0.2% Hard Max Risk ($20 on $10k)
         state.riskPolicy.hardMaxRiskPerTrade = Math.round(payload.balance * 0.002); // 0.2% ($20 on $10k)
         state.riskPolicy.dailyLossLock = Math.round(payload.balance * 0.01);       // 1.0% ($100 on $10k)
         state.riskPolicy.weeklyLossLock = Math.round(payload.balance * 0.03);      // 3.0% ($300 on $10k)
-        state.riskPolicy.maxOpenPositions = 5;                                     // Up to 5 concurrent positions
+        state.riskPolicy.maxOpenPositions = 15;                                    // Up to 15 concurrent positions
         if (firstScale) {
-          log(state, 'info', `[MT5 BRIDGE] Adaptive Risk Policy scaled for $${payload.balance.toFixed(0)} balance: 5 max positions, $${state.riskPolicy.defaultRiskPerTrade} risk per trade, $${state.riskPolicy.dailyLossLock} daily lock`);
+          log(state, 'info', `[MT5 BRIDGE] Adaptive Risk Policy scaled for $${payload.balance.toFixed(0)} balance: 15 max positions, $${state.riskPolicy.hardMaxRiskPerTrade} hard max risk per trade, $${state.riskPolicy.dailyLossLock} daily lock`);
         }
       }
 

@@ -21,7 +21,7 @@ export class ExecutionEngine {
   private recentSignals: StrategySignal[] = [];
   private lastEntryTime = 0;
   /** Cooldown in ms between trades to prevent immediate duplicate executions */
-  private readonly entryCooldownMs = 15_000;
+  private readonly entryCooldownMs = 5_000;
 
   constructor(store: ControllerStore, mt5Bridge?: Mt5Bridge) {
     this.store = store;
@@ -79,17 +79,17 @@ export class ExecutionEngine {
 
     const state = this.store.snapshot;
 
-    // 2. Manage open position exits & unrealized P&L regardless of whether paused or running
-    const existingIndex = state.positions.findIndex((p) => p.symbol === sym.display);
-    if (existingIndex !== -1) {
-      this.evaluatePositionExit(sym.display, quote, existingIndex);
-      return;
-    }
+    // 2. Manage open position exits & unrealized P&L for all positions on this symbol
+    this.evaluatePositionsForSymbol(sym.display, quote);
 
     // 3. Evaluate new entries ONLY when automation is running
     if (state.status !== 'running') return;
     if (!state.selectedSymbols.includes(sym.display)) return;
     if (state.positions.length >= state.riskPolicy.maxOpenPositions) return;
+
+    // Concurrency guard: up to 2 concurrent setups per symbol, overall capped by maxOpenPositions (15)
+    const symbolPositions = state.positions.filter((p) => p.symbol === sym.display);
+    if (symbolPositions.length >= 2) return;
 
     const now = Date.now();
     if (now - this.lastEntryTime < this.entryCooldownMs) return;
@@ -100,8 +100,8 @@ export class ExecutionEngine {
     const signal = FalconEngine.evaluate(sym.display, sym.code, candles, atr, quote);
     if (!signal) return;
 
-    // Adapt trade risk to active account risk policy ($10 on $10k, $0.10 on $20)
-    signal.riskUsd = state.riskPolicy.defaultRiskPerTrade;
+    // Calibrate trade risk to Hard Maximum Risk ($20 on $10k balance, 0.2%)
+    signal.riskUsd = state.riskPolicy.hardMaxRiskPerTrade ?? state.riskPolicy.defaultRiskPerTrade;
 
     // 4. Pre-trade Risk Gate Validation
     const decision = assessNewTrade(state, { risk: signal.riskUsd, marginUsagePercent: 5 });
@@ -135,11 +135,11 @@ export class ExecutionEngine {
 
     this.store.mutate((s) => {
       s.positions = [...s.positions, position];
-      s.marginUsagePercent = 5;
+      s.marginUsagePercent = Math.min(s.positions.length * 2, 20);
       log(
         s,
         'info',
-        `[SMC ENGINE] Opened ${signal.side} on ${signal.symbol} @ ${signal.entryPrice.toFixed(2)} · SL: ${signal.stopLoss.toFixed(2)} · TP: ${signal.takeProfit.toFixed(2)} · Target: 1:${signal.rrRatio} R:R`
+        `[SMC ENGINE] Opened ${signal.side} on ${signal.symbol} @ ${signal.entryPrice.toFixed(2)} · SL: ${signal.stopLoss.toFixed(2)} · TP: ${signal.takeProfit.toFixed(2)} · Target: 1:${signal.rrRatio} R:R (Risk: $${signal.riskUsd})`
       );
     });
 
@@ -150,60 +150,65 @@ export class ExecutionEngine {
   }
 
   /**
-   * Real-time position tracking and TP/SL automated exit processing.
+   * Real-time position tracking and TP/SL automated exit processing for all positions of a symbol.
    */
-  private evaluatePositionExit(symbol: SymbolName, currentPrice: number, posIndex: number): void {
+  private evaluatePositionsForSymbol(symbol: SymbolName, currentPrice: number): void {
     this.store.mutate((s) => {
-      const pos = s.positions[posIndex];
-      if (!pos || pos.simulated === false || !pos.entryPrice || !pos.stopLoss || !pos.takeProfit) return;
+      const positions = s.positions.filter((p) => p.symbol === symbol && p.simulated !== false);
+      if (positions.length === 0) return;
 
-      const slDistance = Math.abs(pos.entryPrice - pos.stopLoss);
-      if (slDistance <= 0) return;
+      for (const pos of positions) {
+        if (!pos.entryPrice || !pos.stopLoss || !pos.takeProfit) continue;
 
-      const isBuy = pos.side === 'BUY';
-      const priceDelta = (currentPrice - pos.entryPrice) * (isBuy ? 1 : -1);
+        const slDistance = Math.abs(pos.entryPrice - pos.stopLoss);
+        if (slDistance <= 0) continue;
 
-      // Check Take Profit Reached
-      const tpHit = isBuy ? currentPrice >= pos.takeProfit : currentPrice <= pos.takeProfit;
-      if (tpHit) {
-        const gain = Math.round(pos.risk * (pos.rrRatio ?? 2.5) * 100) / 100;
-        s.positions = s.positions.filter((p) => p.id !== pos.id);
-        s.balance = Math.round((s.balance + gain) * 100) / 100;
-        s.sessionPnl = Math.round((s.sessionPnl + gain) * 100) / 100;
-        s.dailyPnl = Math.round((s.dailyPnl + gain) * 100) / 100;
-        s.marginUsagePercent = s.positions.length > 0 ? 5 : 0;
-        s.equity = s.balance;
-        log(
-          s,
-          'success',
-          `[TP HIT] Target reached on ${pos.symbol} @ ${currentPrice.toFixed(2)} · Realized +$${gain.toFixed(2)} (1:${pos.rrRatio ?? 2.5} R:R)`
-        );
-        return;
+        const isBuy = pos.side === 'BUY';
+        const priceDelta = (currentPrice - pos.entryPrice) * (isBuy ? 1 : -1);
+
+        // Check Take Profit Reached
+        const tpHit = isBuy ? currentPrice >= pos.takeProfit : currentPrice <= pos.takeProfit;
+        if (tpHit) {
+          const gain = Math.round(pos.risk * (pos.rrRatio ?? 2.5) * 100) / 100;
+          s.positions = s.positions.filter((p) => p.id !== pos.id);
+          s.balance = Math.round((s.balance + gain) * 100) / 100;
+          s.sessionPnl = Math.round((s.sessionPnl + gain) * 100) / 100;
+          s.dailyPnl = Math.round((s.dailyPnl + gain) * 100) / 100;
+          s.marginUsagePercent = s.positions.length > 0 ? Math.min(s.positions.length * 2, 20) : 0;
+          s.equity = s.balance;
+          log(
+            s,
+            'success',
+            `[TP HIT] Target reached on ${pos.symbol} @ ${currentPrice.toFixed(2)} · Realized +$${gain.toFixed(2)} (1:${pos.rrRatio ?? 2.5} R:R)`
+          );
+          continue;
+        }
+
+        // Check Stop Loss Reached
+        const slHit = isBuy ? currentPrice <= pos.stopLoss : currentPrice >= pos.stopLoss;
+        if (slHit) {
+          const loss = pos.risk;
+          s.positions = s.positions.filter((p) => p.id !== pos.id);
+          s.balance = Math.round((s.balance - loss) * 100) / 100;
+          s.sessionPnl = Math.round((s.sessionPnl - loss) * 100) / 100;
+          s.dailyPnl = Math.round((s.dailyPnl - loss) * 100) / 100;
+          s.drawdown = Math.round(Math.max(s.drawdown, s.riskPolicy.initialBalance - s.balance) * 100) / 100;
+          s.marginUsagePercent = s.positions.length > 0 ? Math.min(s.positions.length * 2, 20) : 0;
+          s.equity = s.balance;
+          log(
+            s,
+            'warning',
+            `[SL HIT] Stopped out on ${pos.symbol} @ ${currentPrice.toFixed(2)} · Loss -$${loss.toFixed(2)}`
+          );
+          continue;
+        }
+
+        // Active position unrealized P&L update
+        const normalizedPnl = Math.round(((priceDelta / slDistance) * pos.risk) * 100) / 100;
+        pos.unrealizedPnl = normalizedPnl;
       }
 
-      // Check Stop Loss Reached
-      const slHit = isBuy ? currentPrice <= pos.stopLoss : currentPrice >= pos.stopLoss;
-      if (slHit) {
-        const loss = pos.risk;
-        s.positions = s.positions.filter((p) => p.id !== pos.id);
-        s.balance = Math.round((s.balance - loss) * 100) / 100;
-        s.sessionPnl = Math.round((s.sessionPnl - loss) * 100) / 100;
-        s.dailyPnl = Math.round((s.dailyPnl - loss) * 100) / 100;
-        s.drawdown = Math.round(Math.max(s.drawdown, s.riskPolicy.initialBalance - s.balance) * 100) / 100;
-        s.marginUsagePercent = s.positions.length > 0 ? 5 : 0;
-        s.equity = s.balance;
-        log(
-          s,
-          'warning',
-          `[SL HIT] Stopped out on ${pos.symbol} @ ${currentPrice.toFixed(2)} · Loss -$${loss.toFixed(2)}`
-        );
-        return;
-      }
-
-      // Active position unrealized P&L update
-      const normalizedPnl = Math.round(((priceDelta / slDistance) * pos.risk) * 100) / 100;
-      pos.unrealizedPnl = normalizedPnl;
-      const totalUnrealized = s.positions.reduce((acc, p) => acc + p.unrealizedPnl, 0);
+      const totalUnrealized = s.positions.reduce((acc, p) => acc + (p.unrealizedPnl ?? 0), 0);
       s.equity = Math.round((s.balance + totalUnrealized) * 100) / 100;
     });
   }
