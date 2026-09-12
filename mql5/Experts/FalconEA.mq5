@@ -167,6 +167,7 @@ void UpdateChartHUD()
       "==========================================================\n"
       "   FALCON FX · SMC EXECUTION EA (%s)                      \n"
       "==========================================================\n"
+      "  MODE: MULTI-SYMBOL MASTER (Trades all pairs from 1 chart)\n"
       "  ACCOUNT TELEMETRY:\n"
       "    • Account: #%I64d | Server: %s\n"
       "    • Equity: $%.2f | Balance: $%.2f | Free Margin: $%.2f\n"
@@ -418,6 +419,25 @@ int OnInit()
    PrintFormat("       FALCON EA · %s BRIDGE          ", AccountInfoString(ACCOUNT_SERVER));
    Print("=================================================");
 
+   // Enforce single master gateway instance across terminal charts
+   string singleton_var = "FalconEA_MasterGateway";
+   long current_chart = ChartID();
+   if(GlobalVariableCheck(singleton_var))
+     {
+      long existing_chart = (long)GlobalVariableGet(singleton_var);
+      if(existing_chart != 0 && existing_chart != current_chart)
+        {
+         if(ChartSymbol(existing_chart) != "")
+           {
+            PrintFormat("[FalconEA] NOTICE: FalconEA is already active as Master Gateway on Chart ID %I64d (%s).",
+                        existing_chart, ChartSymbol(existing_chart));
+            Print("[FalconEA] FalconEA trades ALL 10 synthetic instruments from a SINGLE chart. Opening multiple charts with FalconEA is not needed.");
+            return INIT_FAILED;
+           }
+        }
+     }
+   GlobalVariableSet(singleton_var, (double)current_chart);
+
    // Configure CTrade execution properties
    g_trade.SetExpertMagicNumber(InpMagicNumber);
    g_trade.SetDeviationInPoints(20);
@@ -495,6 +515,12 @@ void OnDeinit(const int reason)
   {
    EventKillTimer();
    Comment("");
+   string singleton_var = "FalconEA_MasterGateway";
+   if(GlobalVariableCheck(singleton_var))
+     {
+      if((long)GlobalVariableGet(singleton_var) == ChartID())
+         GlobalVariableDel(singleton_var);
+     }
    PrintFormat("[FalconEA] Deinitialized safely. Reason code: %d", reason);
   }
 

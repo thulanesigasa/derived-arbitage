@@ -626,3 +626,27 @@ sequenceDiagram
 5. **Full Position Lifecycle & Sync**:
    - If you close the trade manually on your phone in MetaTrader 5 or desktop MT5, the controller reconciles the closure within 1 second.
    - If Take-Profit or Stop-Loss is hit, both MT5 and the Mobile Controller record the realized P&L and update daily drawdown metrics in real time.
+
+---
+
+### 7. Multi-Symbol Master Gateway: Single Chart vs. Multiple Charts
+
+#### Do I Need to Open Multiple Charts for Multiple Instruments?
+**NO. You only need ONE SINGLE CHART open with FalconEA.**
+
+* **How It Works**:
+  In MetaTrader 5, the execution engine (`CTrade`) and market inspector (`CSymbolInfo`) are **not locked** to the chart they are attached to.
+  When the strategy engine in the Mobile Controller identifies a trading setup on `Volatility 75 Index`, `Boom 1000 Index`, `Crash 500 Index`, or `Step Index`, it transmits an `EXECUTE_ORDER` command containing the target `symbol` to the bridge.
+  The single instance of `FalconEA` running on your `Volatility 100 Index, M1` chart polls that order, selects the requested symbol dynamically, validates portfolio risk, and executes the trade directly via `g_trade.Buy(lots, symbol, ...)` or `g_trade.Sell(lots, symbol, ...)`.
+
+* **The Single Requirement**:
+  The only requirement in MetaTrader 5 is that your desired synthetic instruments are visible in the **Market Watch** window:
+  1. In MT5, press `Ctrl + M` to open **Market Watch**.
+  2. Right-click anywhere in the symbol list and click **"Show All"**.
+  3. That's it! FalconEA can now trade any of those instruments.
+
+* **Why You Should NOT Attach FalconEA to Multiple Charts**:
+  If you were to attach `FalconEA` to 5 or 10 different charts simultaneously:
+  - All 10 charts would poll `/api/mt5/commands` every 1 second, flooding the bridge with redundant requests.
+  - Multiple charts could race to execute the exact same order command, causing unintended duplicate entries.
+  - To prevent this, `FalconEA` includes built-in **Master Gateway Singleton Protection** (`GlobalVariable` guard) that automatically detects if another chart already has `FalconEA` running and safely deinitializes any duplicate instance with a helpful notice in the Experts log.
