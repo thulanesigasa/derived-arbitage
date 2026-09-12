@@ -44,29 +44,25 @@ export function SmcStructureModal({
   const [data, setData] = useState<InstrumentStructureResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!visible || !symbolCode) return;
-    let mounted = true;
+  const loadStructure = () => {
+    if (!symbolCode) return;
     setLoading(true);
     setError(null);
 
     getMarketStructure(symbolCode)
       .then((res) => {
-        if (mounted) {
-          setData(res);
-          setLoading(false);
-        }
+        setData(res);
+        setLoading(false);
       })
       .catch((err) => {
-        if (mounted) {
-          setError(err instanceof Error ? err.message : 'Could not load structure');
-          setLoading(false);
-        }
+        setError(err instanceof Error ? err.message : 'Could not load structure');
+        setLoading(false);
       });
+  };
 
-    return () => {
-      mounted = false;
-    };
+  useEffect(() => {
+    if (!visible || !symbolCode) return;
+    loadStructure();
   }, [visible, symbolCode]);
 
   const decimals = pip < 0.01 ? 4 : 2;
@@ -110,6 +106,13 @@ export function SmcStructureModal({
           ) : error ? (
             <View style={styles.centerContainer}>
               <Text style={styles.errorText}>{error}</Text>
+              <Pressable
+                accessibilityRole="button"
+                onPress={loadStructure}
+                style={({ pressed }) => [styles.retryBtn, pressed && styles.pressedBtn]}
+              >
+                <Text style={styles.retryBtnText}>Retry Analysis</Text>
+              </Pressable>
             </View>
           ) : data ? (
             <ScrollView
@@ -182,6 +185,46 @@ export function SmcStructureModal({
                   </Text>
                 </View>
               </View>
+
+              {/* SMC Analytical Reference Guide */}
+              <View style={styles.guideCard}>
+                <Text style={styles.cardLabel}>SMC TELEMETRY DEFINITIONS</Text>
+
+                <View style={styles.guideItem}>
+                  <Text style={styles.guideTitle}>• Trend Bias</Text>
+                  <Text style={styles.guideDesc}>
+                    Current directional order flow derived from higher-highs/higher-lows (BULLISH) vs lower-highs/lower-lows (BEARISH).
+                  </Text>
+                </View>
+
+                <View style={styles.guideItem}>
+                  <Text style={styles.guideTitle}>• Break of Structure (BOS)</Text>
+                  <Text style={styles.guideDesc}>
+                    Occurs when price breaches and closes past a recent swing fractal, confirming trend continuation.
+                  </Text>
+                </View>
+
+                <View style={styles.guideItem}>
+                  <Text style={styles.guideTitle}>• Change of Character (CHoCH)</Text>
+                  <Text style={styles.guideDesc}>
+                    Initial break of opposing market structure, signaling an institutional trend reversal.
+                  </Text>
+                </View>
+
+                <View style={styles.guideItem}>
+                  <Text style={styles.guideTitle}>• Fair Value Gaps (FVG)</Text>
+                  <Text style={styles.guideDesc}>
+                    3-candle liquidity imbalances left by aggressive smart money buying or selling.
+                  </Text>
+                </View>
+
+                <View style={styles.guideItem}>
+                  <Text style={styles.guideTitle}>• Dynamic ATR</Text>
+                  <Text style={styles.guideDesc}>
+                    Average True Range calculated across forming bars, determining minimum stop loss buffer and risk scaling.
+                  </Text>
+                </View>
+              </View>
             </ScrollView>
           ) : null}
         </View>
@@ -194,7 +237,10 @@ function CandleChart({ candles, decimals }: { candles: Candle[]; decimals: numbe
   if (candles.length === 0) {
     return (
       <View style={styles.emptyChart}>
-        <Text style={styles.emptyChartText}>Awaiting candle accumulation…</Text>
+        <Text style={styles.emptyChartTitle}>Awaiting Candle Accumulation</Text>
+        <Text style={styles.emptyChartText}>
+          Constructing live M1 bars from broker feed. Visual candlestick sparklines and fractal swing levels appear once completed 1-minute bars accumulate.
+        </Text>
       </View>
     );
   }
@@ -300,7 +346,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 24,
     borderColor: colors.border,
     borderWidth: 1,
-    maxHeight: '85%',
+    height: '82%',
     paddingBottom: 32,
   },
   modalHeader: {
@@ -362,6 +408,20 @@ const styles = StyleSheet.create({
     color: colors.orange,
     fontSize: 13,
   },
+  retryBtn: {
+    marginTop: 8,
+    minHeight: 48,
+    backgroundColor: colors.orange,
+    borderRadius: 10,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  retryBtnText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '800',
+  },
 
   body: {
     flex: 1,
@@ -412,13 +472,22 @@ const styles = StyleSheet.create({
     fontFamily: 'monospace',
   },
   emptyChart: {
-    height: 100,
+    paddingVertical: 20,
+    paddingHorizontal: 12,
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 6,
+  },
+  emptyChartTitle: {
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: '700',
   },
   emptyChartText: {
     color: colors.muted,
-    fontSize: 12,
+    fontSize: 11,
+    textAlign: 'center',
+    lineHeight: 16,
   },
 
   gridCard: {
@@ -474,4 +543,27 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
   },
+
+  guideCard: {
+    backgroundColor: colors.panel,
+    borderColor: colors.border,
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 16,
+    gap: 10,
+  },
+  guideItem: {
+    gap: 2,
+  },
+  guideTitle: {
+    color: colors.orange,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  guideDesc: {
+    color: colors.muted,
+    fontSize: 11,
+    lineHeight: 16,
+  },
 });
+
