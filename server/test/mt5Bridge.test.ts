@@ -236,7 +236,7 @@ describe('Mt5Bridge Server Layer', () => {
     expect(cmd?.direction).toBe('SELL');
   });
 
-  it('dynamically auto-scales risk policy and increases maxOpenPositions to 5 on $10,000 balance', () => {
+  it('dynamically auto-scales risk policy and increases maxOpenPositions to 15 on $10,000 balance', () => {
     const store = new ControllerStore();
     const bridge = new Mt5Bridge(store);
 
@@ -263,8 +263,8 @@ describe('Mt5Bridge Server Layer', () => {
     expect(s.balance).toBe(10000.0);
     expect(s.equity).toBe(10000.0);
     expect(s.riskPolicy.initialBalance).toBe(10000.0);
-    expect(s.riskPolicy.maxOpenPositions).toBe(5);
-    expect(s.riskPolicy.defaultRiskPerTrade).toBe(10.0); // 0.1% of $10,000
+    expect(s.riskPolicy.maxOpenPositions).toBe(15);
+    expect(s.riskPolicy.defaultRiskPerTrade).toBe(20.0); // 0.2% Hard Max Risk of $10,000
     expect(s.riskPolicy.hardMaxRiskPerTrade).toBe(20.0); // 0.2% of $10,000
     expect(s.riskPolicy.absoluteEquityFloor).toBe(8500.0); // 85% of $10,000
     expect(s.riskPolicy.dailyLossLock).toBe(100.0); // 1% of $10,000

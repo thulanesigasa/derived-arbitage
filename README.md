@@ -187,10 +187,26 @@ A common point of confusion when configuring the Profile screen or MT5 bridge is
 
 ---
 
-## Risk Policy (Demo)
+## Risk Policy
+
+### Standard & Demo Accounts ($10,000 Baseline)
+
+| Guard | Value | Ratio / Pct | Operational Function |
+|---|---:|---:|---|
+| **Starting Balance** | $10,000.00 | 100% | High-capacity institutional baseline balance |
+| **Absolute Equity Floor** | $8,500.00 | 85.0% | Emergency circuit-breaker closes all trades and locks engine |
+| **Maximum Total Drawdown** | $1,500.00 | 15.0% | Cumulative portfolio loss threshold |
+| **Hard Max Risk / Trade** | $20.00 | 0.20% | Every signal is strictly sized to the $20 Hard Maximum Risk |
+| **Daily Loss Lock** | $100.00 | 1.0% | Daily circuit-breaker halts trading until 00:00 UTC |
+| **Weekly Loss Lock** | $300.00 | 3.0% | Cumulative weekly loss lock |
+| **Max Open Positions** | 15 | — | Arbitrage capacity allowing up to 15 concurrent market executions |
+| **Max Margin Usage** | 20.0% | 20.0% | Max allocated margin cap across all open positions |
+| **Max Daily Trades** | 100 | — | Daily ceiling for multi-position arbitrage executions |
+
+### Micro Account Mode ($20.00 Baseline)
 
 | Guard | Value |
-|-------|------:|
+|---|---:|
 | Starting balance | $20.00 |
 | Absolute equity floor | $15.00 |
 | Max total loss | $5.00 |
@@ -599,7 +615,7 @@ sequenceDiagram
     Engine->>Bridge: queueSignalExecution(signal) -> EXECUTE_ORDER
     FalconEA->>Bridge: GET /api/mt5/commands (1-second timer poll)
     Bridge-->>FalconEA: Dispatches EXECUTE_ORDER command
-    FalconEA->>FalconEA: Validate risk against $10,000 balance ($10 risk, 5 max pos)
+    FalconEA->>FalconEA: Validate risk against $10,000 balance ($20 hard max risk, 15 max pos)
     FalconEA->>Broker: g_trade.Buy() / g_trade.Sell()
     Broker-->>FalconEA: Trade Executed! Ticket #123456789
 
@@ -650,3 +666,13 @@ sequenceDiagram
   - All 10 charts would poll `/api/mt5/commands` every 1 second, flooding the bridge with redundant requests.
   - Multiple charts could race to execute the exact same order command, causing unintended duplicate entries.
   - To prevent this, `FalconEA` includes built-in **Master Gateway Singleton Protection** (`GlobalVariable` guard) that automatically detects if another chart already has `FalconEA` running and safely deinitializes any duplicate instance with a helpful notice in the Experts log.
+
+---
+
+### 8. High-Capacity Concurrent Arbitrage (15 Simultaneous Positions)
+
+To capitalize on synthetic index arbitrage discrepancies across multiple uncorrelated assets:
+* **Concurrent Capacity (`maxOpenPositions = 15`)**: The execution engine and MQL5 Risk Engine permit up to 15 concurrent open positions simultaneously (with up to 2 concurrent setups per symbol).
+* **Hard Maximum Risk Calibration ($20 / trade)**: Each trade entry is calibrated directly to the Hard Maximum Risk ($20.00 on a $10,000 balance, exactly 0.20%), ensuring maximal capital efficiency without breaching account safety rules.
+* **Portfolio Risk Harmonization**: 15 concurrent positions × $20.00 = $300.00 maximum aggregate exposure, perfectly aligned with the $300.00 Weekly Loss Lock (3.0%) and comfortably above the $8,500.00 Absolute Equity Floor (85.0%).
+* **Rapid Cooldown (5,000 ms)**: New setup evaluation cooldown is reduced to 5 seconds to support high-frequency fills across simultaneous market opportunities.

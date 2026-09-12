@@ -148,7 +148,7 @@ describe('ExecutionEngine', () => {
     const pos = store.snapshot.positions[0]!;
     expect(pos.symbol).toBe('Volatility 75 Index');
     expect(pos.side).toBe('BUY');
-    expect(pos.risk).toBe(0.10);
+    expect(pos.risk).toBe(0.20);
 
     // Price moves toward TP: unrealized P&L should be positive
     engine.handleTick('R_75', 135, 1700000010);

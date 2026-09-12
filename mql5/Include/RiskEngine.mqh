@@ -600,12 +600,12 @@ void CRiskEngine::SetDefaultConfig()
    m_config.max_total_loss             = 5.00;
    m_config.default_risk_per_trade     = 0.10;
    m_config.hard_max_risk_per_trade    = 0.20;
-   m_config.max_open_positions         = 1;
+   m_config.max_open_positions         = 15;
    m_config.max_margin_usage_percent   = 20.0;
    m_config.max_spread_points          = 600.0;
    m_config.max_consecutive_losses     = 3;
    m_config.cooldown_duration_sec      = 3600;
-   m_config.max_daily_trades           = 15;
+   m_config.max_daily_trades           = 100;
    m_config.require_hard_sl            = true;
    m_config.break_even_enabled         = true;
    m_config.break_even_trigger_rr      = 1.5;

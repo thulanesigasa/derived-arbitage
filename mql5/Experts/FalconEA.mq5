@@ -31,9 +31,9 @@ input double   InpEquityFloorWarnPct   = 90.0;                   // Equity Warni
 input double   InpMaxDailyLossPercent  = 1.0;                    // Maximum Daily Loss (% of balance, e.g. 1.0%)
 input double   InpMaxWeeklyLossPercent = 3.0;                    // Maximum Weekly Loss (% of balance, e.g. 3.0%)
 input double   InpMaxTotalLossPercent  = 10.0;                   // Maximum Total Drawdown (% of balance, e.g. 10.0%)
-input double   InpRiskPerTradePercent  = 0.1;                    // Target Risk Per Trade (% of balance, e.g. 0.1%)
+input double   InpRiskPerTradePercent  = 0.2;                    // Target Risk Per Trade (% of balance, e.g. 0.2% = Hard Max Risk)
 input double   InpHardRiskTradePercent = 0.2;                    // Hard Max Risk Per Trade (% of balance, e.g. 0.2%)
-input int      InpMaxPositions         = 5;                      // Max Simultaneous Positions (5)
+input int      InpMaxPositions         = 15;                     // Max Simultaneous Positions (15)
 
 input group "=== Manual Override Limits (if Dynamic Mode = false) ==="
 input double   InpEquityFloor          = 8500.00;                // Manual Equity Floor ($)
@@ -41,7 +41,7 @@ input double   InpEquityFloorWarning   = 9000.00;                // Manual Warni
 input double   InpMaxDailyLoss         = 100.00;                 // Manual Maximum Daily Loss ($)
 input double   InpMaxWeeklyLoss        = 300.00;                 // Manual Maximum Weekly Loss ($)
 input double   InpMaxTotalLoss         = 1000.00;                // Manual Maximum Cumulative Loss ($)
-input double   InpTargetRiskPerTrade   = 10.00;                  // Manual Target Risk per Trade ($)
+input double   InpTargetRiskPerTrade   = 20.00;                  // Manual Target Risk per Trade ($)
 input double   InpHardMaxRiskPerTrade  = 20.00;                  // Manual Hard Max Risk per Trade ($)
 
 input group "=== Trade Risk & Execution Guardrails ==="
@@ -542,7 +542,7 @@ int OnInit()
    config.max_spread_points          = InpMaxSpreadPoints;
    config.max_consecutive_losses     = InpMaxLossStreak;
    config.cooldown_duration_sec      = InpCooldownSec;
-   config.max_daily_trades           = 15;
+   config.max_daily_trades           = 100;
    config.require_hard_sl            = true;
    config.break_even_enabled         = InpBreakEvenEnabled;
    config.break_even_trigger_rr      = InpBreakEvenTriggerRR;
