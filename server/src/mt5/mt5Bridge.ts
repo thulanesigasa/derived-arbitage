@@ -74,14 +74,27 @@ export class Mt5Bridge {
       pendingCommandsCount: this.pendingCommands.length,
     };
 
-    // Dispatch live broker tick forwarded by MT5 terminal to strategy execution engine
-    if (payload.chartSymbol && payload.quote && payload.quote > 0 && this.tickListener) {
-      const code = DISPLAY_TO_CODE.get(payload.chartSymbol as SymbolName) ?? payload.chartSymbol;
+    // Dispatch live broker ticks forwarded by MT5 terminal to strategy execution engine
+    if (this.tickListener) {
       const epoch = Math.floor(now / 1000);
-      try {
-        this.tickListener(code, payload.quote, epoch, payload.ask ?? payload.quote, payload.bid ?? payload.quote);
-      } catch (err) {
-        console.error('[MT5 Bridge] Error dispatching tick to execution engine:', err);
+      if (Array.isArray(payload.quotes) && payload.quotes.length > 0) {
+        for (const q of payload.quotes) {
+          if (q.symbol && q.quote && q.quote > 0) {
+            const code = DISPLAY_TO_CODE.get(q.symbol as SymbolName) ?? q.symbol;
+            try {
+              this.tickListener(code, q.quote, epoch, q.ask ?? q.quote, q.bid ?? q.quote);
+            } catch (err) {
+              console.error(`[MT5 Bridge] Error dispatching tick for ${q.symbol}:`, err);
+            }
+          }
+        }
+      } else if (payload.chartSymbol && payload.quote && payload.quote > 0) {
+        const code = DISPLAY_TO_CODE.get(payload.chartSymbol as SymbolName) ?? payload.chartSymbol;
+        try {
+          this.tickListener(code, payload.quote, epoch, payload.ask ?? payload.quote, payload.bid ?? payload.quote);
+        } catch (err) {
+          console.error('[MT5 Bridge] Error dispatching tick to execution engine:', err);
+        }
       }
     }
 

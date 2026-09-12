@@ -348,4 +348,38 @@ describe('Mt5Bridge Server Layer', () => {
     expect(polled[0]!.type).toBe('CLOSE_POSITION');
     expect(polled[0]!.ticket).toBe(882233);
   });
+
+  it('dispatches ticks for all instruments received in payload.quotes array', () => {
+    const store = new ControllerStore();
+    const bridge = new Mt5Bridge(store);
+
+    const receivedTicks: Array<{ code: string; quote: number }> = [];
+    bridge.onTick((code, quote) => {
+      receivedTicks.push({ code, quote });
+    });
+
+    bridge.handleTelemetry({
+      account: 6048573,
+      balance: 10000,
+      equity: 10000,
+      margin: 0,
+      freeMargin: 10000,
+      dailyPnlUsd: 0,
+      openPositions: [],
+      riskLocked: false,
+      equityFloorLocked: false,
+      terminalTime: '2026-09-13 01:00:00',
+      chartSymbol: 'Volatility 100 Index',
+      quote: 545.10,
+      quotes: [
+        { symbol: 'Volatility 100 Index', bid: 545.10, ask: 545.20, quote: 545.10 },
+        { symbol: 'Volatility 75 Index', bid: 125000, ask: 125005, quote: 125000 },
+        { symbol: 'Step Index', bid: 8200, ask: 8201, quote: 8200 },
+        { symbol: 'Boom 1000 Index', bid: 10500, ask: 10502, quote: 10500 },
+      ],
+    });
+
+    expect(receivedTicks).toHaveLength(4);
+    expect(receivedTicks.map((t) => t.code)).toEqual(['R_100', 'R_75', 'stpRNG', 'BOOM1000']);
+  });
 });

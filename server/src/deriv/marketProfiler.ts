@@ -190,6 +190,28 @@ export class MarketProfiler {
   }
 
 
+  /** Ingest live broker tick forwarded by MT5 bridge to populate real-time profiler telemetry */
+  recordBrokerTick(symbolCode: string, quote: number, epoch: number, ask?: number, bid?: number): void {
+    const askVal = ask ?? quote;
+    const bidVal = bid ?? quote;
+
+    const existing = this.activeInfo.get(symbolCode);
+    if (existing) {
+      existing.spot = quote;
+      existing.isOpen = true;
+    } else {
+      this.activeInfo.set(symbolCode, { pip: 0.01, spot: quote, isOpen: true });
+    }
+
+    this.tickStore.push(symbolCode, {
+      epoch,
+      ask: askVal,
+      bid: bidVal,
+      quote,
+      spread: Math.max(0, askVal - bidVal),
+    });
+  }
+
   /** Build the full ProfilerApiState snapshot. Called by REST endpoints. */
   getState(): ProfilerApiState {
     const profiles: SymbolProfile[] = SYMBOL_MAP.map((sym): SymbolProfile => {

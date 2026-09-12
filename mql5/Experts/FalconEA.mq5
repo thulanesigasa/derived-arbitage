@@ -72,6 +72,27 @@ CAccountInfo   g_account;
 CPositionInfo  g_position;
 CSymbolInfo    g_symbol;
 
+// Multi-Asset Arbitrage Watchlist
+const string g_watched_symbols[] = {
+   "Volatility 10 Index",
+   "Volatility 25 Index",
+   "Volatility 50 Index",
+   "Volatility 75 Index",
+   "Volatility 100 Index",
+   "Volatility 10 (1s) Index",
+   "Volatility 25 (1s) Index",
+   "Volatility 50 (1s) Index",
+   "Volatility 75 (1s) Index",
+   "Volatility 100 (1s) Index",
+   "Step Index",
+   "Boom 500 Index",
+   "Boom 1000 Index",
+   "Crash 500 Index",
+   "Crash 100 Index",
+   "Crash 300 Index",
+   "Crash 1000 Index"
+};
+
 //+------------------------------------------------------------------+
 //| Build Complete Telemetry JSON Payload for Server Bridge          |
 //+------------------------------------------------------------------+
@@ -115,24 +136,47 @@ string BuildFullTelemetryJson()
    double quote = (bid > 0.0) ? bid : SymbolInfoDouble(_Symbol, SYMBOL_LAST);
    bool broker_connected = (bool)TerminalInfoInteger(TERMINAL_CONNECTED);
 
-   string json = StringFormat(
-      "{\"account\":%I64d,\"balance\":%.2f,\"equity\":%.2f,\"margin\":%.2f,\"freeMargin\":%.2f,\"openPositions\":%s,\"dailyPnlUsd\":%.2f,\"riskLocked\":%s,\"equityFloorLocked\":%s,\"terminalTime\":\"%s\",\"chartSymbol\":\"%s\",\"bid\":%.5f,\"ask\":%.5f,\"quote\":%.5f,\"brokerConnected\":%s}",
-      g_account.Login(),
-      m.current_balance,
-      m.current_equity,
-      m.margin_used,
-      m.free_margin,
-      positions_json,
-      m.daily_net_pnl,
-      m.risk_locked ? "true" : "false",
-      m.equity_floor_locked ? "true" : "false",
-      TimeToString(TimeCurrent(), TIME_DATE|TIME_SECONDS),
-      _Symbol,
-      bid,
-      ask,
-      quote,
-      broker_connected ? "true" : "false"
-   );
+   // Collect live broker quotes for all watched instruments in Market Watch
+   string quotes_json = "[";
+   int q_count = 0;
+   int watched_count = ArraySize(g_watched_symbols);
+   for(int i = 0; i < watched_count; i++)
+     {
+      string s_name = g_watched_symbols[i];
+      SymbolSelect(s_name, true);
+      double s_bid   = SymbolInfoDouble(s_name, SYMBOL_BID);
+      double s_ask   = SymbolInfoDouble(s_name, SYMBOL_ASK);
+      double s_last  = SymbolInfoDouble(s_name, SYMBOL_LAST);
+      double s_quote = (s_bid > 0.0) ? s_bid : s_last;
+      if(s_quote > 0.0)
+        {
+         if(q_count > 0)
+            quotes_json += ",";
+         quotes_json += StringFormat("{\"symbol\":\"%s\",\"bid\":%.5f,\"ask\":%.5f,\"quote\":%.5f}",
+                                     s_name, s_bid, s_ask, s_quote);
+         q_count++;
+        }
+     }
+   quotes_json += "]";
+
+   string json = "{";
+   json += StringFormat("\"account\":%I64d,", g_account.Login());
+   json += StringFormat("\"balance\":%.2f,", m.current_balance);
+   json += StringFormat("\"equity\":%.2f,", m.current_equity);
+   json += StringFormat("\"margin\":%.2f,", m.margin_used);
+   json += StringFormat("\"freeMargin\":%.2f,", m.free_margin);
+   json += "\"openPositions\":" + positions_json + ",";
+   json += StringFormat("\"dailyPnlUsd\":%.2f,", m.daily_net_pnl);
+   json += StringFormat("\"riskLocked\":%s,", m.risk_locked ? "true" : "false");
+   json += StringFormat("\"equityFloorLocked\":%s,", m.equity_floor_locked ? "true" : "false");
+   json += StringFormat("\"terminalTime\":\"%s\",", TimeToString(TimeCurrent(), TIME_DATE|TIME_SECONDS));
+   json += StringFormat("\"chartSymbol\":\"%s\",", _Symbol);
+   json += StringFormat("\"bid\":%.5f,", bid);
+   json += StringFormat("\"ask\":%.5f,", ask);
+   json += StringFormat("\"quote\":%.5f,", quote);
+   json += StringFormat("\"brokerConnected\":%s,", broker_connected ? "true" : "false");
+   json += "\"quotes\":" + quotes_json;
+   json += "}";
 
    return json;
   }
@@ -557,6 +601,13 @@ int OnInit()
 
    // Dynamically scale risk limits immediately to live account balance
    CheckAndApplyDynamicRisk(true);
+
+   // Ensure all watched instruments are active in Market Watch for streaming
+   int watched_count = ArraySize(g_watched_symbols);
+   for(int i = 0; i < watched_count; i++)
+     {
+      SymbolSelect(g_watched_symbols[i], true);
+     }
 
    // Configure Bridge Client with API Key Authentication
    g_bridge.Init(InpBridgeUrl, 3000, InpBridgeApiKey);
