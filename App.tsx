@@ -10,6 +10,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import {
   API_BASE_URL,
@@ -169,10 +170,20 @@ export default function App() {
         const workingHost = await probeCandidateUrls();
         if (workingHost && mounted.current) {
           setCurrentApiUrl(workingHost);
+          setApiBaseUrl(workingHost);
           const recovered = await getState();
           setState(recovered);
           setOnline(true);
           setError(null);
+          void AsyncStorage.getItem('@mobile_ea_profile_config').then((raw) => {
+            try {
+              const cfg = raw ? JSON.parse(raw) : {};
+              cfg.bridgeUrl = workingHost;
+              void AsyncStorage.setItem('@mobile_ea_profile_config', JSON.stringify(cfg));
+            } catch {
+              // ignore
+            }
+          });
           return;
         }
       } catch {
