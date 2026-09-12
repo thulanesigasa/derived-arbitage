@@ -568,12 +568,9 @@ The Risk Engine is fully adaptive and auto-scales risk parameters based on the c
   - **Cumulative Drawdown Limit**: `10.0%` of balance (e.g., `$1,000.00` on `$10,000.00`; `$2.00` on `$20.00`).
   - **Target Risk Per Trade**: `0.1%` of balance (e.g., `$10.00` on `$10,000.00`; `$0.05` on `$20.00`).
   - **Max Concurrent Positions**: Scaled up to **`5` positions**!
-* **How to Refresh EA on an Active MT5 Chart**:
-  Because MT5 keeps running whatever EA was attached to the chart until reloaded:
-  1. On your active chart, press **`F7`** (EA Properties).
-  2. Click **Reset** (to load the latest percentage-based inputs) and click **OK**.
-  3. Alternatively, right-click the chart $\rightarrow$ **Expert List** $\rightarrow$ **Remove**, then drag `FalconEA` from Navigator back onto the chart.
-  The HUD will immediately display the scaled $10,000 limits with active percentage indicators!
+* **Cold-Start Safe Initialization & Self-Healing**:
+  When attaching `FalconEA` to newly opened market charts before price ticks are established, the engine automatically defaults to a safe non-zero baseline ($8,500.00 floor, $100.00 daily loss) and self-heals transient circuit breaker states, ensuring zero-limit edge cases can never trigger false risk locks.
+
 
 
 

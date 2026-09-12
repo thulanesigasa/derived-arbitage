@@ -845,9 +845,9 @@ ENUM_RISK_BREACH_REASON CRiskEngine::CheckRiskLimits()
   {
    RecalculateMetrics();
 
-   // 1. ABSOLUTE EQUITY FLOOR CIRCUIT BREAKER ($15.00)
-   // Guard: ignore cold-start uninitialized equity (<= 0.0) from MT5
-   if(m_metrics.current_equity > 0.0 && m_metrics.current_equity <= m_config.equity_floor)
+   // 1. ABSOLUTE EQUITY FLOOR CIRCUIT BREAKER
+   // Guard: ignore unconfigured or cold-start uninitialized equity (<= 0.0) from MT5
+   if(m_config.equity_floor > 0.0 && m_metrics.current_equity > 0.0 && m_metrics.current_equity <= m_config.equity_floor)
      {
       if(!m_metrics.equity_floor_locked)
         {
@@ -860,14 +860,14 @@ ENUM_RISK_BREACH_REASON CRiskEngine::CheckRiskLimits()
         }
       return BREACH_EQUITY_FLOOR;
      }
-   else if(m_metrics.current_equity > m_config.equity_floor_warning && m_metrics.equity_floor_locked)
+   else if(m_config.equity_floor > 0.0 && m_metrics.current_equity > m_config.equity_floor_warning && m_metrics.equity_floor_locked)
      {
-      // Self-heal: clear false lock if equity was temporarily reported 0.00 during chart initialization
+      // Self-heal: clear false lock if equity is safely above warning threshold
       m_metrics.equity_floor_locked = false;
      }
 
-   // 2. PRE-WARNING EQUITY FLOOR THRESHOLD ($16.00)
-   if(m_metrics.current_equity > m_config.equity_floor && m_metrics.current_equity <= m_config.equity_floor_warning && !m_metrics.equity_floor_locked)
+   // 2. PRE-WARNING EQUITY FLOOR THRESHOLD
+   if(m_config.equity_floor > 0.0 && m_metrics.current_equity > m_config.equity_floor && m_metrics.current_equity <= m_config.equity_floor_warning && !m_metrics.equity_floor_locked)
      {
       m_logger.Log(LOG_LEVEL_WARNING, "RiskWarning",
                    StringFormat("WARNING: Equity ($%.2f) approaching absolute floor ($%.2f). Extreme defense active.",
@@ -875,8 +875,8 @@ ENUM_RISK_BREACH_REASON CRiskEngine::CheckRiskLimits()
                    m_metrics.current_equity, m_metrics.current_balance, m_metrics.daily_net_pnl);
      }
 
-   // 3. DAILY LOSS LIMIT CIRCUIT BREAKER ($0.40)
-   if(m_metrics.daily_net_pnl <= -m_config.max_daily_loss)
+   // 3. DAILY LOSS LIMIT CIRCUIT BREAKER
+   if(m_config.max_daily_loss > 0.0 && m_metrics.daily_net_pnl <= -m_config.max_daily_loss)
      {
       if(!m_metrics.risk_locked)
         {
@@ -889,9 +889,14 @@ ENUM_RISK_BREACH_REASON CRiskEngine::CheckRiskLimits()
         }
       return BREACH_DAILY_LOSS_LIMIT;
      }
+   else if(m_config.max_daily_loss > 0.0 && m_metrics.risk_locked && m_metrics.daily_net_pnl > -m_config.max_daily_loss && m_metrics.current_drawdown < m_config.max_total_loss)
+     {
+      // Self-heal: clear false lock if DayPnL is healthy and drawdown is within safe limits
+      m_metrics.risk_locked = false;
+     }
 
-   // 4. CUMULATIVE MAXIMUM DRAWDOWN ($5.00)
-   if(m_metrics.current_drawdown >= m_config.max_total_loss)
+   // 4. CUMULATIVE MAXIMUM DRAWDOWN
+   if(m_config.max_total_loss > 0.0 && m_metrics.current_drawdown >= m_config.max_total_loss)
      {
       if(!m_metrics.risk_locked)
         {

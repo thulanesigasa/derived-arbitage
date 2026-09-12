@@ -340,22 +340,25 @@ void ProcessBridgeCommand(const BridgeCommand &cmd)
      }
   }
 
+double g_last_scaled_balance = -1.0;
+
 //+------------------------------------------------------------------+
 //| Dynamic Real-Time Adaptive Risk Scaling                          |
 //+------------------------------------------------------------------+
 void CheckAndApplyDynamicRisk(bool force = false)
   {
-   static double s_last_scaled_balance = -1.0;
    double cur_bal = AccountInfoDouble(ACCOUNT_BALANCE);
    if(cur_bal <= 0.0)
       cur_bal = AccountInfoDouble(ACCOUNT_EQUITY);
-   if(cur_bal <= 0.0) return;
-
-   // Re-scale if forced or if balance shifted by more than 0.5%
-   if(!force && s_last_scaled_balance > 0.0 && MathAbs(cur_bal - s_last_scaled_balance) / s_last_scaled_balance < 0.005)
-      return;
+   if(cur_bal <= 0.0)
+      cur_bal = 10000.0; // Safe fallback baseline if terminal has not ticked yet
 
    RiskConfig config = g_risk.GetConfig();
+   bool needs_scale = force || (config.max_daily_loss <= 0.0) || (config.equity_floor <= 0.0);
+
+   // Re-scale if forced, unconfigured, or if balance shifted by more than 0.5%
+   if(!needs_scale && g_last_scaled_balance > 0.0 && MathAbs(cur_bal - g_last_scaled_balance) / g_last_scaled_balance < 0.005)
+      return;
 
    if(InpAutoDynamicRisk)
      {
@@ -387,7 +390,7 @@ void CheckAndApplyDynamicRisk(bool force = false)
    if(config.max_open_positions < 1) config.max_open_positions = 1;
 
    g_risk.UpdateConfig(config);
-   s_last_scaled_balance = cur_bal;
+   g_last_scaled_balance = cur_bal;
 
    PrintFormat("[FalconEA] Dynamic Risk Scaled for Balance $%.2f: Floor=$%.2f (%.0f%%), DailyLossLimit=$%.2f (%.1f%%), WeeklyLimit=$%.2f (%.1f%%), TotalLossLimit=$%.2f (%.0f%%), Risk/Trade=$%.2f (%.1f%%), MaxPos=%d",
                cur_bal, config.equity_floor, InpEquityFloorPercent,
@@ -412,15 +415,35 @@ int OnInit()
    g_trade.SetDeviationInPoints(20);
    g_trade.SetTypeFilling(ORDER_FILLING_IOC);
 
+   g_last_scaled_balance = -1.0;
+
+   double init_bal = AccountInfoDouble(ACCOUNT_BALANCE);
+   if(init_bal <= 0.0) init_bal = AccountInfoDouble(ACCOUNT_EQUITY);
+   if(init_bal <= 0.0) init_bal = 10000.0;
+
    // Configure RiskEngine with user guardrails
    RiskConfig config;
-   config.equity_floor               = 0.0;
-   config.equity_floor_warning       = 0.0;
-   config.max_daily_loss             = 0.0;
-   config.max_weekly_loss            = 0.0;
-   config.max_total_loss             = 0.0;
-   config.default_risk_per_trade     = 0.0;
-   config.hard_max_risk_per_trade    = 0.0;
+   if(InpAutoDynamicRisk)
+     {
+      config.equity_floor            = NormalizeDouble(init_bal * (InpEquityFloorPercent / 100.0), 2);
+      config.equity_floor_warning    = NormalizeDouble(init_bal * (InpEquityFloorWarnPct / 100.0), 2);
+      config.max_daily_loss          = NormalizeDouble(init_bal * (InpMaxDailyLossPercent / 100.0), 2);
+      config.max_weekly_loss         = NormalizeDouble(init_bal * (InpMaxWeeklyLossPercent / 100.0), 2);
+      config.max_total_loss          = NormalizeDouble(init_bal * (InpMaxTotalLossPercent / 100.0), 2);
+      config.default_risk_per_trade  = NormalizeDouble(init_bal * (InpRiskPerTradePercent / 100.0), 2);
+      config.hard_max_risk_per_trade = NormalizeDouble(init_bal * (InpHardRiskTradePercent / 100.0), 2);
+     }
+   else
+     {
+      config.equity_floor            = InpEquityFloor;
+      config.equity_floor_warning    = InpEquityFloorWarning;
+      config.max_daily_loss          = InpMaxDailyLoss;
+      config.max_weekly_loss         = InpMaxWeeklyLoss;
+      config.max_total_loss          = InpMaxTotalLoss;
+      config.default_risk_per_trade  = InpTargetRiskPerTrade;
+      config.hard_max_risk_per_trade = InpHardMaxRiskPerTrade;
+     }
+
    config.max_open_positions         = InpMaxPositions;
    config.max_margin_usage_percent   = InpMaxMarginPercent;
    config.max_spread_points          = InpMaxSpreadPoints;
@@ -437,6 +460,7 @@ int OnInit()
    config.emergency_flatten_retries  = 5;
 
    g_risk.Init(config);
+   g_last_scaled_balance = init_bal;
 
    // Dynamically scale risk limits immediately to live account balance
    CheckAndApplyDynamicRisk(true);
