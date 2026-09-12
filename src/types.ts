@@ -229,6 +229,7 @@ export interface Mt5TelemetryPayload {
   bid?: number;
   ask?: number;
   quote?: number;
+  brokerConnected?: boolean;
 }
 
 export interface Mt5Command {

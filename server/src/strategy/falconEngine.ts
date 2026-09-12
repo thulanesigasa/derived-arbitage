@@ -25,6 +25,8 @@ export class FalconEngine {
     const latest = candles[candles.length - 1]!;
     const prev = candles[candles.length - 2]!;
 
+    const minSlDistance = Math.max(atr * 1.5, spotPrice * 0.003, 1.5);
+
     // ─── Setup 1: Falcon Liquidity Sweep Reversal ────────────────────────────
     // Wick sweeps recent swing point but closes back inside range
     const recentHigh = smc.swingHighs[smc.swingHighs.length - 1];
@@ -32,7 +34,7 @@ export class FalconEngine {
 
     if (recentHigh && latest.high > recentHigh.price && latest.close < recentHigh.price) {
       // Bearish sweep of buy-side liquidity
-      const slDistance = Math.max(latest.high - spotPrice + (atr * 0.5), atr * 1.5);
+      const slDistance = Math.max(latest.high - spotPrice + (atr * 0.5), minSlDistance);
       const sl = spotPrice + slDistance;
       const tp = spotPrice - (slDistance * this.MIN_RR);
 
@@ -54,7 +56,7 @@ export class FalconEngine {
 
     if (recentLow && latest.low < recentLow.price && latest.close > recentLow.price) {
       // Bullish sweep of sell-side liquidity
-      const slDistance = Math.max(spotPrice - latest.low + (atr * 0.5), atr * 1.5);
+      const slDistance = Math.max(spotPrice - latest.low + (atr * 0.5), minSlDistance);
       const sl = spotPrice - slDistance;
       const tp = spotPrice + (slDistance * this.MIN_RR);
 
@@ -77,7 +79,7 @@ export class FalconEngine {
     // ─── Setup 2: SMC Change of Character (CHoCH) Trend Reversal ─────────────
     if (smc.lastCHoCH) {
       const isBullish = smc.lastCHoCH.type === 'BULLISH';
-      const slDistance = atr * 1.5;
+      const slDistance = minSlDistance;
       const sl = isBullish ? spotPrice - slDistance : spotPrice + slDistance;
       const tp = isBullish ? spotPrice + (slDistance * this.MIN_RR) : spotPrice - (slDistance * this.MIN_RR);
 
@@ -100,7 +102,7 @@ export class FalconEngine {
     // ─── Setup 3: SMC Break of Structure (BOS) Continuation ──────────────────
     if (smc.lastBOS) {
       const isBullish = smc.lastBOS.type === 'BULLISH';
-      const slDistance = atr * 1.5;
+      const slDistance = minSlDistance;
       const sl = isBullish ? spotPrice - slDistance : spotPrice + slDistance;
       const tp = isBullish ? spotPrice + (slDistance * this.MIN_RR) : spotPrice - (slDistance * this.MIN_RR);
 
@@ -124,7 +126,7 @@ export class FalconEngine {
     if (smc.activeFVGs.length > 0) {
       const fvg = smc.activeFVGs[smc.activeFVGs.length - 1]!;
       if (fvg.type === 'BULLISH' && spotPrice >= fvg.bottom && spotPrice <= fvg.top) {
-        const slDistance = Math.max(spotPrice - fvg.bottom + (atr * 0.5), atr * 1.2);
+        const slDistance = Math.max(spotPrice - fvg.bottom + (atr * 0.5), minSlDistance);
         const sl = spotPrice - slDistance;
         const tp = spotPrice + (slDistance * this.MIN_RR);
 
@@ -143,7 +145,7 @@ export class FalconEngine {
           createdAt: new Date().toISOString(),
         };
       } else if (fvg.type === 'BEARISH' && spotPrice <= fvg.top && spotPrice >= fvg.bottom) {
-        const slDistance = Math.max(fvg.top - spotPrice + (atr * 0.5), atr * 1.2);
+        const slDistance = Math.max(fvg.top - spotPrice + (atr * 0.5), minSlDistance);
         const sl = spotPrice + slDistance;
         const tp = spotPrice - (slDistance * this.MIN_RR);
 
@@ -167,3 +169,5 @@ export class FalconEngine {
     return null;
   }
 }
+
+

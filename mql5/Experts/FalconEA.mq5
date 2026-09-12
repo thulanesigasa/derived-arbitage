@@ -113,9 +113,10 @@ string BuildFullTelemetryJson()
    double bid   = SymbolInfoDouble(_Symbol, SYMBOL_BID);
    double ask   = SymbolInfoDouble(_Symbol, SYMBOL_ASK);
    double quote = (bid > 0.0) ? bid : SymbolInfoDouble(_Symbol, SYMBOL_LAST);
+   bool broker_connected = (bool)TerminalInfoInteger(TERMINAL_CONNECTED);
 
    string json = StringFormat(
-      "{\"account\":%I64d,\"balance\":%.2f,\"equity\":%.2f,\"margin\":%.2f,\"freeMargin\":%.2f,\"openPositions\":%s,\"dailyPnlUsd\":%.2f,\"riskLocked\":%s,\"equityFloorLocked\":%s,\"terminalTime\":\"%s\",\"chartSymbol\":\"%s\",\"bid\":%.5f,\"ask\":%.5f,\"quote\":%.5f}",
+      "{\"account\":%I64d,\"balance\":%.2f,\"equity\":%.2f,\"margin\":%.2f,\"freeMargin\":%.2f,\"openPositions\":%s,\"dailyPnlUsd\":%.2f,\"riskLocked\":%s,\"equityFloorLocked\":%s,\"terminalTime\":\"%s\",\"chartSymbol\":\"%s\",\"bid\":%.5f,\"ask\":%.5f,\"quote\":%.5f,\"brokerConnected\":%s}",
       g_account.Login(),
       m.current_balance,
       m.current_equity,
@@ -129,7 +130,8 @@ string BuildFullTelemetryJson()
       _Symbol,
       bid,
       ask,
-      quote
+      quote,
+      broker_connected ? "true" : "false"
    );
 
    return json;
@@ -163,6 +165,9 @@ void UpdateChartHUD()
    double weekly_pct = (m.current_balance > 0.0) ? (c.max_weekly_loss / m.current_balance * 100.0) : 0.0;
    double total_pct = (m.current_balance > 0.0) ? (c.max_total_loss / m.current_balance * 100.0) : 0.0;
 
+   bool broker_connected = (bool)TerminalInfoInteger(TERMINAL_CONNECTED);
+   string broker_conn_str = broker_connected ? "ONLINE (CONNECTED)" : "DISCONNECTED (CHECK MT5 IN BOTTOM-RIGHT)";
+
    string hud = StringFormat(
       "==========================================================\n"
       "   FALCON FX · SMC EXECUTION EA (%s)                      \n"
@@ -181,7 +186,8 @@ void UpdateChartHUD()
       "    • Loss Streak: %d / %d | Cooldown: %s\n"
       "    • Open Positions: %d / %d\n"
       "----------------------------------------------------------\n"
-      "  BRIDGE TELEMETRY:\n"
+      "  NETWORK & BROKER STATUS:\n"
+      "    • Deriv Trade Server: %s\n"
       "    • Bridge Connection: %s\n"
       "    • Round-Trip Latency: %u ms | Failures: %d\n"
       "    • Last Heartbeat: %s\n"
@@ -198,6 +204,7 @@ void UpdateChartHUD()
       m.consecutive_losses, InpMaxLossStreak,
       m.cooldown_active ? StringFormat("[ACTIVE until %s]", TimeToString(m.cooldown_expiry)) : "[OFF]",
       PositionsTotal(), c.max_open_positions,
+      broker_conn_str,
       bridge_conn,
       g_bridge.GetLatencyMs(), g_bridge.GetConsecutiveErrors(),
       (g_bridge.GetLastSyncTime() > 0) ? TimeToString(g_bridge.GetLastSyncTime(), TIME_DATE|TIME_SECONDS) : "NEVER"
@@ -273,6 +280,16 @@ void ProcessBridgeCommand(const BridgeCommand &cmd)
          return;
         }
 
+      // Pre-execution Broker Connection Validation
+      if(!TerminalInfoInteger(TERMINAL_CONNECTED))
+        {
+         string no_conn_msg = "MT5 terminal has no network connection to Deriv broker server. Check MT5 connection in bottom-right corner or File -> Login.";
+         PrintFormat("[FalconEA] Execution rejected: %s", no_conn_msg);
+         g_bridge.MarkCommandAsProcessed(cmd.id);
+         g_bridge.SendOrderResult(0, cmd.id, false, no_conn_msg, 0.0);
+         return;
+        }
+
       g_symbol.RefreshRates();
       ENUM_ORDER_TYPE order_type;
       double price = 0.0;
@@ -292,6 +309,54 @@ void ProcessBridgeCommand(const BridgeCommand &cmd)
          g_bridge.MarkCommandAsProcessed(cmd.id);
          g_bridge.SendOrderResult(0, cmd.id, false, "Invalid order direction", 0.0);
          return;
+        }
+
+      // Ensure SL distance satisfies broker stops_level & freeze_level
+      double stops_level = (double)g_symbol.StopsLevel() * g_symbol.Point();
+      double freeze_level = (double)g_symbol.FreezeLevel() * g_symbol.Point();
+      double min_dist = MathMax(stops_level, freeze_level);
+      double buffer = 5.0 * g_symbol.Point();
+      double required_min_dist = min_dist + buffer;
+
+      // If no SL provided (e.g. test or manual execution), generate default SL and TP
+      if(sl <= 0.0)
+        {
+         double default_dist = MathMax(required_min_dist, 250.0 * g_symbol.Point());
+         if(order_type == ORDER_TYPE_BUY)
+           {
+            sl = price - default_dist;
+            if(tp <= 0.0) tp = price + (default_dist * 2.5);
+           }
+         else if(order_type == ORDER_TYPE_SELL)
+           {
+            sl = price + default_dist;
+            if(tp <= 0.0) tp = price - (default_dist * 2.5);
+           }
+         PrintFormat("[FalconEA] Generated default SL/TP for order: SL=%.5f, TP=%.5f (Dist: %.5f)", sl, tp, default_dist);
+        }
+      else if(required_min_dist > 0.0)
+        {
+         double current_sl_dist = MathAbs(price - sl);
+         if(current_sl_dist < required_min_dist)
+           {
+            double original_rr = 2.5;
+            if(current_sl_dist > 0.0 && tp > 0.0)
+               original_rr = MathAbs(tp - price) / current_sl_dist;
+
+            if(order_type == ORDER_TYPE_BUY)
+              {
+               sl = price - required_min_dist;
+               if(tp > 0.0) tp = price + (required_min_dist * original_rr);
+              }
+            else if(order_type == ORDER_TYPE_SELL)
+              {
+               sl = price + required_min_dist;
+               if(tp > 0.0) tp = price - (required_min_dist * original_rr);
+              }
+
+            PrintFormat("[FalconEA] Auto-adjusted SL/TP to meet broker minimum stops: SL Dist %.5f -> %.5f pts (Req Min: %.5f)",
+                        current_sl_dist, required_min_dist, min_dist);
+           }
         }
 
       // Dynamic Fractional Lot Sizing Calculation
