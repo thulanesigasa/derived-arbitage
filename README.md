@@ -655,6 +655,10 @@ sequenceDiagram
   When the strategy engine in the Mobile Controller identifies a trading setup on `Volatility 75 Index`, `Boom 1000 Index`, `Crash 500 Index`, or `Step Index`, it transmits an `EXECUTE_ORDER` command containing the target `symbol` to the bridge.
   The single instance of `FalconEA` running on your `Volatility 100 Index, M1` chart polls that order, selects the requested symbol dynamically, validates portfolio risk, and executes the trade directly via `g_trade.Buy(lots, symbol, ...)` or `g_trade.Sell(lots, symbol, ...)`.
 
+* **Multi-Asset Market Watch Broadcast Stream**:
+  `FalconEA` contains a built-in `g_watched_symbols` multi-asset inspector. On every 1-second timer tick, it queries `SymbolInfoDouble(sym, SYMBOL_BID/ASK/LAST)` for all active synthetic indices in Market Watch and packages them into a `quotes` array inside the telemetry payload.
+  The server's `Mt5Bridge` unpacks this multi-asset quote stream and dispatches real-time ticks to both the **SMC Strategy Engine** (generating candles, FVGs, and Liquidity Sweeps across all 10 pairs) and the **Market Profiler** (streaming live spot prices and spread metrics to the mobile app).
+
 * **The Single Requirement**:
   The only requirement in MetaTrader 5 is that your desired synthetic instruments are visible in the **Market Watch** window:
   1. In MT5, press `Ctrl + M` to open **Market Watch**.

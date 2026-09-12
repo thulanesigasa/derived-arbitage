@@ -214,6 +214,13 @@ export interface Mt5Position {
   openTime: string;
 }
 
+export interface Mt5QuotePayload {
+  symbol: string;
+  bid: number;
+  ask: number;
+  quote: number;
+}
+
 export interface Mt5TelemetryPayload {
   account: number;
   balance: number;
@@ -230,6 +237,7 @@ export interface Mt5TelemetryPayload {
   ask?: number;
   quote?: number;
   brokerConnected?: boolean;
+  quotes?: Mt5QuotePayload[];
 }
 
 export interface Mt5Command {

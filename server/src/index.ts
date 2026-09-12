@@ -27,6 +27,7 @@ profiler.onTick((symbolCode, quote, epoch, ask, bid) => {
 });
 mt5Bridge.onTick((symbolCode, quote, epoch, ask, bid) => {
   executionEngine.handleTick(symbolCode, quote, epoch, ask, bid);
+  profiler.recordBrokerTick(symbolCode, quote, epoch, ask, bid);
 });
 
 const app      = express();
