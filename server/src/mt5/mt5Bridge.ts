@@ -10,6 +10,7 @@ import type {
 } from '../../../src/types.js';
 import { ControllerStore, log } from '../stateMachine.js';
 import { DISPLAY_TO_CODE } from '../deriv/symbolMap.js';
+import { tradeJournalStore } from '../journal/tradeJournalStore.js';
 
 export interface OrderResultPayload {
   ticket: number;
@@ -135,6 +136,14 @@ export class Mt5Bridge {
       for (const prev of previousPositions) {
         const stillOpen = incomingTickets.has(prev.id) || incomingSymbols.has(prev.symbol);
         if (!stillOpen) {
+          const outcome = (prev.unrealizedPnl ?? 0) > 0 ? 'TP_HIT' : ((prev.unrealizedPnl ?? 0) < 0 ? 'SL_HIT' : 'MANUAL_CLOSE');
+          tradeJournalStore.recordTradeClose(
+            prev.id,
+            prev.entryPrice ?? 0,
+            outcome,
+            prev.unrealizedPnl ?? 0,
+            payload.balance
+          );
           log(
             state,
             'info',
@@ -148,7 +157,7 @@ export class Mt5Bridge {
         const existing = previousPositions.find(
           (p) => p.id === String(mt5Pos.ticket) || p.symbol === mt5Pos.symbol
         );
-        return {
+        const position: SimulatedPosition = {
           id: String(mt5Pos.ticket),
           symbol: mt5Pos.symbol as SymbolName,
           side: mt5Pos.type,
@@ -163,6 +172,11 @@ export class Mt5Bridge {
           setupName: existing?.setupName ?? 'MT5 Synced Trade',
           rrRatio: existing?.rrRatio ?? 2.5,
         };
+        // Ensure new positions are tracked in journal
+        if (!existing) {
+          tradeJournalStore.recordTradeOpen(position);
+        }
+        return position;
       });
 
       if (payload.balance > 0 && payload.margin > 0) {

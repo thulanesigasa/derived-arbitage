@@ -10,6 +10,7 @@ import { ExecutionEngine } from './strategy/executionEngine.js';
 import { Mt5Bridge } from './mt5/mt5Bridge.js';
 import { securityManager, requireAuth, rateLimiter, AuthError } from './auth/authMiddleware.js';
 import { activationGateEngine } from './gates/activationGate.js';
+import { tradeJournalStore } from './journal/tradeJournalStore.js';
 
 const port       = Number(process.env.CONTROL_SERVER_PORT ?? 4000);
 const host       = process.env.CONTROL_SERVER_HOST ?? '0.0.0.0';
@@ -245,10 +246,35 @@ app.post('/api/positions/:id/close', (req, res) => {
     s.positions = s.positions.filter((p) => p.id !== id);
     s.marginUsagePercent = s.positions.length > 0 ? 5 : 0;
     if (pos) {
+      tradeJournalStore.recordTradeClose(
+        pos.id,
+        pos.entryPrice ?? 0,
+        'MANUAL_CLOSE',
+        pos.unrealizedPnl ?? 0,
+        s.balance
+      );
       log(s, 'info', `[MANUAL EXIT] Closed position ${pos.side} on ${pos.symbol} (#${id})`);
     }
   });
   res.json({ ok: true });
+});
+
+// ─── Real-Time Trade Journal (Phase 4.5) endpoints ─────────────────────────
+
+/** Fetch all journaled real trades (closed and live) */
+app.get('/api/journal/trades', (_req, res) => {
+  res.json({ ok: true, trades: tradeJournalStore.getEntries() });
+});
+
+/** Record a custom or manual trade journal entry */
+app.post('/api/journal/trades', (req, res) => {
+  const entry = req.body;
+  if (entry && entry.symbol && entry.direction) {
+    tradeJournalStore.addManualEntry(entry);
+    res.json({ ok: true });
+  } else {
+    res.status(400).json({ error: 'Invalid journal entry format' });
+  }
 });
 
 // ─── Error handler ───────────────────────────────────────────────────────────

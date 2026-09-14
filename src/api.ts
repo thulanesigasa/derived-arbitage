@@ -7,6 +7,7 @@ import type {
   LiveActivationReport,
   MonteCarloSimulationResult,
   ProfilerApiState,
+  TradeJournalEntry,
 } from './types';
 
 export function normalizeBaseUrl(value: string): string {
@@ -470,3 +471,25 @@ export function stateSocketUrl(): string {
   const wsBase = API_BASE_URL.replace(/^http/, 'ws');
   return activeAuthToken ? `${wsBase}/ws?token=${activeAuthToken}` : `${wsBase}/ws?apiKey=${activeApiKey}`;
 }
+
+export async function fetchTradeJournal(): Promise<TradeJournalEntry[]> {
+  try {
+    const res = await request<{ ok: boolean; trades: TradeJournalEntry[] }>('/api/journal/trades');
+    return res.trades ?? [];
+  } catch {
+    return [];
+  }
+}
+
+export async function saveTradeJournalEntry(entry: TradeJournalEntry): Promise<boolean> {
+  try {
+    const res = await request<{ ok: boolean }>('/api/journal/trades', {
+      method: 'POST',
+      body: JSON.stringify(entry),
+    });
+    return res.ok ?? false;
+  } catch {
+    return false;
+  }
+}
+

@@ -13,6 +13,7 @@ import { ControllerStore, log } from '../stateMachine.js';
 import { CandleAggregator } from './candleAggregator.js';
 import { FalconEngine } from './falconEngine.js';
 import { SMCDetector, type SMCStructureAnalysis } from './smcDetector.js';
+import { tradeJournalStore } from '../journal/tradeJournalStore.js';
 
 export class ExecutionEngine {
   private store: ControllerStore;
@@ -143,6 +144,9 @@ export class ExecutionEngine {
       );
     });
 
+    // Record open trade in real-time Journal
+    tradeJournalStore.recordTradeOpen(position);
+
     // 6. Forward signal execution to MT5 terminal if bridge is actively connected
     if (this.mt5Bridge && this.mt5Bridge.isConnected()) {
       this.mt5Bridge.queueSignalExecution(signal);
@@ -176,6 +180,7 @@ export class ExecutionEngine {
           s.dailyPnl = Math.round((s.dailyPnl + gain) * 100) / 100;
           s.marginUsagePercent = s.positions.length > 0 ? Math.min(s.positions.length * 2, 20) : 0;
           s.equity = s.balance;
+          tradeJournalStore.recordTradeClose(pos.id, currentPrice, 'TP_HIT', gain, s.balance);
           log(
             s,
             'success',
@@ -195,6 +200,7 @@ export class ExecutionEngine {
           s.drawdown = Math.round(Math.max(s.drawdown, s.riskPolicy.initialBalance - s.balance) * 100) / 100;
           s.marginUsagePercent = s.positions.length > 0 ? Math.min(s.positions.length * 2, 20) : 0;
           s.equity = s.balance;
+          tradeJournalStore.recordTradeClose(pos.id, currentPrice, 'SL_HIT', -loss, s.balance);
           log(
             s,
             'warning',
