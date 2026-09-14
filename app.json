@@ -5,11 +5,25 @@
     "version": "0.1.0",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#080808"
+    },
     "android": {
       "package": "com.personal.eacontrollerdemo",
       "adaptiveIcon": {
-        "backgroundColor": "#07111F"
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#080808"
       }
+    },
+    "ios": {
+      "supportsTablet": true,
+      "icon": "./assets/icon.png"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
     },
     "extra": {
       "demoOnly": true

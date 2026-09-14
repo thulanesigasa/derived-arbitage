@@ -253,7 +253,13 @@ derived_arbitage/
 ├── package.json                   # Scripts + deps (react-native-svg, async-storage, etc.)
 ├── .env.example                   # Config template (never commit .env)
 ├── assets/
-│   └── robot_hero.jpg             # Cybernetic AI robot asset for Home hero & avatar
+│   ├── robot_hero.jpg             # Cybernetic AI robot asset for Home hero & avatar
+│   ├── icon.png                   # 1024x1024 primary app launcher icon derived from robot_hero
+│   ├── adaptive-icon.png          # 1024x1024 Android adaptive icon with safe-zone padding
+│   ├── splash.png                 # High-resolution splash screen image on #080808 background
+│   └── favicon.png                # Web favicon derived from robot_hero
+├── scripts/
+│   └── generate_icons.ps1         # Asset generation utility for icon, adaptive icon, splash, and favicon
 ├── mql5/                          # Phase 4: Native MetaTrader 5 Expert Advisor & Risk Engine
 │   ├── Experts/
 │   │   └── FalconEA.mq5           # Falcon FX & SMC Execution EA with timer & tick hooks
