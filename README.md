@@ -279,8 +279,8 @@ derived_arbitage/
 │       ├── HomeScreen.tsx         # Tab 1: Robot center, primary controls, KPIs, active trade
 │       ├── ControllerScreen.tsx   # Tab 2: Risk guardrails, positions, Live Activation Gate
 │       ├── ProfilerScreen.tsx     # Tab 3: Live Deriv market profiler & SMC signals
-│       ├── ActivityScreen.tsx     # Tab 4: Chronological event and audit log
-│       └── ProfileScreen.tsx      # Tab 5: User profile, app preferences, Privacy Policy, Terms, Risk & Disclaimer hub
+│       ├── ActivityScreen.tsx     # Tab 4: Trade Journal & Self-Improvement Analysis hub (SL/TP duration, PnL, reflections, next steps)
+│       └── ProfileScreen.tsx      # Tab 5: User profile, app preferences, System Logs, Privacy Policy, Terms, Risk & Disclaimer hub
 └── server/
     ├── src/
     │   ├── index.ts               # Express server, WS broadcast, REST endpoints
@@ -705,4 +705,28 @@ The Profile tab provides a streamlined user profile, application settings, and l
   - **Terms of Service**: Outlines software licensing, acceptable analytical usage, and trader account execution responsibilities.
   - **Risk of Trading**: Thorough disclosure of synthetic indices artificial volatility, 24/7 algorithmic spike mechanics, leverage risks, and capital loss warnings.
   - **Disclaimer**: Highlights independent software tool status (non-affiliated with MetaQuotes or Deriv Group), educational purpose, and no-financial-advice policy.
+* **System & Audit Logs (Migrated from Activity Tab)**:
+  - Accessible directly in Profile & Settings under **System & Audit Logs**.
+  - Displays chronological controller state transitions, risk limit breach alarms, and execution event logs with color-coded marks and exact timestamps.
+
+---
+
+### 10. Trade Journal & Self-Improvement Analysis Hub
+
+The **Journal** tab provides an interactive trade journal engineered specifically for algorithmic and discretionary synthetic indices execution analysis:
+
+* **Performance Metric Header**:
+  - **Total Trades Tracked**: Real-time count of logged trade outcomes.
+  - **Win Rate Percentage**: Automated calculation of profitable trade executions.
+  - **Net Realized P&L ($)**: Aggregate dollar gain/loss across all logged journal entries.
+* **Granular Trade Breakdown**:
+  - **Trade Placed**: Synthetic symbol, order direction (`BUY` / `SELL`), lots, entry and exit prices.
+  - **Time to Exit**: Tracks exact duration taken to trigger Take-Profit (`TP_HIT`) or Stop-Loss (`SL_HIT`).
+  - **Capital P&L Impact**: Realized dollar gain/loss and percentage return per trade.
+  - **Post-Trade Reflection ("What Happened")**: Comprehensive narrative of price action, liquidity sweeps, order block interactions, and tick volume behavior during the trade lifecycle.
+  - **Actionable Self-Improvement ("What To Do Next")**: Key psychological and algorithmic takeaways, rule refinements, and execution adjustments to improve subsequent setups.
+* **Interactive Reflection Logging**:
+  - Built-in **Log Trade** modal allowing traders to document manual observations or automated reflections with persistent local device storage (`AsyncStorage`).
+  - Quick filter pills (`All`, `Wins (+TP)`, `Losses (-SL)`) and clickable detail modal for deep analysis.
+
 
