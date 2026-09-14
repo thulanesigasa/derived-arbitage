@@ -23,8 +23,10 @@ import {
   LockIcon,
   SettingsSlidersIcon,
   ShieldIcon,
+  TerminalLogIcon,
   WarningTriangleIcon,
 } from '../components/TabIcons';
+import type { ControllerState } from '../types';
 
 const colors = {
   bg: '#080808',
@@ -70,9 +72,13 @@ const DEFAULT_SETTINGS: AppSettings = {
   autoReconnect: true,
 };
 
-type ActiveModal = 'edit-profile' | 'privacy' | 'terms' | 'risk' | 'disclaimer' | null;
+type ActiveModal = 'edit-profile' | 'privacy' | 'terms' | 'risk' | 'disclaimer' | 'logs' | null;
 
-export function ProfileScreen() {
+interface ProfileScreenProps {
+  state?: ControllerState | null;
+}
+
+export function ProfileScreen({ state }: ProfileScreenProps) {
   const [profile, setProfile] = useState<UserProfile>(DEFAULT_PROFILE);
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [activeModal, setActiveModal] = useState<ActiveModal>(null);
@@ -321,7 +327,31 @@ export function ProfileScreen() {
           </View>
         </View>
 
-        {/* 4. About & Version Info */}
+        {/* 4. System & Audit Logs Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionHeader}>SYSTEM & AUDIT LOGS</Text>
+          <View style={styles.cardGroup}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="System & Audit Logs"
+              onPress={() => setActiveModal('logs')}
+              style={({ pressed }) => [styles.navRow, pressed && styles.pressedRow]}
+            >
+              <View style={styles.navRowLeft}>
+                <TerminalLogIcon size={18} color={colors.orange} />
+                <View style={styles.navTextCol}>
+                  <Text style={styles.navRowTitle}>System & Audit Logs</Text>
+                  <Text style={styles.navRowSubtitle}>
+                    {state?.activity?.length ? `${state.activity.length} recorded events` : 'Chronological controller logs'}
+                  </Text>
+                </View>
+              </View>
+              <ChevronRightIcon size={18} color={colors.muted} />
+            </Pressable>
+          </View>
+        </View>
+
+        {/* 5. About & Version Info */}
         <View style={styles.aboutCard}>
           <Text style={styles.aboutAppName}>Derived Arbitrage</Text>
           <Text style={styles.aboutVersion}>Version 0.1.0 · Build 2026.09.14</Text>
@@ -575,6 +605,63 @@ export function ProfileScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* ─── MODAL 6: System & Audit Logs ─── */}
+      <Modal visible={activeModal === 'logs'} animationType="slide" transparent>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalSheet}>
+            <View style={styles.modalHeader}>
+              <View style={styles.modalHeaderCol}>
+                <Text style={styles.modalTitle}>System & Audit Logs</Text>
+                <Text style={styles.modalSub}>
+                  {state?.activity?.length ? `${state.activity.length} events recorded` : 'Controller event stream'}
+                </Text>
+              </View>
+              <Pressable onPress={() => setActiveModal(null)} style={styles.closeBtn}>
+                <CrossIcon size={18} color={colors.muted} />
+              </Pressable>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.modalBody}>
+              {!state?.activity || state.activity.length === 0 ? (
+                <View style={styles.emptyLogBox}>
+                  <TerminalLogIcon size={32} color={colors.muted} />
+                  <Text style={styles.emptyLogTitle}>No logged events</Text>
+                  <Text style={styles.emptyLogSub}>
+                    Robot actions and risk engine state changes will appear here in real time.
+                  </Text>
+                </View>
+              ) : (
+                state.activity.map((item, idx) => {
+                  const isLast = idx === state.activity.length - 1;
+                  const markColor =
+                    item.kind === 'danger' || item.kind === 'success' ? colors.orange : colors.muted;
+
+                  return (
+                    <View key={item.id} style={[styles.logItemRow, !isLast && styles.logBorder]}>
+                      <View style={[styles.logMark, { backgroundColor: markColor }]} />
+                      <View style={styles.logTextWrap}>
+                        <Text style={styles.logMessage}>{item.message}</Text>
+                        <Text style={styles.logTime}>
+                          {new Date(item.at).toLocaleTimeString([], {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            second: '2-digit',
+                          })}
+                        </Text>
+                      </View>
+                    </View>
+                  );
+                })
+              )}
+
+              <Pressable onPress={() => setActiveModal(null)} style={styles.dismissBtn}>
+                <Text style={styles.dismissBtnText}>Close Logs</Text>
+              </Pressable>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -787,6 +874,14 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#222222',
   },
+  modalHeaderCol: {
+    flex: 1,
+    gap: 2,
+  },
+  modalSub: {
+    color: colors.muted,
+    fontSize: 12,
+  },
   modalTitle: {
     color: colors.text,
     fontSize: 17,
@@ -880,5 +975,52 @@ const styles = StyleSheet.create({
   },
   pressedRow: {
     backgroundColor: '#1C1C1C',
+  },
+
+  // ─── Log Item Elements ───
+  logItemRow: {
+    flexDirection: 'row',
+    gap: 12,
+    paddingVertical: 10,
+    alignItems: 'flex-start',
+  },
+  logBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#202020',
+  },
+  logMark: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginTop: 6,
+  },
+  logTextWrap: {
+    flex: 1,
+    gap: 4,
+  },
+  logMessage: {
+    color: colors.text,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  logTime: {
+    color: colors.muted,
+    fontSize: 11,
+  },
+  emptyLogBox: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 36,
+    gap: 10,
+  },
+  emptyLogTitle: {
+    color: colors.text,
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  emptyLogSub: {
+    color: colors.muted,
+    fontSize: 12,
+    textAlign: 'center',
   },
 });

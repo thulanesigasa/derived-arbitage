@@ -32,9 +32,9 @@ import { ProfilerScreen } from './src/screens/ProfilerScreen';
 import { ActivityScreen } from './src/screens/ActivityScreen';
 import { ProfileScreen } from './src/screens/ProfileScreen';
 import {
-  ActivityIcon,
   ControllerIcon,
   HomeIcon,
+  JournalIcon,
   ProfileIcon,
   ProfilerIcon,
 } from './src/components/TabIcons';
@@ -105,7 +105,7 @@ const TAB_DEFS: Array<{
   { id: 'home',       label: 'Home',     Icon: HomeIcon },
   { id: 'controller', label: 'Control',  Icon: ControllerIcon },
   { id: 'profiler',   label: 'Profiler', Icon: ProfilerIcon },
-  { id: 'activity',   label: 'Activity', Icon: ActivityIcon },
+  { id: 'activity',   label: 'Journal',  Icon: JournalIcon },
   { id: 'profile',    label: 'Profile',  Icon: ProfileIcon },
 ];
 
@@ -373,7 +373,7 @@ export default function App() {
             />
           )}
 
-          {activeTab === 'profile' && <ProfileScreen />}
+          {activeTab === 'profile' && <ProfileScreen state={state} />}
         </View>
 
         {/* Floating Pill Tab Navigation Bar with Animated Sliding Indicator (Rule 15 & Reference Design) */}
