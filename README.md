@@ -1,4 +1,4 @@
-# Mobile EA Controller — Deriv Synthetic Indices
+# Derived Arbitrage — Deriv Synthetic Indices
 
 A personal Android controller for a Deriv MT5 EA trading Volatility, Boom, Crash, and Step synthetic indices. This project is structured in validated phases — no live trading until every gate passes.
 
