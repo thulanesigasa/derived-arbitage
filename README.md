@@ -280,7 +280,7 @@ derived_arbitage/
 │       ├── ControllerScreen.tsx   # Tab 2: Risk guardrails, positions, Live Activation Gate
 │       ├── ProfilerScreen.tsx     # Tab 3: Live Deriv market profiler & SMC signals
 │       ├── ActivityScreen.tsx     # Tab 4: Chronological event and audit log
-│       └── ProfileScreen.tsx      # Tab 5: VPS bridge auth & account connectivity hub
+│       └── ProfileScreen.tsx      # Tab 5: User profile, app preferences, Privacy Policy, Terms, Risk & Disclaimer hub
 └── server/
     ├── src/
     │   ├── index.ts               # Express server, WS broadcast, REST endpoints
@@ -686,3 +686,23 @@ To capitalize on synthetic index arbitrage discrepancies across multiple uncorre
 * **Hard Maximum Risk Calibration ($20 / trade)**: Each trade entry is calibrated directly to the Hard Maximum Risk ($20.00 on a $10,000 balance, exactly 0.20%), ensuring maximal capital efficiency without breaching account safety rules.
 * **Portfolio Risk Harmonization**: 15 concurrent positions × $20.00 = $300.00 maximum aggregate exposure, perfectly aligned with the $300.00 Weekly Loss Lock (3.0%) and comfortably above the $8,500.00 Absolute Equity Floor (85.0%).
 * **Rapid Cooldown (5,000 ms)**: New setup evaluation cooldown is reduced to 5 seconds to support high-frequency fills across simultaneous market opportunities.
+
+---
+
+### 9. User Profile, Settings, and Legal Compliance Hub
+
+The Profile tab provides a streamlined user profile, application settings, and legal disclosures without technical developer clutter:
+
+* **Trader Profile & Customization**:
+  - Displays user avatar with the cybernetic robot asset (`robot_hero.jpg`), custom trader tag, and strategy methodology.
+  - Interactive **Edit Profile** modal allows customization of Display Name, Trader Tag, Strategy Style, Favorite Synthetic Basket, and Trader Bio, persisted in local sandboxed storage (`AsyncStorage`).
+* **Application Preferences**:
+  - **Execution Alerts**: Toggle audio notifications on automated order execution.
+  - **Haptic Feedback**: Toggle tactile vibration feedback on threshold locks and state transitions.
+  - **High-Precision Telemetry**: Toggle real-time streaming quotes for all synthetic instruments.
+* **Legal & Risk Disclosures (Rule 16 Compliant Modals)**:
+  - **Privacy Policy**: Details local device storage, zero remote database credential tracking, and authenticated WebSocket telemetry.
+  - **Terms of Service**: Outlines software licensing, acceptable analytical usage, and trader account execution responsibilities.
+  - **Risk of Trading**: Thorough disclosure of synthetic indices artificial volatility, 24/7 algorithmic spike mechanics, leverage risks, and capital loss warnings.
+  - **Disclaimer**: Highlights independent software tool status (non-affiliated with MetaQuotes or Deriv Group), educational purpose, and no-financial-advice policy.
+
