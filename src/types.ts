@@ -266,6 +266,33 @@ export interface Mt5BridgeStatus {
   pendingCommandsCount: number;
 }
 
+// ─── Phase 4.5: Real-Time Trade Journal ─────────────────────────────────────
+
+export type TradeOutcome = 'TP_HIT' | 'SL_HIT' | 'TRAILING_STOP' | 'MANUAL_CLOSE' | 'OPEN';
+
+export interface TradeJournalEntry {
+  id: string;
+  ticket?: number;
+  symbol: SymbolName | string;
+  direction: 'BUY' | 'SELL';
+  lots: number;
+  entryPrice: number;
+  exitPrice?: number;
+  stopLoss?: number;
+  takeProfit?: number;
+  duration: string;
+  durationSeconds: number;
+  outcome: TradeOutcome;
+  pnl: number;
+  pnlPercent: number;
+  setup: string;
+  whatHappened: string;
+  whatToDoNext: string;
+  openedAt: string;
+  closedAt?: string;
+  isReal?: boolean;
+}
+
 // ─── Phase 5: Auth & Security Types ──────────────────────────────────────────
 
 export interface AuthTokenResponse {

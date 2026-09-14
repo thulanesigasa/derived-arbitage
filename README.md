@@ -283,9 +283,11 @@ derived_arbitage/
 │       └── ProfileScreen.tsx      # Tab 5: User profile, app preferences, System Logs, Privacy Policy, Terms, Risk & Disclaimer hub
 └── server/
     ├── src/
-    │   ├── index.ts               # Express server, WS broadcast, REST endpoints
+    │   ├── index.ts               # Express server, WS broadcast, REST endpoints, journal API
     │   ├── stateMachine.ts        # Control state machine, idempotency, live mode transition
     │   ├── risk.ts                # Trade risk assessment, lock calculation
+    │   ├── journal/               # Phase 4.5: Real-Time Trade Journal Engine
+    │   │   └── tradeJournalStore.ts # Real-time trade open/close tracking, SL/TP duration, diagnosis synthesis
     │   ├── auth/                  # Phase 5: VPS Bridge Security & Auth
     │   │   └── authMiddleware.ts  # Bearer JWT, constant-time API key, device binding, rate limit
     │   ├── gates/                 # Phase 6: Live Activation Gate Engine
@@ -299,13 +301,14 @@ derived_arbitage/
     │   │   ├── candleAggregator.ts# M1/M5 candle reconstruction + dynamic ATR
     │   │   ├── smcDetector.ts     # Swing fractals, BOS, CHoCH, Fair Value Gaps
     │   │   ├── falconEngine.ts    # Falcon FX liquidity sweeps & continuation signals
-    │   │   └── executionEngine.ts # Paper execution lifecycle, live tick P&L, TP/SL
+    │   │   └── executionEngine.ts # Real-time execution lifecycle, live tick P&L, TP/SL, journal hook
     │   └── mt5/                   # Phase 4: Server-side MT5 Bridge
-    │       └── mt5Bridge.ts       # Telemetry ingestion, command queueing, watchdog
+    │       └── mt5Bridge.ts       # Telemetry ingestion, command queueing, real-time position journal sync
     └── test/
         ├── stateMachine.test.ts   # Automated state machine transition tests
         ├── strategyEngine.test.ts # Strategy, candle, SMC, and execution tests
         ├── mt5Bridge.test.ts      # MT5 bridge telemetry, queueing, and watchdog tests
+        ├── tradeJournal.test.ts   # Real-time trade journal duration, P&L, and reflection synthesis tests
         ├── authBridge.test.ts     # Phase 5: JWT, API key, device binding, rate limiter tests
         └── activationGate.test.ts # Phase 6: 5-gate validation & Monte Carlo drawdown tests
 ```
@@ -711,22 +714,27 @@ The Profile tab provides a streamlined user profile, application settings, and l
 
 ---
 
-### 10. Trade Journal & Self-Improvement Analysis Hub
+### 10. Real-Time Trade Journal & Self-Improvement Analysis Hub
 
-The **Journal** tab provides an interactive trade journal engineered specifically for algorithmic and discretionary synthetic indices execution analysis:
+The **Journal** tab is powered by a real-time trade journaling engine ([server/src/journal/tradeJournalStore.ts](file:///d:/workspace_programming/mobile_ea/derived-arbitage/server/src/journal/tradeJournalStore.ts)) that captures live trades as they are placed and resolved in real time by the algorithmic execution engine or native MetaTrader 5 terminal:
 
-* **Performance Metric Header**:
-  - **Total Trades Tracked**: Real-time count of logged trade outcomes.
-  - **Win Rate Percentage**: Automated calculation of profitable trade executions.
-  - **Net Realized P&L ($)**: Aggregate dollar gain/loss across all logged journal entries.
-* **Granular Trade Breakdown**:
-  - **Trade Placed**: Synthetic symbol, order direction (`BUY` / `SELL`), lots, entry and exit prices.
-  - **Time to Exit**: Tracks exact duration taken to trigger Take-Profit (`TP_HIT`) or Stop-Loss (`SL_HIT`).
-  - **Capital P&L Impact**: Realized dollar gain/loss and percentage return per trade.
-  - **Post-Trade Reflection ("What Happened")**: Comprehensive narrative of price action, liquidity sweeps, order block interactions, and tick volume behavior during the trade lifecycle.
-  - **Actionable Self-Improvement ("What To Do Next")**: Key psychological and algorithmic takeaways, rule refinements, and execution adjustments to improve subsequent setups.
-* **Interactive Reflection Logging**:
-  - Built-in **Log Trade** modal allowing traders to document manual observations or automated reflections with persistent local device storage (`AsyncStorage`).
-  - Quick filter pills (`All`, `Wins (+TP)`, `Losses (-SL)`) and clickable detail modal for deep analysis.
+* **Live Open Positions Monitoring**:
+  - Automatically hooks into active trades (`state.positions`) forwarded by MT5 terminal telemetry or the strategy engine.
+  - Features real-time elapsed duration clock updating every second (`Time Active: 4m 12s`).
+  - Displays live entry price, dynamic stop-loss, take-profit targets, and real-time unrealized P&L.
+  - Includes a direct position close action dispatching execution commands to MT5 or the server store.
+
+* **Real-Time Automated Trade Resolution**:
+  - **Trade Placed**: Records exact symbol, order direction (`BUY` / `SELL`), lots, entry price, and initial risk parameters.
+  - **Time to SL / TP**: Calculates precise elapsed duration from open time to resolution (e.g. `18m 42s`).
+  - **P&L Gained or Lost**: Tracks realized currency gain/loss and percentage return based on account equity.
+  - **Post-Trade Reflection ("What Happened")**: Automatically synthesizes technical market analysis based on entry price, exit price, duration, and market flow (liquidity sweeps, order blocks, breaker cascades, or volatility expansions).
+  - **Actionable Self-Improvement ("What To Do Next")**: Generates context-aware, deliberate practice feedback (e.g., discipline on winning trades to prevent euphoric over-trading; strict adherence to hard stop limits and tick velocity checks on stopped-out setups).
+
+* **Server Synchronization & Sandboxed Local Cache**:
+  - Real trades are served via `GET /api/journal/trades` and cached in device-sandboxed storage (`@derived_arbitrage_trade_journal`).
+  - Offline-first resilience ensures historical trade journal entries remain accessible without network connectivity.
+  - Includes "+ Log Trade" modal allowing discretionary manual notes and observations on live trades.
+
 
 
