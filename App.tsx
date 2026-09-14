@@ -4,6 +4,7 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
+  Image,
   Platform,
   Pressable,
   StyleSheet,
@@ -116,8 +117,33 @@ export default function App() {
   const [busy, setBusy] = useState(false);
   const [online, setOnline] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [appInitializing, setAppInitializing] = useState(true);
+  const splashFadeAnim = useRef(new Animated.Value(1)).current;
+  const splashScaleAnim = useRef(new Animated.Value(0.9)).current;
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mounted = useRef(true);
+
+  // Smooth entrance scale animation and dismissal timer for initial splash
+  useEffect(() => {
+    Animated.spring(splashScaleAnim, {
+      toValue: 1,
+      useNativeDriver: true,
+      friction: 7,
+      tension: 45,
+    }).start();
+
+    const minTimer = setTimeout(() => {
+      Animated.timing(splashFadeAnim, {
+        toValue: 0,
+        duration: 350,
+        useNativeDriver: true,
+      }).start(() => {
+        setAppInitializing(false);
+      });
+    }, 1100);
+
+    return () => clearTimeout(minTimer);
+  }, [splashFadeAnim, splashScaleAnim]);
 
   // Animated sliding pill indicator for bottom tab navigation
   const tabAnim = useRef(new Animated.Value(0)).current;
@@ -393,6 +419,43 @@ export default function App() {
             })}
           </View>
         </View>
+
+        {/* In-app Splash / Loading Transition Screen with Robot Hero Icon */}
+        {appInitializing && (
+          <Animated.View
+            style={[
+              styles.splashOverlay,
+              {
+                opacity: splashFadeAnim,
+              },
+            ]}
+            pointerEvents="box-none"
+          >
+            <Animated.View
+              style={[
+                styles.splashContent,
+                {
+                  transform: [{ scale: splashScaleAnim }],
+                },
+              ]}
+            >
+              <View style={styles.splashIconContainer}>
+                <Image
+                  source={require('./assets/robot_hero.jpg')}
+                  style={styles.splashIcon}
+                  resizeMode="cover"
+                />
+              </View>
+              <Text style={styles.splashTitle}>FALCON EA</Text>
+              <Text style={styles.splashSubtitle}>Derived Arbitrage Control</Text>
+              <ActivityIndicator
+                size="small"
+                color={colors.orange}
+                style={styles.splashSpinner}
+              />
+            </Animated.View>
+          </Animated.View>
+        )}
       </SafeAreaView>
     </SafeAreaProvider>
   );
@@ -480,5 +543,58 @@ const styles = StyleSheet.create({
     color: colors.muted,
     fontSize: 12,
     textAlign: 'center',
+  },
+
+  // ─── Initial App Launch Loading Screen (Rule 1: 60-30-10, Rule 15: 8px grid) ──
+  splashOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: colors.bg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 9999,
+  },
+  splashContent: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  splashIconContainer: {
+    width: 96,
+    height: 96,
+    borderRadius: 24,
+    borderWidth: 2,
+    borderColor: colors.orange,
+    backgroundColor: colors.panel,
+    overflow: 'hidden',
+    elevation: 8,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.5,
+    shadowRadius: 10,
+  },
+  splashIcon: {
+    width: '100%',
+    height: '100%',
+  },
+  splashTitle: {
+    marginTop: 24,
+    fontSize: 20,
+    fontWeight: '800',
+    color: colors.text,
+    letterSpacing: 2,
+  },
+  splashSubtitle: {
+    marginTop: 8,
+    fontSize: 12,
+    fontWeight: '500',
+    color: colors.muted,
+    letterSpacing: 0.5,
+  },
+  splashSpinner: {
+    marginTop: 24,
   },
 });
