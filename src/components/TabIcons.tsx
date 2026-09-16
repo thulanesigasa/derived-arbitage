@@ -481,3 +481,42 @@ export function TerminalLogIcon({ size = 20, color = '#FF6B00' }: IconProps) {
 }
 
 
+export function LockClosedIcon({ size = 16, color = '#FF6B00' }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Rect
+        x="3"
+        y="11"
+        width="18"
+        height="11"
+        rx="2"
+        ry="2"
+        stroke={color}
+        strokeWidth="2"
+      />
+      <Path
+        d="M7 11V7a5 5 0 0 1 10 0v4"
+        stroke={color}
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+    </Svg>
+  );
+}
+
+export function ChevronUpIcon({ size = 20, color = '#FF6B00' }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M18 15l-6-6-6 6"
+        stroke={color}
+        strokeWidth="2.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
+
+
