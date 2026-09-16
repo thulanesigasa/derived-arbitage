@@ -52,6 +52,14 @@ describe('ControllerStore state machine', () => {
     const store = new ControllerStore(state);
     expect(() => store.control('start', state.revision, 'request-floor-lock')).toThrow(/equity floor/);
   });
+
+  it('allows clearing watchlist and blocks startup with zero instruments', () => {
+    const state = createInitialState();
+    const store = new ControllerStore(state);
+    const updated = store.setSymbols([], state.revision, 'req-clear-symbols');
+    expect(updated.selectedSymbols).toHaveLength(0);
+    expect(() => store.control('start', updated.revision, 'req-start-zero')).toThrow(/Add instruments before running/);
+  });
 });
 
 describe('risk guard', () => {

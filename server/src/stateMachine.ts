@@ -109,7 +109,6 @@ export class ControllerStore {
     if (cached) return structuredClone(cached);
     this.assertRevision(expectedRevision);
     const unique = [...new Set(symbols)];
-    if (!unique.length) throw new TransitionError('Select at least one simulated instrument.', 'INVALID_SETTINGS');
     if (unique.some((symbol) => !ALL_SYMBOLS.includes(symbol))) throw new TransitionError('Unknown instrument.', 'INVALID_SETTINGS');
     this.mutate((state) => {
       state.selectedSymbols = unique;
@@ -178,6 +177,7 @@ export class ControllerStore {
   }
 
   private assertCanRun(): void {
+    if (this.state.selectedSymbols.length === 0) throw new TransitionError('Unable to place trades: Add instruments before running the EA.', 'NO_INSTRUMENTS');
     if (this.state.equity <= this.state.riskPolicy.absoluteEquityFloor) throw new TransitionError('Cannot run: the $15 equity floor is active.', 'RISK_LOCK');
     if (this.state.dailyPnl <= -this.state.riskPolicy.dailyLossLock) throw new TransitionError('Cannot run: daily loss lock is active.', 'RISK_LOCK');
     if (this.state.weeklyPnl <= -this.state.riskPolicy.weeklyLossLock) throw new TransitionError('Cannot run: weekly loss lock is active.', 'RISK_LOCK');

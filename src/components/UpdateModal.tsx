@@ -129,7 +129,7 @@ export function UpdateModal({
           <Text style={styles.title}>Falcon EA Update Ready</Text>
           <Text style={styles.body}>
             A fresh algorithmic update for Derived Arbitrage is ready.
-            Tap below to apply the latest strategies and improvements instantly without reinstalling.
+            Tap below to apply the latest strategies and improvements.
           </Text>
 
           {/* Primary CTA */}

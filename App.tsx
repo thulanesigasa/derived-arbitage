@@ -31,8 +31,10 @@ import { ControllerScreen } from './src/screens/ControllerScreen';
 import { ProfilerScreen } from './src/screens/ProfilerScreen';
 import { ActivityScreen } from './src/screens/ActivityScreen';
 import { ProfileScreen } from './src/screens/ProfileScreen';
+import { LegalScreen, type LegalSectionKey } from './src/screens/LegalScreen';
 import { useOTAUpdate } from './src/hooks/useOTAUpdate';
 import { UpdateModal } from './src/components/UpdateModal';
+import { NoInstrumentsModal } from './src/components/NoInstrumentsModal';
 import {
   ControllerIcon,
   HomeIcon,
@@ -114,6 +116,9 @@ const TAB_DEFS: Array<{
 export default function App() {
   const ota = useOTAUpdate();
   const [activeTab, setActiveTab] = useState<TabId>('home');
+  const [activeLegalSection, setActiveLegalSection] = useState<LegalSectionKey | null>(null);
+  const [noInstrumentsModalVisible, setNoInstrumentsModalVisible] = useState(false);
+  const [scrollToBasketTrigger, setScrollToBasketTrigger] = useState(0);
   const [state, setState] = useState<ControllerState>(OFFLINE_FALLBACK_STATE);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -287,6 +292,10 @@ export default function App() {
   const performControl = useCallback(
     async (action: ControlAction) => {
       if (!state || busy) return;
+      if (action === 'start' && state.selectedSymbols.length === 0) {
+        setNoInstrumentsModalVisible(true);
+        return;
+      }
       setBusy(true);
       setError(null);
       try {
@@ -302,16 +311,29 @@ export default function App() {
     [busy, load, state]
   );
 
+  const setSymbolsList = useCallback(
+    async (symbols: SymbolName[]) => {
+      if (!state || busy) return;
+      setBusy(true);
+      try {
+        setState(await updateSymbols(symbols, state.revision, requestId('symbols')));
+        setError(null);
+      } catch (caught) {
+        setError(caught instanceof Error ? caught.message : 'Could not update instruments.');
+        await load(true);
+      } finally {
+        if (mounted.current) setBusy(false);
+      }
+    },
+    [busy, load, state]
+  );
+
   const changeSymbol = useCallback(
     async (symbol: SymbolName, enabled: boolean) => {
       if (!state || busy) return;
       const nextSymbols = enabled
         ? [...state.selectedSymbols, symbol]
         : state.selectedSymbols.filter((item) => item !== symbol);
-      if (!nextSymbols.length) {
-        Alert.alert('Keep one instrument', 'Select at least one simulated instrument for monitoring.');
-        return;
-      }
       setBusy(true);
       try {
         setState(await updateSymbols(nextSymbols, state.revision, requestId('symbols')));
@@ -332,96 +354,112 @@ export default function App() {
         <StatusBar style="light" />
 
         {/* Screen content */}
-        <View style={styles.screenArea}>
-          {activeTab === 'home' && (
-            <HomeScreen
-              state={state}
-              online={online}
-              busy={busy}
-              refreshing={refreshing}
-              onRefresh={() => {
-                setRefreshing(true);
-                void load(true);
-              }}
-              onControl={(action) => void performControl(action)}
-              onNavigateTab={(tab) => setActiveTab(tab)}
-            />
-          )}
+        {activeLegalSection ? (
+          <LegalScreen
+            initialSection={activeLegalSection}
+            onBack={() => setActiveLegalSection(null)}
+          />
+        ) : (
+          <>
+            <View style={styles.screenArea}>
+              {activeTab === 'home' && (
+                <HomeScreen
+                  state={state}
+                  online={online}
+                  busy={busy}
+                  refreshing={refreshing}
+                  onRefresh={() => {
+                    setRefreshing(true);
+                    void load(true);
+                  }}
+                  onControl={(action) => void performControl(action)}
+                  onNavigateTab={(tab) => setActiveTab(tab)}
+                />
+              )}
 
-          {activeTab === 'controller' && (
-            <ControllerScreen
-              state={state}
-              online={online}
-              busy={busy}
-              refreshing={refreshing}
-              onRefresh={() => {
-                setRefreshing(true);
-                void load(true);
-              }}
-              onControl={(action) => void performControl(action)}
-              onChangeSymbol={(symbol, enabled) => void changeSymbol(symbol, enabled)}
-            />
-          )}
+              {activeTab === 'controller' && (
+                <ControllerScreen
+                  state={state}
+                  online={online}
+                  busy={busy}
+                  refreshing={refreshing}
+                  onRefresh={() => {
+                    setRefreshing(true);
+                    void load(true);
+                  }}
+                  onControl={(action) => void performControl(action)}
+                  onChangeSymbol={(symbol, enabled) => void changeSymbol(symbol, enabled)}
+                />
+              )}
 
-          {activeTab === 'profiler' && <ProfilerScreen />}
+              {activeTab === 'profiler' && <ProfilerScreen />}
 
-          {activeTab === 'activity' && (
-            <ActivityScreen
-              state={state}
-              refreshing={refreshing}
-              onRefresh={() => {
-                setRefreshing(true);
-                void load(true);
-              }}
-            />
-          )}
+              {activeTab === 'activity' && (
+                <ActivityScreen
+                  state={state}
+                  refreshing={refreshing}
+                  onRefresh={() => {
+                    setRefreshing(true);
+                    void load(true);
+                  }}
+                />
+              )}
 
-          {activeTab === 'profile' && <ProfileScreen state={state} ota={ota} />}
-        </View>
+              {activeTab === 'profile' && (
+                <ProfileScreen
+                  state={state}
+                  onNavigateLegal={(sec) => setActiveLegalSection(sec)}
+                  onUpdateSymbols={setSymbolsList}
+                  scrollToBasketTrigger={scrollToBasketTrigger}
+                />
+              )}
+            </View>
 
-        {/* Floating Pill Tab Navigation Bar with Animated Sliding Indicator (Rule 15 & Reference Design) */}
-        <View style={styles.floatingNavWrapper}>
-          <View
-            style={styles.pillBar}
-            onLayout={(e) => setPillContainerWidth(e.nativeEvent.layout.width)}
-          >
-            {/* Smooth animated sliding underline indicator below active tab */}
-            {tabWidth > 0 && (
-              <Animated.View
-                style={[
-                  styles.slidingIndicator,
-                  {
-                    width: tabWidth,
-                    transform: [{ translateX }],
-                  },
-                ]}
+            {/* Floating Pill Tab Navigation Bar with Animated Sliding Indicator (Rule 15 & Reference Design) */}
+            <View style={styles.floatingNavWrapper}>
+              <View
+                style={styles.pillBar}
+                onLayout={(e) => setPillContainerWidth(e.nativeEvent.layout.width)}
               >
-                <View style={styles.sliderLine} />
-              </Animated.View>
-            )}
+                {/* Smooth animated sliding underline indicator below active tab */}
+                {tabWidth > 0 && (
+                  <Animated.View
+                    style={[
+                      styles.slidingIndicator,
+                      {
+                        width: tabWidth,
+                        transform: [{ translateX }],
+                      },
+                    ]}
+                  >
+                    <View style={styles.sliderLine} />
+                  </Animated.View>
+                )}
 
-            {/* Tab items */}
-            {TAB_DEFS.map(({ id, label, Icon }) => {
-              const active = activeTab === id;
-              const color = active ? colors.orange : colors.muted;
-              return (
-                <Pressable
-                  key={id}
-                  accessibilityRole="button"
-                  accessibilityLabel={label}
-                  accessibilityState={{ selected: active }}
-                  onPress={() => setActiveTab(id)}
-                  style={styles.tabItem}
-                >
-                  <Icon size={20} color={color} />
-                  <Text style={[styles.tabLabel, active ? styles.tabLabelActive : styles.tabLabelIdle]}>
-                    {label}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-        </View>
+                {/* Tab items */}
+                {TAB_DEFS.map(({ id, label, Icon }) => {
+                  const active = activeTab === id;
+                  const color = active ? colors.orange : colors.muted;
+                  return (
+                    <Pressable
+                      key={id}
+                      accessibilityRole="button"
+                      accessibilityLabel={label}
+                      accessibilityState={{ selected: active }}
+                      onPress={() => setActiveTab(id)}
+                      style={styles.tabItem}
+                    >
+                      <Icon size={20} color={color} />
+                      <Text style={[styles.tabLabel, active ? styles.tabLabelActive : styles.tabLabelIdle]}>
+                        {label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+          </>
+        )}
 
         {/* In-app Splash / Loading Transition Screen with Robot Hero Icon */}
         {appInitializing && (
@@ -466,6 +504,18 @@ export default function App() {
           onUpdate={ota.applyUpdate}
           onDismiss={ota.dismissUpdate}
           accent={colors.orange}
+        />
+
+        {/* Zero-Instrument Play Gate Modal */}
+        <NoInstrumentsModal
+          visible={noInstrumentsModalVisible}
+          onDismiss={() => setNoInstrumentsModalVisible(false)}
+          onAddInstruments={() => {
+            setNoInstrumentsModalVisible(false);
+            setActiveLegalSection(null);
+            setActiveTab('profile');
+            setScrollToBasketTrigger((prev) => prev + 1);
+          }}
         />
       </SafeAreaView>
     </SafeAreaProvider>

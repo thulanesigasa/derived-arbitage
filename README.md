@@ -54,6 +54,9 @@ A personal Android controller for a Deriv MT5 EA trading Volatility, Boom, Crash
 - **Color System**: 60% Background (`#080808` Pitch Black), 30% Panel (`#161616` Matte Charcoal), 10% Accent (`#FF6B00` Vivid Electric Orange), Text (`#FFFFFF` Pure White)
 - **Safe Area Insets**: Handled via `react-native-safe-area-context` (`SafeAreaProvider` + `SafeAreaView` with explicit top/side edges)
 - **Keyboard Avoidance & Input Accessibility**: Zero text input keyboard overlap across all screens and dialogs. Managed via Android `softwareKeyboardLayoutMode: "resize"`, root and modal `KeyboardAvoidingView` wrappers, `keyboardShouldPersistTaps="handled"`, `keyboardDismissMode="on-drag"`, and bottom offset padding to guarantee all fields remain visible above software keyboards and bottom chrome
+- **Dedicated Legal Screens**: Standalone screens for Privacy Policy, Terms of Service, Risk of Trading, and Disclaimer with cross-document pill switcher and header Back navigation to Settings (`LegalScreen.tsx`)
+- **Trader Profile & Synthetics Basket**: Profile editing restricted strictly to Display Name and Trader Tag with a locked institutional Strategy badge. Preferred Synthetics Basket is configured via an interactive dropdown menu box (supporting quick presets and symbol checkboxes) directly managing the active EA watchlist
+- **Zero-Instrument Safety Gate**: Attempting to start the EA with zero active instruments triggers the "Unable to Place Trades" modal with an "Add Instruments" action that navigates to Settings and auto-scrolls directly to the basket selector
 - **No Status Badges**: Strictly zero status badges or indicator tags (e.g. READ ONLY, DEMO ONLY, STOPPED, REVIEW, OK) in component UIs (Rule 16)
 
 ---
