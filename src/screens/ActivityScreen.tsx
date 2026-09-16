@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -624,7 +626,10 @@ export function ActivityScreen({ state, refreshing, onRefresh }: ActivityScreenP
         animationType="slide"
         onRequestClose={() => setShowAddModal(false)}
       >
-        <View style={styles.modalBackdrop}>
+        <KeyboardAvoidingView
+          style={styles.modalBackdrop}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
           <View style={styles.modalCardLarge}>
             <View style={styles.modalHeaderRow}>
               <Text style={styles.modalTitle}>Log Real-Time Trade</Text>
@@ -637,7 +642,13 @@ export function ActivityScreen({ state, refreshing, onRefresh }: ActivityScreenP
               </Pressable>
             </View>
 
-            <ScrollView style={styles.modalBodyScroll} showsVerticalScrollIndicator={false}>
+            <ScrollView
+              style={styles.modalBodyScroll}
+              contentContainerStyle={styles.modalBodyScrollContent}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="on-drag"
+            >
               <Text style={styles.inputLabel}>Asset Symbol</Text>
               <TextInput
                 style={styles.inputField}
@@ -773,7 +784,7 @@ export function ActivityScreen({ state, refreshing, onRefresh }: ActivityScreenP
               <Text style={styles.saveTradeBtnText}>Save Reflection to Journal</Text>
             </Pressable>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );
@@ -1157,7 +1168,8 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 20,
     width: '100%',
-    maxHeight: '90%',
+    maxHeight: '85%',
+    flexShrink: 1,
     borderWidth: 1,
     borderColor: colors.border,
   },
@@ -1184,6 +1196,10 @@ const styles = StyleSheet.create({
   },
   modalBodyScroll: {
     marginBottom: 16,
+    flexShrink: 1,
+  },
+  modalBodyScrollContent: {
+    paddingBottom: 24,
   },
   modalMetaRow: {
     flexDirection: 'row',

@@ -53,6 +53,7 @@ A personal Android controller for a Deriv MT5 EA trading Volatility, Boom, Crash
 - **Touch Targets**: Minimum 48×48dp (Android) / 44×44pt (iOS) across all buttons, tab items, and switches
 - **Color System**: 60% Background (`#080808` Pitch Black), 30% Panel (`#161616` Matte Charcoal), 10% Accent (`#FF6B00` Vivid Electric Orange), Text (`#FFFFFF` Pure White)
 - **Safe Area Insets**: Handled via `react-native-safe-area-context` (`SafeAreaProvider` + `SafeAreaView` with explicit top/side edges)
+- **Keyboard Avoidance & Input Accessibility**: Zero text input keyboard overlap across all screens and dialogs. Managed via Android `softwareKeyboardLayoutMode: "resize"`, root and modal `KeyboardAvoidingView` wrappers, `keyboardShouldPersistTaps="handled"`, `keyboardDismissMode="on-drag"`, and bottom offset padding to guarantee all fields remain visible above software keyboards and bottom chrome
 - **No Status Badges**: Strictly zero status badges or indicator tags (e.g. READ ONLY, DEMO ONLY, STOPPED, REVIEW, OK) in component UIs (Rule 16)
 
 ---
