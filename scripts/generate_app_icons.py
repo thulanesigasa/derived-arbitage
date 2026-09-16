@@ -19,17 +19,16 @@ def generate_icons():
     brand_bg_rgba = (8, 8, 8, 255)
     
     # ─── 1. Android Adaptive Launcher Icon: android-icon-foreground.png (Rule 15 & Rule 19) ───
-    # Must be centered on 512x512 canvas with target icon height of 96px (bounding box ~80x96px),
-    # providing ~72% clean breathing room so Samsung One UI squircle masks and standard Android launcher
-    # cutouts never crop or zoom into the icon.
-    target_fg_h = 96
-    target_fg_w = 96
+    # Scaled 58% larger from 96px baseline to 152x152px on 512x512 canvas,
+    # fitting perfectly within Android's 330px circular safe zone while maintaining clean squircle breathing room.
+    target_fg_h = 152
+    target_fg_w = 152
     hero_fg_scaled = square_hero.resize((target_fg_w, target_fg_h), Image.Resampling.LANCZOS)
     
     # Rounded emblem styling for the launcher foreground
     mask_fg = Image.new("L", (target_fg_w, target_fg_h), 0)
     draw_fg = ImageDraw.Draw(mask_fg)
-    draw_fg.rounded_rectangle([(0, 0), (target_fg_w, target_fg_h)], radius=22, fill=255)
+    draw_fg.rounded_rectangle([(0, 0), (target_fg_w, target_fg_h)], radius=35, fill=255)
     
     emblem_fg = Image.new("RGBA", (target_fg_w, target_fg_h), (0, 0, 0, 0))
     emblem_fg.paste(hero_fg_scaled, (0, 0), mask_fg)
