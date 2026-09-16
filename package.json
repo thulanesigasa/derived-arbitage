@@ -17,7 +17,9 @@
     "check": "npm run typecheck && npm test"
   },
   "dependencies": {
+    "@babel/core": "^7.29.0",
     "@react-native-async-storage/async-storage": "2.2.0",
+    "babel-preset-expo": "~57.0.0",
     "cors": "latest",
     "dotenv": "latest",
     "expo": "~57.0.23",
