@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   Image,
-  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -14,28 +14,30 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppHeader } from '../components/AppHeader';
 import { ToggleSwitch } from '../components/ToggleSwitch';
 import {
+  ArrowPathIcon,
   BellAlertIcon,
+  ChevronDownIcon,
   ChevronRightIcon,
-  CrossIcon,
   DocumentTextIcon,
-  EditPencilIcon,
   InfoCircleIcon,
-  LockIcon,
   SettingsSlidersIcon,
   ShieldIcon,
   TerminalLogIcon,
   WarningTriangleIcon,
 } from '../components/TabIcons';
+import { getApiBaseUrl, setApiBaseUrl, probeCandidateUrls, getState } from '../api';
 import type { ControllerState } from '../types';
+import type { OTAUpdateState } from '../hooks/useOTAUpdate';
 
 const colors = {
-  bg: '#080808',
-  panel: '#161616',
+  bg: '#080808',        // 60% Dominant Background
+  panel: '#161616',     // 30% Panel / Surface
   panelAlt: '#1E1E1E',
   border: '#282828',
+  borderLight: '#383838',
   text: '#FFFFFF',
   muted: '#9A9A9A',
-  orange: '#FF6B00',
+  orange: '#FF6B00',    // 10% Accent
   orangeDark: '#2D1405',
 };
 
@@ -72,97 +74,169 @@ const DEFAULT_SETTINGS: AppSettings = {
   autoReconnect: true,
 };
 
-type ActiveModal = 'edit-profile' | 'privacy' | 'terms' | 'risk' | 'disclaimer' | 'logs' | null;
+type AccordionKey = 'privacy' | 'terms' | 'risk' | 'disclaimer' | 'logs' | null;
 
 interface ProfileScreenProps {
   state?: ControllerState | null;
+  ota?: OTAUpdateState;
 }
 
-export function ProfileScreen({ state }: ProfileScreenProps) {
+/**
+ * ProfileScreen — Unified Single-Body Settings
+ *
+ * Implements Rule 1 (60-30-10 palette), Rule 2 & 4 (SVGs), Rule 15 & 19 (Calibrated Logo).
+ * Consolidates all user profile inputs, server bridge config, app preferences,
+ * OTA updates check, and expandable legal/audit sections under ONE unified, scrollable body.
+ */
+export function ProfileScreen({ state, ota }: ProfileScreenProps) {
   const [profile, setProfile] = useState<UserProfile>(DEFAULT_PROFILE);
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
-  const [activeModal, setActiveModal] = useState<ActiveModal>(null);
+  const [bridgeUrl, setBridgeUrl] = useState(() => getApiBaseUrl());
+  const [testingBridge, setTestingBridge] = useState(false);
+  const [bridgeStatus, setBridgeStatus] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saveSuccessNotice, setSaveSuccessNotice] = useState(false);
 
-  // Edit profile form draft state
-  const [draftName, setDraftName] = useState(DEFAULT_PROFILE.displayName);
-  const [draftTag, setDraftTag] = useState(DEFAULT_PROFILE.traderTag);
-  const [draftStyle, setDraftStyle] = useState(DEFAULT_PROFILE.tradingStyle);
-  const [draftBasket, setDraftBasket] = useState(DEFAULT_PROFILE.preferredBasket);
-  const [draftBio, setDraftBio] = useState(DEFAULT_PROFILE.bio);
+  // Accordion open/close state for in-body disclosure
+  const [openAccordion, setOpenAccordion] = useState<AccordionKey>(null);
 
-  // Load saved profile & settings on mount
+  const toggleAccordion = (key: AccordionKey) => {
+    setOpenAccordion((prev) => (prev === key ? null : key));
+  };
+
+  // Load saved configuration on mount
   useEffect(() => {
     void (async () => {
       try {
-        const [rawProfile, rawSettings] = await Promise.all([
+        const [rawProfile, rawSettings, rawBridge] = await Promise.all([
           AsyncStorage.getItem(USER_PROFILE_KEY),
           AsyncStorage.getItem(SETTINGS_KEY),
+          AsyncStorage.getItem('@mobile_ea_profile_config'),
         ]);
         if (rawProfile) {
-          const parsed = JSON.parse(rawProfile) as UserProfile;
-          setProfile(parsed);
-          setDraftName(parsed.displayName);
-          setDraftTag(parsed.traderTag);
-          setDraftStyle(parsed.tradingStyle);
-          setDraftBasket(parsed.preferredBasket);
-          setDraftBio(parsed.bio);
+          setProfile(JSON.parse(rawProfile) as UserProfile);
         }
         if (rawSettings) {
           setSettings(JSON.parse(rawSettings) as AppSettings);
         }
+        if (rawBridge) {
+          try {
+            const parsed = JSON.parse(rawBridge) as { bridgeUrl?: string };
+            if (parsed.bridgeUrl) setBridgeUrl(parsed.bridgeUrl);
+          } catch {
+            // ignore
+          }
+        }
       } catch {
-        // Fallback to defaults
+        // Continue with defaults
       }
     })();
   }, []);
 
-  const handleSaveProfile = useCallback(async () => {
-    if (!draftName.trim()) {
+  const handleTestBridge = async () => {
+    setTestingBridge(true);
+    setBridgeStatus('Testing bridge connection...');
+    try {
+      setApiBaseUrl(bridgeUrl.trim());
+      await getState();
+      setBridgeStatus('Connected successfully! Bridge is live.');
+    } catch {
+      try {
+        setBridgeStatus('Probing candidate hosts...');
+        const discovered = await probeCandidateUrls();
+        if (discovered) {
+          setBridgeUrl(discovered);
+          setApiBaseUrl(discovered);
+          setBridgeStatus(`Auto-connected to host: ${discovered}`);
+        } else {
+          setBridgeStatus('Could not reach VPS bridge at this address.');
+        }
+      } catch {
+        setBridgeStatus('Connection failed. Verify server and port.');
+      }
+    } finally {
+      setTestingBridge(false);
+    }
+  };
+
+  const handleSaveAll = useCallback(async () => {
+    if (!profile.displayName.trim()) {
       Alert.alert('Validation Error', 'Display name cannot be empty.');
       return;
     }
-    const updated: UserProfile = {
-      displayName: draftName.trim(),
-      traderTag: draftTag.trim().startsWith('@') ? draftTag.trim() : `@${draftTag.trim()}`,
-      tradingStyle: draftStyle.trim() || 'SMC Arbitrage',
-      preferredBasket: draftBasket.trim() || 'Synthetic Basket',
-      bio: draftBio.trim(),
-    };
-    try {
-      await AsyncStorage.setItem(USER_PROFILE_KEY, JSON.stringify(updated));
-      setProfile(updated);
-      setActiveModal(null);
-    } catch {
-      Alert.alert('Error', 'Could not save profile changes.');
-    }
-  }, [draftName, draftTag, draftStyle, draftBasket, draftBio]);
 
-  const updateSetting = useCallback(
-    async <K extends keyof AppSettings>(key: K, val: AppSettings[K]) => {
-      const updated = { ...settings, [key]: val };
-      setSettings(updated);
-      try {
-        await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(updated));
-      } catch {
-        // Continue in memory
-      }
-    },
-    [settings]
-  );
+    setSaving(true);
+    try {
+      const normalizedProfile: UserProfile = {
+        ...profile,
+        displayName: profile.displayName.trim(),
+        traderTag: profile.traderTag.trim().startsWith('@')
+          ? profile.traderTag.trim()
+          : `@${profile.traderTag.trim()}`,
+      };
+
+      await Promise.all([
+        AsyncStorage.setItem(USER_PROFILE_KEY, JSON.stringify(normalizedProfile)),
+        AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)),
+        AsyncStorage.setItem(
+          '@mobile_ea_profile_config',
+          JSON.stringify({ bridgeUrl: bridgeUrl.trim() })
+        ),
+      ]);
+
+      setApiBaseUrl(bridgeUrl.trim());
+      setProfile(normalizedProfile);
+      setSaveSuccessNotice(true);
+      setTimeout(() => setSaveSuccessNotice(false), 2600);
+    } catch {
+      Alert.alert('Error', 'Failed to save configuration settings.');
+    } finally {
+      setSaving(false);
+    }
+  }, [profile, settings, bridgeUrl]);
+
+  const handleResetDefaults = () => {
+    Alert.alert(
+      'Reset Settings',
+      'Are you sure you want to revert all settings to their original defaults?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reset',
+          style: 'destructive',
+          onPress: () => {
+            setProfile(DEFAULT_PROFILE);
+            setSettings(DEFAULT_SETTINGS);
+          },
+        },
+      ]
+    );
+  };
 
   return (
     <View style={styles.screenRoot}>
-      <AppHeader eyebrow="USER & SETTINGS" title="Profile" />
+      <AppHeader eyebrow="PREFERENCES & SYSTEM" title="Settings" />
 
-      <ScrollView style={styles.root} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {/* 1. Profile Identity Card */}
+      <ScrollView
+        style={styles.root}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Success Notice Banner */}
+        {saveSuccessNotice && (
+          <View style={styles.successBanner}>
+            <Text style={styles.successBannerText}>Settings saved successfully</Text>
+          </View>
+        )}
+
+        {/* 1. Header Profile Identity Card */}
         <View style={styles.profileCard}>
           <View style={styles.avatarRow}>
             <View style={styles.avatarContainer}>
               <Image
-                source={require('../../assets/robot_hero.jpg')}
+                source={require('../../assets/icon.png')}
                 style={styles.avatarImage}
-                resizeMode="cover"
+                resizeMode="contain"
               />
             </View>
             <View style={styles.profileInfo}>
@@ -171,42 +245,138 @@ export function ProfileScreen({ state }: ProfileScreenProps) {
               <Text style={styles.profileStyle}>{profile.tradingStyle}</Text>
             </View>
           </View>
-
           {profile.bio ? <Text style={styles.profileBio}>{profile.bio}</Text> : null}
-
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Edit Profile"
-            onPress={() => {
-              setDraftName(profile.displayName);
-              setDraftTag(profile.traderTag);
-              setDraftStyle(profile.tradingStyle);
-              setDraftBasket(profile.preferredBasket);
-              setDraftBio(profile.bio);
-              setActiveModal('edit-profile');
-            }}
-            style={({ pressed }) => [styles.editProfileBtn, pressed && styles.pressedBtn]}
-          >
-            <EditPencilIcon size={16} color={colors.orange} />
-            <Text style={styles.editProfileBtnText}>Edit Profile</Text>
-          </Pressable>
         </View>
 
-        {/* 2. Preferences & App Settings */}
+        {/* 2. Trader Profile Information (Direct Inline in Body) */}
         <View style={styles.section}>
-          <Text style={styles.sectionHeader}>APP PREFERENCES</Text>
+          <Text style={styles.sectionHeader}>TRADER PROFILE</Text>
+          <View style={styles.cardGroup}>
+            <View style={styles.inputRow}>
+              <Text style={styles.fieldLabel}>DISPLAY NAME</Text>
+              <TextInput
+                style={styles.textInput}
+                value={profile.displayName}
+                onChangeText={(text) => setProfile((p) => ({ ...p, displayName: text }))}
+                placeholder="Falcon Trader"
+                placeholderTextColor={colors.muted}
+              />
+            </View>
+
+            <View style={styles.divider} />
+
+            <View style={styles.inputRow}>
+              <Text style={styles.fieldLabel}>TRADER TAG</Text>
+              <TextInput
+                style={styles.textInput}
+                value={profile.traderTag}
+                onChangeText={(text) => setProfile((p) => ({ ...p, traderTag: text }))}
+                placeholder="@synthetics_pro"
+                placeholderTextColor={colors.muted}
+                autoCapitalize="none"
+              />
+            </View>
+
+            <View style={styles.divider} />
+
+            <View style={styles.inputRow}>
+              <Text style={styles.fieldLabel}>TRADING STRATEGY</Text>
+              <TextInput
+                style={styles.textInput}
+                value={profile.tradingStyle}
+                onChangeText={(text) => setProfile((p) => ({ ...p, tradingStyle: text }))}
+                placeholder="Falcon FX · SMC Arbitrage"
+                placeholderTextColor={colors.muted}
+              />
+            </View>
+
+            <View style={styles.divider} />
+
+            <View style={styles.inputRow}>
+              <Text style={styles.fieldLabel}>PREFERRED SYNTHETICS BASKET</Text>
+              <TextInput
+                style={styles.textInput}
+                value={profile.preferredBasket}
+                onChangeText={(text) => setProfile((p) => ({ ...p, preferredBasket: text }))}
+                placeholder="Volatility 75, Boom/Crash 1000"
+                placeholderTextColor={colors.muted}
+              />
+            </View>
+
+            <View style={styles.divider} />
+
+            <View style={styles.inputRow}>
+              <Text style={styles.fieldLabel}>STRATEGY BIO & NOTES</Text>
+              <TextInput
+                style={[styles.textInput, styles.bioInput]}
+                value={profile.bio}
+                onChangeText={(text) => setProfile((p) => ({ ...p, bio: text }))}
+                placeholder="Algorithmic risk boundaries and notes..."
+                placeholderTextColor={colors.muted}
+                multiline
+                numberOfLines={3}
+              />
+            </View>
+          </View>
+        </View>
+
+        {/* 3. Server Bridge & Network Configuration (Direct Inline in Body) */}
+        <View style={styles.section}>
+          <Text style={styles.sectionHeader}>SERVER BRIDGE CONNECTION</Text>
+          <View style={styles.cardGroup}>
+            <View style={styles.inputRow}>
+              <Text style={styles.fieldLabel}>VPS BRIDGE API URL</Text>
+              <TextInput
+                style={styles.textInput}
+                value={bridgeUrl}
+                onChangeText={setBridgeUrl}
+                placeholder="http://192.168.1.50:3001"
+                placeholderTextColor={colors.muted}
+                autoCapitalize="none"
+                keyboardType="url"
+              />
+            </View>
+
+            <View style={styles.bridgeActionRow}>
+              <Pressable
+                style={({ pressed }) => [styles.bridgeBtn, pressed && styles.pressedBtn]}
+                onPress={() => void handleTestBridge()}
+                disabled={testingBridge}
+              >
+                {testingBridge ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <>
+                    <ArrowPathIcon size={16} color="#FFFFFF" />
+                    <Text style={styles.bridgeBtnText}>Test & Discover</Text>
+                  </>
+                )}
+              </Pressable>
+            </View>
+
+            {bridgeStatus ? (
+              <View style={styles.bridgeStatusBox}>
+                <Text style={styles.bridgeStatusText}>{bridgeStatus}</Text>
+              </View>
+            ) : null}
+          </View>
+        </View>
+
+        {/* 4. App & Execution Preferences (Inline Switches) */}
+        <View style={styles.section}>
+          <Text style={styles.sectionHeader}>EXECUTION & TELEMETRY PREFERENCES</Text>
           <View style={styles.cardGroup}>
             <View style={styles.settingRow}>
               <View style={styles.settingTextCol}>
                 <View style={styles.settingLabelRow}>
                   <BellAlertIcon size={18} color={colors.orange} />
-                  <Text style={styles.settingTitle}>Execution Alerts</Text>
+                  <Text style={styles.settingTitle}>Execution Audio Chime</Text>
                 </View>
-                <Text style={styles.settingSubtitle}>Audio chime on automated SMC order execution</Text>
+                <Text style={styles.settingSubtitle}>Audible tone upon automated SMC order placement</Text>
               </View>
               <ToggleSwitch
                 value={settings.soundAlerts}
-                onValueChange={(val) => void updateSetting('soundAlerts', val)}
+                onValueChange={(val) => setSettings((s) => ({ ...s, soundAlerts: val }))}
                 accessibilityLabel="Toggle sound alerts"
               />
             </View>
@@ -219,11 +389,11 @@ export function ProfileScreen({ state }: ProfileScreenProps) {
                   <SettingsSlidersIcon size={18} color={colors.orange} />
                   <Text style={styles.settingTitle}>Haptic Feedback</Text>
                 </View>
-                <Text style={styles.settingSubtitle}>Vibration on risk thresholds and state transitions</Text>
+                <Text style={styles.settingSubtitle}>Tactile vibration on risk limits and state transitions</Text>
               </View>
               <ToggleSwitch
                 value={settings.hapticFeedback}
-                onValueChange={(val) => void updateSetting('hapticFeedback', val)}
+                onValueChange={(val) => setSettings((s) => ({ ...s, hapticFeedback: val }))}
                 accessibilityLabel="Toggle haptic feedback"
               />
             </View>
@@ -236,432 +406,293 @@ export function ProfileScreen({ state }: ProfileScreenProps) {
                   <ShieldIcon size={18} color={colors.orange} />
                   <Text style={styles.settingTitle}>High-Precision Telemetry</Text>
                 </View>
-                <Text style={styles.settingSubtitle}>Real-time streaming ticks for all 10 synthetic instruments</Text>
+                <Text style={styles.settingSubtitle}>Real-time streaming tick data across all synthetic instruments</Text>
               </View>
               <ToggleSwitch
                 value={settings.highPrecisionQuotes}
-                onValueChange={(val) => void updateSetting('highPrecisionQuotes', val)}
-                accessibilityLabel="Toggle telemetry stream"
+                onValueChange={(val) => setSettings((s) => ({ ...s, highPrecisionQuotes: val }))}
+                accessibilityLabel="Toggle high-precision telemetry"
               />
             </View>
           </View>
         </View>
 
-        {/* 3. Legal & Compliance Section */}
+        {/* 5. Over-The-Air (OTA) Updates & Build Info */}
         <View style={styles.section}>
-          <Text style={styles.sectionHeader}>LEGAL & COMPLIANCE</Text>
+          <Text style={styles.sectionHeader}>OVER-THE-AIR (OTA) UPDATES</Text>
           <View style={styles.cardGroup}>
-            {/* Privacy Policy Row */}
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Privacy Policy"
-              onPress={() => setActiveModal('privacy')}
-              style={({ pressed }) => [styles.navRow, pressed && styles.pressedRow]}
-            >
-              <View style={styles.navRowLeft}>
-                <DocumentTextIcon size={18} color={colors.orange} />
-                <View style={styles.navTextCol}>
-                  <Text style={styles.navRowTitle}>Privacy Policy</Text>
-                  <Text style={styles.navRowSubtitle}>Local storage, data security, and telemetry handling</Text>
-                </View>
+            <View style={styles.otaRow}>
+              <View style={styles.otaMetaCol}>
+                <Text style={styles.otaMetaLabel}>CURRENT VERSION</Text>
+                <Text style={styles.otaMetaValue}>v0.1.0 · Build 2026.09.16</Text>
               </View>
-              <ChevronRightIcon size={18} color={colors.muted} />
-            </Pressable>
+              <View style={styles.otaMetaCol}>
+                <Text style={styles.otaMetaLabel}>RUNTIME POLICY</Text>
+                <Text style={styles.otaMetaValue}>appVersion (0.1.0)</Text>
+              </View>
+            </View>
 
             <View style={styles.divider} />
 
-            {/* Terms of Service Row */}
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Terms of Service"
-              onPress={() => setActiveModal('terms')}
-              style={({ pressed }) => [styles.navRow, pressed && styles.pressedRow]}
-            >
-              <View style={styles.navRowLeft}>
-                <DocumentTextIcon size={18} color={colors.orange} />
-                <View style={styles.navTextCol}>
-                  <Text style={styles.navRowTitle}>Terms of Service</Text>
-                  <Text style={styles.navRowSubtitle}>Software license, usage boundaries, and user agreement</Text>
-                </View>
-              </View>
-              <ChevronRightIcon size={18} color={colors.muted} />
-            </Pressable>
-
-            <View style={styles.divider} />
-
-            {/* Risk of Trading Row */}
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Risk of Trading"
-              onPress={() => setActiveModal('risk')}
-              style={({ pressed }) => [styles.navRow, pressed && styles.pressedRow]}
-            >
-              <View style={styles.navRowLeft}>
-                <WarningTriangleIcon size={18} color={colors.orange} />
-                <View style={styles.navTextCol}>
-                  <Text style={styles.navRowTitle}>Risk of Trading</Text>
-                  <Text style={styles.navRowSubtitle}>Synthetic indices mechanics, volatility, and leverage warning</Text>
-                </View>
-              </View>
-              <ChevronRightIcon size={18} color={colors.muted} />
-            </Pressable>
-
-            <View style={styles.divider} />
-
-            {/* Disclaimer Section Row */}
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Disclaimer"
-              onPress={() => setActiveModal('disclaimer')}
-              style={({ pressed }) => [styles.navRow, pressed && styles.pressedRow]}
-            >
-              <View style={styles.navRowLeft}>
-                <InfoCircleIcon size={18} color={colors.orange} />
-                <View style={styles.navTextCol}>
-                  <Text style={styles.navRowTitle}>Disclaimer</Text>
-                  <Text style={styles.navRowSubtitle}>Independent utility, no financial advice, regulatory terms</Text>
-                </View>
-              </View>
-              <ChevronRightIcon size={18} color={colors.muted} />
-            </Pressable>
+            <View style={styles.otaActionRow}>
+              <Pressable
+                style={({ pressed }) => [styles.checkUpdateBtn, pressed && styles.pressedBtn]}
+                onPress={() => ota?.checkForUpdate(true)}
+                disabled={ota?.isCheckingForUpdate}
+              >
+                {ota?.isCheckingForUpdate ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <>
+                    <ArrowPathIcon size={16} color="#FFFFFF" />
+                    <Text style={styles.checkUpdateBtnText}>Check for Updates</Text>
+                  </>
+                )}
+              </Pressable>
+              {ota?.checkStatusMessage ? (
+                <Text style={styles.otaStatusText}>{ota.checkStatusMessage}</Text>
+              ) : (
+                <Text style={styles.otaStatusText}>
+                  {ota?.lastCheckedTime ? `Checked today at ${ota.lastCheckedTime}` : 'Tap to check EAS cloud'}
+                </Text>
+              )}
+            </View>
           </View>
         </View>
 
-        {/* 4. System & Audit Logs Section */}
+        {/* 6. Legal, Compliance & System Logs (Single-Body Collapsible Accordions) */}
         <View style={styles.section}>
-          <Text style={styles.sectionHeader}>SYSTEM & AUDIT LOGS</Text>
+          <Text style={styles.sectionHeader}>LEGAL, RISK & SYSTEM LOGS</Text>
           <View style={styles.cardGroup}>
+            {/* Accordion 1: Privacy Policy */}
             <Pressable
+              style={styles.accordionHeader}
+              onPress={() => toggleAccordion('privacy')}
               accessibilityRole="button"
-              accessibilityLabel="System & Audit Logs"
-              onPress={() => setActiveModal('logs')}
-              style={({ pressed }) => [styles.navRow, pressed && styles.pressedRow]}
             >
-              <View style={styles.navRowLeft}>
-                <TerminalLogIcon size={18} color={colors.orange} />
-                <View style={styles.navTextCol}>
-                  <Text style={styles.navRowTitle}>System & Audit Logs</Text>
-                  <Text style={styles.navRowSubtitle}>
-                    {state?.activity?.length ? `${state.activity.length} recorded events` : 'Chronological controller logs'}
-                  </Text>
+              <View style={styles.accordionHeaderLeft}>
+                <DocumentTextIcon size={18} color={colors.orange} />
+                <View style={styles.accordionTitleCol}>
+                  <Text style={styles.accordionTitle}>Privacy Policy</Text>
+                  <Text style={styles.accordionSubtitle}>Local sandboxed storage, encryption, no analytics</Text>
                 </View>
               </View>
-              <ChevronRightIcon size={18} color={colors.muted} />
+              {openAccordion === 'privacy' ? (
+                <ChevronDownIcon size={18} color={colors.orange} />
+              ) : (
+                <ChevronRightIcon size={18} color={colors.muted} />
+              )}
             </Pressable>
-          </View>
-        </View>
-
-        {/* 5. About & Version Info */}
-        <View style={styles.aboutCard}>
-          <Text style={styles.aboutAppName}>Derived Arbitrage</Text>
-          <Text style={styles.aboutVersion}>Version 0.1.0 · Build 2026.09.14</Text>
-          <Text style={styles.aboutEngine}>Falcon FX SMC Engine · MetaTrader 5 MQL5</Text>
-        </View>
-      </ScrollView>
-
-      {/* ─── MODAL 1: Edit Profile ─── */}
-      <Modal visible={activeModal === 'edit-profile'} animationType="slide" transparent>
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalSheet}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Edit Profile</Text>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Close modal"
-                onPress={() => setActiveModal(null)}
-                style={styles.closeBtn}
-              >
-                <CrossIcon size={18} color={colors.muted} />
-              </Pressable>
-            </View>
-
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.modalBody}>
-              <View style={styles.fieldGroup}>
-                <Text style={styles.fieldLabel}>DISPLAY NAME</Text>
-                <TextInput
-                  style={styles.input}
-                  value={draftName}
-                  onChangeText={setDraftName}
-                  placeholder="e.g. Falcon Trader"
-                  placeholderTextColor={colors.muted}
-                />
-              </View>
-
-              <View style={styles.fieldGroup}>
-                <Text style={styles.fieldLabel}>TRADER TAG</Text>
-                <TextInput
-                  style={styles.input}
-                  value={draftTag}
-                  onChangeText={setDraftTag}
-                  placeholder="e.g. @synthetics_pro"
-                  placeholderTextColor={colors.muted}
-                />
-              </View>
-
-              <View style={styles.fieldGroup}>
-                <Text style={styles.fieldLabel}>TRADING STRATEGY</Text>
-                <TextInput
-                  style={styles.input}
-                  value={draftStyle}
-                  onChangeText={setDraftStyle}
-                  placeholder="e.g. Falcon FX · SMC Arbitrage"
-                  placeholderTextColor={colors.muted}
-                />
-              </View>
-
-              <View style={styles.fieldGroup}>
-                <Text style={styles.fieldLabel}>FAVORITE SYNTHETIC BASKET</Text>
-                <TextInput
-                  style={styles.input}
-                  value={draftBasket}
-                  onChangeText={setDraftBasket}
-                  placeholder="e.g. Volatility 75, Boom 1000"
-                  placeholderTextColor={colors.muted}
-                />
-              </View>
-
-              <View style={styles.fieldGroup}>
-                <Text style={styles.fieldLabel}>TRADER BIO</Text>
-                <TextInput
-                  style={[styles.input, styles.bioInput]}
-                  value={draftBio}
-                  onChangeText={setDraftBio}
-                  placeholder="Brief trading overview or notes"
-                  placeholderTextColor={colors.muted}
-                  multiline
-                  numberOfLines={3}
-                />
-              </View>
-
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Save Profile Changes"
-                onPress={() => void handleSaveProfile()}
-                style={({ pressed }) => [styles.saveActionBtn, pressed && styles.pressedBtn]}
-              >
-                <Text style={styles.saveActionBtnText}>Save Profile</Text>
-              </Pressable>
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-
-      {/* ─── MODAL 2: Privacy Policy ─── */}
-      <Modal visible={activeModal === 'privacy'} animationType="slide" transparent>
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalSheet}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Privacy Policy</Text>
-              <Pressable onPress={() => setActiveModal(null)} style={styles.closeBtn}>
-                <CrossIcon size={18} color={colors.muted} />
-              </Pressable>
-            </View>
-
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.modalBody}>
-              <Text style={styles.legalSectionTitle}>1. Local Storage Policy</Text>
-              <Text style={styles.legalBodyText}>
-                Derived Arbitrage stores all user profile information, trading preferences, and layout settings exclusively on your local device using encrypted sandboxed storage (AsyncStorage). We do not collect, store, or sell your personal details to any central remote databases.
-              </Text>
-
-              <Text style={styles.legalSectionTitle}>2. Security & Credentials</Text>
-              <Text style={styles.legalBodyText}>
-                The application operates as an analytical and execution management interface. Your MetaTrader 5 live account passwords are never accessed, saved, or transmitted by the mobile interface.
-              </Text>
-
-              <Text style={styles.legalSectionTitle}>3. Real-Time Telemetry</Text>
-              <Text style={styles.legalBodyText}>
-                Tick data, market profiles, and account balance telemetry communicated between your local VPS bridge and mobile controller utilize HTTPS and authenticated WebSocket streams protected by Bearer JWT tokens. Telemetry is purely ephemeral and processed in real time.
-              </Text>
-
-              <Text style={styles.legalSectionTitle}>4. No Third-Party Tracking</Text>
-              <Text style={styles.legalBodyText}>
-                Derived Arbitrage contains strictly zero third-party advertising SDKs, tracking beacons, analytics telemetry frameworks, or external user profiling cookies.
-              </Text>
-
-              <Pressable onPress={() => setActiveModal(null)} style={styles.dismissBtn}>
-                <Text style={styles.dismissBtnText}>Understood</Text>
-              </Pressable>
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-
-      {/* ─── MODAL 3: Terms of Service ─── */}
-      <Modal visible={activeModal === 'terms'} animationType="slide" transparent>
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalSheet}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Terms of Service</Text>
-              <Pressable onPress={() => setActiveModal(null)} style={styles.closeBtn}>
-                <CrossIcon size={18} color={colors.muted} />
-              </Pressable>
-            </View>
-
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.modalBody}>
-              <Text style={styles.legalSectionTitle}>1. Acceptance of Terms</Text>
-              <Text style={styles.legalBodyText}>
-                By accessing or utilizing the Derived Arbitrage application, you agree to be bound by these Terms of Service. If you do not agree with any provision, do not deploy or operate the software.
-              </Text>
-
-              <Text style={styles.legalSectionTitle}>2. License & Authorized Use</Text>
-              <Text style={styles.legalBodyText}>
-                The software is provided for personal monitoring, statistical analysis, and algorithmic risk management on synthetic indices. You agree not to reverse-engineer, decompile, or exploit the software for fraudulent or malicious purposes.
-              </Text>
-
-              <Text style={styles.legalSectionTitle}>3. User Operational Responsibility</Text>
-              <Text style={styles.legalBodyText}>
-                You maintain sole and absolute responsibility for all trading activities, order placement decisions, lot sizing adjustments, risk parameter configurations, and financial margin management executed on your broker accounts.
-              </Text>
-
-              <Text style={styles.legalSectionTitle}>4. Network Availability & Latency</Text>
-              <Text style={styles.legalBodyText}>
-                Automated order transmission relies upon third-party network providers, local VPS stability, and MetaTrader 5 execution servers. Derived Arbitrage makes no guarantee against network latency, packet loss, or execution slippage caused by internet drops.
-              </Text>
-
-              <Pressable onPress={() => setActiveModal(null)} style={styles.dismissBtn}>
-                <Text style={styles.dismissBtnText}>Accept & Close</Text>
-              </Pressable>
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-
-      {/* ─── MODAL 4: Risk of Trading ─── */}
-      <Modal visible={activeModal === 'risk'} animationType="slide" transparent>
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalSheet}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Risk of Trading</Text>
-              <Pressable onPress={() => setActiveModal(null)} style={styles.closeBtn}>
-                <CrossIcon size={18} color={colors.muted} />
-              </Pressable>
-            </View>
-
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.modalBody}>
-              <Text style={styles.legalSectionTitle}>1. Synthetic Indices Mechanics</Text>
-              <Text style={styles.legalBodyText}>
-                Synthetic indices (including Volatility 10/50/75/100, Step, Boom, and Crash) operate 24 hours a day, 7 days a week, utilizing pseudorandom algorithms to simulate market volatility. They do not correlate to real-world macroeconomic fundamentals and can experience rapid, unpredictable price shifts.
-              </Text>
-
-              <Text style={styles.legalSectionTitle}>2. High Leverage Hazard</Text>
-              <Text style={styles.legalBodyText}>
-                Trading derivative synthetic contracts with financial leverage amplifies both potential profits and substantial losses. A minor adverse price movement can lead to the rapid liquidation of your entire trading capital.
-              </Text>
-
-              <Text style={styles.legalSectionTitle}>3. Algorithmic Guardrails</Text>
-              <Text style={styles.legalBodyText}>
-                While the FalconEA engine incorporates strict invariants ($15 equity floor, $0.40 daily loss lock, and maximum position caps), extreme market spikes or broker network delays can cause execution slippage beyond specified stop levels.
-              </Text>
-
-              <Text style={styles.legalSectionTitle}>4. Total Loss Warning</Text>
-              <Text style={styles.legalBodyText}>
-                Do not trade with money you cannot afford to lose. If you do not fully understand the risks associated with synthetic volatility and leveraged derivative trading, you should consult an independent financial advisor.
-              </Text>
-
-              <Pressable onPress={() => setActiveModal(null)} style={styles.dismissBtn}>
-                <Text style={styles.dismissBtnText}>I Acknowledge the Risks</Text>
-              </Pressable>
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-
-      {/* ─── MODAL 5: Disclaimer Section ─── */}
-      <Modal visible={activeModal === 'disclaimer'} animationType="slide" transparent>
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalSheet}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Disclaimer</Text>
-              <Pressable onPress={() => setActiveModal(null)} style={styles.closeBtn}>
-                <CrossIcon size={18} color={colors.muted} />
-              </Pressable>
-            </View>
-
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.modalBody}>
-              <Text style={styles.legalSectionTitle}>1. Independent Software Tool</Text>
-              <Text style={styles.legalBodyText}>
-                Derived Arbitrage is an independent open-source client utility designed for algorithm monitoring and telemetry visualization. It is not affiliated with, sponsored by, endorsed by, or operated by MetaQuotes Ltd or Deriv Group Ltd.
-              </Text>
-
-              <Text style={styles.legalSectionTitle}>2. No Financial Advice</Text>
-              <Text style={styles.legalBodyText}>
-                All contents, automated signal structures, order block analyses, and Fair Value Gap calculations displayed within this application are strictly for analytical, informational, and educational purposes. Nothing herein constitutes financial, investment, legal, or tax advice.
-              </Text>
-
-              <Text style={styles.legalSectionTitle}>3. Hypothetical & Backtested Results</Text>
-              <Text style={styles.legalBodyText}>
-                Past performance, backtest simulations, and historical statistical models do not represent a guarantee of future operational performance. Real-time market execution involves latency, spread variability, and liquidity nuances.
-              </Text>
-
-              <Text style={styles.legalSectionTitle}>4. Regulatory Compliance</Text>
-              <Text style={styles.legalBodyText}>
-                It is the user's sole responsibility to ensure compliance with all applicable financial regulations, laws, and broker terms of service in their respective jurisdiction.
-              </Text>
-
-              <Pressable onPress={() => setActiveModal(null)} style={styles.dismissBtn}>
-                <Text style={styles.dismissBtnText}>Close Disclaimer</Text>
-              </Pressable>
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-
-      {/* ─── MODAL 6: System & Audit Logs ─── */}
-      <Modal visible={activeModal === 'logs'} animationType="slide" transparent>
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalSheet}>
-            <View style={styles.modalHeader}>
-              <View style={styles.modalHeaderCol}>
-                <Text style={styles.modalTitle}>System & Audit Logs</Text>
-                <Text style={styles.modalSub}>
-                  {state?.activity?.length ? `${state.activity.length} events recorded` : 'Controller event stream'}
+            {openAccordion === 'privacy' && (
+              <View style={styles.accordionBody}>
+                <Text style={styles.legalHeading}>1. Local Storage Policy</Text>
+                <Text style={styles.legalBody}>
+                  Derived Arbitrage stores all user profile parameters, trading preferences, and layout keys exclusively on your device using encrypted sandboxed storage (AsyncStorage). We do not collect, store, or transmit your personal details to any centralized databases.
+                </Text>
+                <Text style={styles.legalHeading}>2. Ephemeral Telemetry</Text>
+                <Text style={styles.legalBody}>
+                  Tick data, market profiles, and account balance telemetry communicated between your local VPS bridge and mobile controller utilize HTTPS and authenticated WebSocket streams protected by Bearer JWT tokens. Telemetry is purely ephemeral and processed in real time.
                 </Text>
               </View>
-              <Pressable onPress={() => setActiveModal(null)} style={styles.closeBtn}>
-                <CrossIcon size={18} color={colors.muted} />
-              </Pressable>
-            </View>
+            )}
 
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.modalBody}>
-              {!state?.activity || state.activity.length === 0 ? (
-                <View style={styles.emptyLogBox}>
-                  <TerminalLogIcon size={32} color={colors.muted} />
-                  <Text style={styles.emptyLogTitle}>No logged events</Text>
-                  <Text style={styles.emptyLogSub}>
-                    Robot actions and risk engine state changes will appear here in real time.
+            <View style={styles.divider} />
+
+            {/* Accordion 2: Terms of Service */}
+            <Pressable
+              style={styles.accordionHeader}
+              onPress={() => toggleAccordion('terms')}
+              accessibilityRole="button"
+            >
+              <View style={styles.accordionHeaderLeft}>
+                <DocumentTextIcon size={18} color={colors.orange} />
+                <View style={styles.accordionTitleCol}>
+                  <Text style={styles.accordionTitle}>Terms of Service</Text>
+                  <Text style={styles.accordionSubtitle}>Software license, usage boundaries, user responsibility</Text>
+                </View>
+              </View>
+              {openAccordion === 'terms' ? (
+                <ChevronDownIcon size={18} color={colors.orange} />
+              ) : (
+                <ChevronRightIcon size={18} color={colors.muted} />
+              )}
+            </Pressable>
+            {openAccordion === 'terms' && (
+              <View style={styles.accordionBody}>
+                <Text style={styles.legalHeading}>1. Acceptance of Terms</Text>
+                <Text style={styles.legalBody}>
+                  By utilizing Derived Arbitrage, you agree to these Terms of Service. The software is provided for personal monitoring, statistical analysis, and algorithmic risk management on synthetic indices.
+                </Text>
+                <Text style={styles.legalHeading}>2. Operational Responsibility</Text>
+                <Text style={styles.legalBody}>
+                  You maintain sole and absolute responsibility for all trading activities, order placement decisions, lot sizing adjustments, risk parameter configurations, and financial margin management executed on your broker accounts.
+                </Text>
+              </View>
+            )}
+
+            <View style={styles.divider} />
+
+            {/* Accordion 3: Risk of Trading */}
+            <Pressable
+              style={styles.accordionHeader}
+              onPress={() => toggleAccordion('risk')}
+              accessibilityRole="button"
+            >
+              <View style={styles.accordionHeaderLeft}>
+                <WarningTriangleIcon size={18} color={colors.orange} />
+                <View style={styles.accordionTitleCol}>
+                  <Text style={styles.accordionTitle}>Risk of Trading</Text>
+                  <Text style={styles.accordionSubtitle}>Synthetic volatility, high leverage hazard, guardrails</Text>
+                </View>
+              </View>
+              {openAccordion === 'risk' ? (
+                <ChevronDownIcon size={18} color={colors.orange} />
+              ) : (
+                <ChevronRightIcon size={18} color={colors.muted} />
+              )}
+            </Pressable>
+            {openAccordion === 'risk' && (
+              <View style={styles.accordionBody}>
+                <Text style={styles.legalHeading}>1. Synthetic Indices Mechanics</Text>
+                <Text style={styles.legalBody}>
+                  Synthetic indices (Volatility, Step, Boom, Crash) operate 24/7 utilizing pseudorandom algorithms to simulate volatility. They do not correlate to real-world macroeconomic fundamentals and can experience rapid, unpredictable price shifts.
+                </Text>
+                <Text style={styles.legalHeading}>2. Leverage Warning</Text>
+                <Text style={styles.legalBody}>
+                  Trading synthetic derivative contracts with financial leverage amplifies both potential profits and substantial losses. Do not trade with capital you cannot afford to lose.
+                </Text>
+              </View>
+            )}
+
+            <View style={styles.divider} />
+
+            {/* Accordion 4: Disclaimer */}
+            <Pressable
+              style={styles.accordionHeader}
+              onPress={() => toggleAccordion('disclaimer')}
+              accessibilityRole="button"
+            >
+              <View style={styles.accordionHeaderLeft}>
+                <InfoCircleIcon size={18} color={colors.orange} />
+                <View style={styles.accordionTitleCol}>
+                  <Text style={styles.accordionTitle}>Disclaimer</Text>
+                  <Text style={styles.accordionSubtitle}>Independent utility, no financial advice, regulatory terms</Text>
+                </View>
+              </View>
+              {openAccordion === 'disclaimer' ? (
+                <ChevronDownIcon size={18} color={colors.orange} />
+              ) : (
+                <ChevronRightIcon size={18} color={colors.muted} />
+              )}
+            </Pressable>
+            {openAccordion === 'disclaimer' && (
+              <View style={styles.accordionBody}>
+                <Text style={styles.legalHeading}>1. Independent Software Tool</Text>
+                <Text style={styles.legalBody}>
+                  Derived Arbitrage is an independent open-source utility designed for algorithm monitoring and telemetry visualization. It is not affiliated with, endorsed by, or operated by MetaQuotes Ltd or Deriv Group Ltd.
+                </Text>
+                <Text style={styles.legalHeading}>2. No Financial Advice</Text>
+                <Text style={styles.legalBody}>
+                  All contents, automated signal structures, order block analyses, and Fair Value Gap calculations displayed within this application are strictly for analytical and educational purposes.
+                </Text>
+              </View>
+            )}
+
+            <View style={styles.divider} />
+
+            {/* Accordion 5: System & Audit Logs */}
+            <Pressable
+              style={styles.accordionHeader}
+              onPress={() => toggleAccordion('logs')}
+              accessibilityRole="button"
+            >
+              <View style={styles.accordionHeaderLeft}>
+                <TerminalLogIcon size={18} color={colors.orange} />
+                <View style={styles.accordionTitleCol}>
+                  <Text style={styles.accordionTitle}>System & Audit Logs</Text>
+                  <Text style={styles.accordionSubtitle}>
+                    {state?.activity?.length
+                      ? `${state.activity.length} recorded controller events`
+                      : 'Chronological controller logs'}
                   </Text>
                 </View>
+              </View>
+              {openAccordion === 'logs' ? (
+                <ChevronDownIcon size={18} color={colors.orange} />
               ) : (
-                state.activity.map((item, idx) => {
-                  const isLast = idx === state.activity.length - 1;
-                  const markColor =
-                    item.kind === 'danger' || item.kind === 'success' ? colors.orange : colors.muted;
-
-                  return (
-                    <View key={item.id} style={[styles.logItemRow, !isLast && styles.logBorder]}>
-                      <View style={[styles.logMark, { backgroundColor: markColor }]} />
-                      <View style={styles.logTextWrap}>
-                        <Text style={styles.logMessage}>{item.message}</Text>
-                        <Text style={styles.logTime}>
-                          {new Date(item.at).toLocaleTimeString([], {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                            second: '2-digit',
-                          })}
-                        </Text>
-                      </View>
-                    </View>
-                  );
-                })
+                <ChevronRightIcon size={18} color={colors.muted} />
               )}
-
-              <Pressable onPress={() => setActiveModal(null)} style={styles.dismissBtn}>
-                <Text style={styles.dismissBtnText}>Close Logs</Text>
-              </Pressable>
-            </ScrollView>
+            </Pressable>
+            {openAccordion === 'logs' && (
+              <View style={styles.accordionBody}>
+                {!state?.activity || state.activity.length === 0 ? (
+                  <Text style={styles.emptyLogText}>No controller events recorded yet.</Text>
+                ) : (
+                  state.activity.map((item, idx) => {
+                    const isLast = idx === state.activity.length - 1;
+                    return (
+                      <View
+                        key={item.id}
+                        style={[styles.logItemRow, !isLast && styles.logBorder]}
+                      >
+                        <View
+                          style={[
+                            styles.logMark,
+                            {
+                              backgroundColor:
+                                item.kind === 'danger' || item.kind === 'success'
+                                  ? colors.orange
+                                  : colors.muted,
+                            },
+                          ]}
+                        />
+                        <View style={styles.logTextWrap}>
+                          <Text style={styles.logMessage}>{item.message}</Text>
+                          <Text style={styles.logTime}>
+                            {new Date(item.at).toLocaleTimeString([], {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                              second: '2-digit',
+                            })}
+                          </Text>
+                        </View>
+                      </View>
+                    );
+                  })
+                )}
+              </View>
+            )}
           </View>
         </View>
-      </Modal>
+
+        {/* 7. Action Footer (Save & Reset) */}
+        <View style={styles.actionFooter}>
+          <Pressable
+            style={({ pressed }) => [styles.saveAllBtn, pressed && styles.pressedBtn]}
+            onPress={() => void handleSaveAll()}
+            disabled={saving}
+          >
+            {saving ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <Text style={styles.saveAllBtnText}>Save Settings</Text>
+            )}
+          </Pressable>
+
+          <Pressable
+            style={({ pressed }) => [styles.resetBtn, pressed && styles.pressedBtn]}
+            onPress={handleResetDefaults}
+          >
+            <Text style={styles.resetBtnText}>Reset to Defaults</Text>
+          </Pressable>
+        </View>
+
+        {/* About App Footer */}
+        <View style={styles.aboutCard}>
+          <Text style={styles.aboutAppName}>DERIVED ARBITRAGE</Text>
+          <Text style={styles.aboutVersion}>EAS Cloud · Falcon FX SMC Engine</Text>
+        </View>
+      </ScrollView>
     </View>
   );
 }
@@ -669,16 +700,32 @@ export function ProfileScreen({ state }: ProfileScreenProps) {
 const styles = StyleSheet.create({
   screenRoot: { flex: 1, backgroundColor: colors.bg },
   root: { flex: 1, backgroundColor: colors.bg },
-  content: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 136, gap: 24 },
+  content: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 120, gap: 20 },
 
-  // ─── Profile Identity Card ───
+  successBanner: {
+    backgroundColor: colors.orangeDark,
+    borderColor: colors.orange,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+  },
+  successBannerText: {
+    color: colors.orange,
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 0.2,
+  },
+
+  // 1. Profile Identity Card
   profileCard: {
     backgroundColor: colors.panel,
     borderColor: colors.border,
     borderWidth: 1,
     borderRadius: 20,
     padding: 20,
-    gap: 16,
+    gap: 14,
   },
   avatarRow: {
     flexDirection: 'row',
@@ -693,6 +740,8 @@ const styles = StyleSheet.create({
     borderColor: colors.orange,
     backgroundColor: '#080808',
     overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   avatarImage: {
     width: '100%',
@@ -725,27 +774,10 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
   },
-  editProfileBtn: {
-    minHeight: 44,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: '#1E1E1E',
-    borderColor: '#303030',
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-  },
-  editProfileBtnText: {
-    color: colors.orange,
-    fontSize: 13,
-    fontWeight: '700',
-  },
 
-  // ─── Section Blocks ───
+  // Section Blocks
   section: {
-    gap: 10,
+    gap: 8,
   },
   sectionHeader: {
     color: colors.muted,
@@ -762,7 +794,65 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
 
-  // ─── Setting Switch Row ───
+  // Input Rows (Direct Inline)
+  inputRow: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 6,
+  },
+  fieldLabel: {
+    color: colors.muted,
+    fontSize: 10.5,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+  },
+  textInput: {
+    backgroundColor: '#1E1E1E',
+    borderColor: colors.border,
+    borderWidth: 1,
+    borderRadius: 10,
+    color: colors.text,
+    fontSize: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontWeight: '500',
+  },
+  bioInput: {
+    height: 72,
+    textAlignVertical: 'top',
+  },
+
+  // Bridge Action
+  bridgeActionRow: {
+    paddingHorizontal: 16,
+    paddingBottom: 14,
+    paddingTop: 4,
+  },
+  bridgeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: colors.orange,
+    borderRadius: 10,
+    paddingVertical: 12,
+  },
+  bridgeBtnText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  bridgeStatusBox: {
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+  },
+  bridgeStatusText: {
+    color: colors.orange,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+
+  // Setting Switch Row
   settingRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -792,8 +882,55 @@ const styles = StyleSheet.create({
     lineHeight: 15,
   },
 
-  // ─── Navigation Row ───
-  navRow: {
+  // OTA Card Rows
+  otaRow: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    justifyContent: 'space-between',
+  },
+  otaMetaCol: {
+    flex: 1,
+    gap: 4,
+  },
+  otaMetaLabel: {
+    color: colors.muted,
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+  },
+  otaMetaValue: {
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  otaActionRow: {
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    gap: 10,
+  },
+  checkUpdateBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: colors.orange,
+    borderRadius: 10,
+    paddingVertical: 12,
+  },
+  checkUpdateBtnText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  otaStatusText: {
+    color: colors.muted,
+    fontSize: 12,
+    textAlign: 'center',
+  },
+
+  // Accordion Rows
+  accordionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -801,226 +938,133 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     minHeight: 60,
   },
-  navRowLeft: {
+  accordionHeaderLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
     flex: 1,
     paddingRight: 8,
   },
-  navTextCol: {
+  accordionTitleCol: {
     flex: 1,
-    gap: 3,
+    gap: 2,
   },
-  navRowTitle: {
+  accordionTitle: {
     color: colors.text,
     fontSize: 14,
     fontWeight: '700',
   },
-  navRowSubtitle: {
+  accordionSubtitle: {
     color: colors.muted,
     fontSize: 11,
     lineHeight: 15,
+  },
+  accordionBody: {
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    backgroundColor: '#111111',
+    borderTopWidth: 1,
+    borderTopColor: '#202020',
+    gap: 8,
+  },
+  legalHeading: {
+    color: colors.orange,
+    fontSize: 12,
+    fontWeight: '700',
+    marginTop: 4,
+  },
+  legalBody: {
+    color: '#CCCCCC',
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  emptyLogText: {
+    color: colors.muted,
+    fontSize: 12,
+  },
+  logItemRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    paddingVertical: 6,
+  },
+  logBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#1E1E1E',
+  },
+  logMark: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginTop: 5,
+  },
+  logTextWrap: {
+    flex: 1,
+    gap: 2,
+  },
+  logMessage: {
+    color: colors.text,
+    fontSize: 12,
+  },
+  logTime: {
+    color: colors.muted,
+    fontSize: 10,
   },
 
   divider: {
     height: 1,
     backgroundColor: '#222222',
-    marginLeft: 46,
   },
 
-  // ─── About Card ───
-  aboutCard: {
-    alignItems: 'center',
-    paddingVertical: 16,
-    gap: 4,
+  // Action Footer
+  actionFooter: {
+    gap: 10,
+    marginTop: 4,
   },
-  aboutAppName: {
-    color: colors.text,
-    fontSize: 14,
-    fontWeight: '800',
-    letterSpacing: 1,
-  },
-  aboutVersion: {
-    color: colors.muted,
-    fontSize: 12,
-  },
-  aboutEngine: {
-    color: '#666666',
-    fontSize: 11,
-  },
-
-  // ─── Modal Elements ───
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.75)',
-    justifyContent: 'flex-end',
-  },
-  modalSheet: {
-    backgroundColor: '#121212',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    borderTopWidth: 1,
-    borderColor: colors.border,
-    maxHeight: '85%',
-    paddingBottom: 36,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 18,
-    borderBottomWidth: 1,
-    borderBottomColor: '#222222',
-  },
-  modalHeaderCol: {
-    flex: 1,
-    gap: 2,
-  },
-  modalSub: {
-    color: colors.muted,
-    fontSize: 12,
-  },
-  modalTitle: {
-    color: colors.text,
-    fontSize: 17,
-    fontWeight: '800',
-    letterSpacing: -0.2,
-  },
-  closeBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#1E1E1E',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  modalBody: {
-    padding: 20,
-    gap: 16,
-  },
-
-  // Form inputs
-  fieldGroup: {
-    gap: 6,
-  },
-  fieldLabel: {
-    color: colors.muted,
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 0.8,
-  },
-  input: {
-    backgroundColor: '#181818',
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    color: colors.text,
-    fontSize: 14,
-    minHeight: 48,
-  },
-  bioInput: {
-    minHeight: 80,
-    textAlignVertical: 'top',
-  },
-  saveActionBtn: {
-    minHeight: 50,
+  saveAllBtn: {
     backgroundColor: colors.orange,
-    borderRadius: 12,
+    borderRadius: 14,
+    paddingVertical: 15,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 8,
   },
-  saveActionBtnText: {
-    color: '#080808',
+  saveAllBtnText: {
+    color: '#FFFFFF',
     fontSize: 15,
-    fontWeight: '800',
-  },
-
-  // Legal Text
-  legalSectionTitle: {
-    color: colors.orange,
-    fontSize: 13,
-    fontWeight: '800',
-    marginTop: 8,
+    fontWeight: '700',
     letterSpacing: 0.3,
   },
-  legalBodyText: {
-    color: '#CCCCCC',
-    fontSize: 13,
-    lineHeight: 20,
-  },
-  dismissBtn: {
-    minHeight: 48,
-    backgroundColor: '#202020',
-    borderColor: '#333333',
+  resetBtn: {
+    backgroundColor: '#1E1E1E',
+    borderColor: colors.border,
     borderWidth: 1,
-    borderRadius: 12,
+    borderRadius: 14,
+    paddingVertical: 13,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 16,
   },
-  dismissBtnText: {
-    color: colors.text,
-    fontSize: 14,
-    fontWeight: '700',
-  },
-
-  pressedBtn: {
-    opacity: 0.85,
-    transform: [{ scale: 0.99 }],
-  },
-  pressedRow: {
-    backgroundColor: '#1C1C1C',
-  },
-
-  // ─── Log Item Elements ───
-  logItemRow: {
-    flexDirection: 'row',
-    gap: 12,
-    paddingVertical: 10,
-    alignItems: 'flex-start',
-  },
-  logBorder: {
-    borderBottomWidth: 1,
-    borderBottomColor: '#202020',
-  },
-  logMark: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginTop: 6,
-  },
-  logTextWrap: {
-    flex: 1,
-    gap: 4,
-  },
-  logMessage: {
-    color: colors.text,
+  resetBtnText: {
+    color: colors.muted,
     fontSize: 13,
-    lineHeight: 18,
+    fontWeight: '600',
   },
-  logTime: {
+  pressedBtn: {
+    opacity: 0.8,
+  },
+
+  aboutCard: {
+    alignItems: 'center',
+    paddingVertical: 8,
+    gap: 3,
+  },
+  aboutAppName: {
     color: colors.muted,
     fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1.2,
   },
-  emptyLogBox: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 36,
-    gap: 10,
-  },
-  emptyLogTitle: {
-    color: colors.text,
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  emptyLogSub: {
-    color: colors.muted,
-    fontSize: 12,
-    textAlign: 'center',
+  aboutVersion: {
+    color: '#555555',
+    fontSize: 11,
   },
 });

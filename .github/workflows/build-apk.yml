@@ -1,0 +1,109 @@
+# ════════════════════════════════════════════════════════════════════════════════
+# Android APK Build & GitHub Release Workflow — Derived Arbitrage
+#
+# Triggers when a version tag is pushed (e.g. v0.1.0, v1.0.0) or manually.
+# Compiles a standalone Android APK via EAS Cloud (preview profile) and uploads
+# it as a downloadable GitHub Release asset for mobile installation.
+# ════════════════════════════════════════════════════════════════════════════════
+name: Build Android APK
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version tag (e.g. v0.1.0)"
+        required: false
+        default: "v0.1.0"
+
+jobs:
+  build-android:
+    name: EAS Build — Android APK
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      # 1. Checkout source code
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. Set up Node.js runtime
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      # 3. Install project dependencies
+      - name: Install dependencies
+        run: npm ci --prefer-offline
+
+      # 4. Install EAS CLI globally
+      - name: Install EAS CLI
+        run: npm install --global eas-cli
+
+      # 5. Authenticate with Expo using secret token
+      - name: Authenticate with Expo
+        run: eas whoami
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+      # 6. Kick off the EAS cloud build (generates standalone APK)
+      - name: Build Android APK (EAS Cloud)
+        id: eas_build
+        run: |
+          eas build \
+            --platform android \
+            --profile preview \
+            --non-interactive \
+            --wait \
+            --json \
+            > build-output.json
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+      # 7. Extract APK download URL and resolve release tag
+      - name: Extract APK URL and Release Tag
+        id: meta
+        run: |
+          APK_URL=$(node -e "const raw=require('./build-output.json'); const b=Array.isArray(raw)?raw[0]:raw; console.log((b.artifacts&&b.artifacts.buildUrl)||(b.artifacts&&b.artifacts.applicationArchiveUrl)||b.artifactUrl||'')")
+          echo "apk_url=$APK_URL" >> $GITHUB_OUTPUT
+          TAG="${{ github.event.inputs.version || github.ref_name }}"
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+
+      # 8. Download the APK from EAS CDN to the runner
+      - name: Download APK artifact
+        if: steps.meta.outputs.apk_url != ''
+        run: |
+          curl -L "${{ steps.meta.outputs.apk_url }}" \
+            -o "derived-arbitrage-${{ steps.meta.outputs.tag }}.apk"
+
+      # 9. Create a GitHub Release and attach the APK
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.meta.outputs.tag }}
+          name: "Derived Arbitrage ${{ steps.meta.outputs.tag }}"
+          body: |
+            ## Derived Arbitrage ${{ steps.meta.outputs.tag }}
+
+            ### Algorithmic Execution & Mobile EA Controller
+            - Standalone mobile build compiled via EAS Cloud.
+            - Over-The-Air (OTA) updates enabled on `preview` and `production` channels.
+
+            ### Installation Instructions
+            1. Download the `derived-arbitrage-${{ steps.meta.outputs.tag }}.apk` file below directly to your Android device.
+            2. Enable **Install from unknown sources** in Android Settings if prompted.
+            3. Tap the file to install and open.
+            
+            *Subsequent app updates will automatically download via Over-The-Air (OTA) updates on app launch.*
+          draft: false
+          prerelease: false
+          files: |
+            derived-arbitrage-${{ steps.meta.outputs.tag }}.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -10,3 +10,10 @@ probe_symbols.mjs
 
 # MT5 Compiled binaries
 *.ex5
+
+# Build artifacts
+*.apk
+*.aab
+build-output.json
+.eas/
+

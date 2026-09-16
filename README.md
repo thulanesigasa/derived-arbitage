@@ -1,5 +1,12 @@
 # Derived Arbitrage — Deriv Synthetic Indices
 
+![React Native](https://img.shields.io/badge/React_Native-0.86.3-20232A?style=flat-square&logo=react)
+![Expo](https://img.shields.io/badge/Expo-57.0.23-000020?style=flat-square&logo=expo)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6?style=flat-square&logo=typescript)
+![EAS Build](https://img.shields.io/badge/EAS_Build-Preview_APK-FF6B00?style=flat-square)
+![OTA Updates](https://img.shields.io/badge/EAS_Updates-Active-0EA5E9?style=flat-square)
+![Tests](https://img.shields.io/badge/Tests-58%20Passed-22C55E?style=flat-square)
+
 A personal Android controller for a Deriv MT5 EA trading Volatility, Boom, Crash, and Step synthetic indices. This project is structured in validated phases — no live trading until every gate passes.
 
 > **Demo only.** This codebase currently connects to a mock control server and the Deriv WebSocket API for read-only market profiling. No trades, no real orders, no broker credentials stored here.
@@ -10,12 +17,13 @@ A personal Android controller for a Deriv MT5 EA trading Volatility, Boom, Crash
 
 | Phase | Description | Status |
 |---|---|:---:|
-| 1 | Demo mobile controller + mock server | ✅ Complete |
-| 2 | Market Profiler — live Deriv WebSocket data | ✅ Complete |
-| 3 | Strategy engine (Falcon FX / SMC signals) | ✅ Complete |
-| 4 | MQL5 EA with independent risk engine | ✅ Complete |
-| 5 | VPS bridge + HTTPS/WSS auth | ✅ Complete |
-| 6 | Live activation gate (demo-proven only) | ✅ Complete |
+| 1 | Demo mobile controller + mock server | ![Complete](https://img.shields.io/badge/Status-Complete-22c55e?style=flat-square) |
+| 2 | Market Profiler — live Deriv WebSocket data | ![Complete](https://img.shields.io/badge/Status-Complete-22c55e?style=flat-square) |
+| 3 | Strategy engine (Falcon FX / SMC signals) | ![Complete](https://img.shields.io/badge/Status-Complete-22c55e?style=flat-square) |
+| 4 | MQL5 EA with independent risk engine | ![Complete](https://img.shields.io/badge/Status-Complete-22c55e?style=flat-square) |
+| 5 | VPS bridge + HTTPS/WSS auth | ![Complete](https://img.shields.io/badge/Status-Complete-22c55e?style=flat-square) |
+| 6 | Live activation gate (demo-proven only) | ![Complete](https://img.shields.io/badge/Status-Complete-22c55e?style=flat-square) |
+| 7 | EAS Standalone APK Release & Over-The-Air (OTA) Pipeline | ![Complete](https://img.shields.io/badge/Status-Complete-22c55e?style=flat-square) |
 
 ---
 
@@ -735,6 +743,82 @@ The **Journal** tab is powered by a real-time trade journaling engine ([server/s
   - Real trades are served via `GET /api/journal/trades` and cached in device-sandboxed storage (`@derived_arbitrage_trade_journal`).
   - Offline-first resilience ensures historical trade journal entries remain accessible without network connectivity.
   - Includes "+ Log Trade" modal allowing discretionary manual notes and observations on live trades.
+
+---
+
+### 11. EAS Standalone Mobile Release & Cloud APK Generation
+
+The mobile build pipeline is powered by **Expo Application Services (EAS Build)** configured in [`eas.json`](file:///d:/workspace_programming/mobile_ea/derived-arbitage/eas.json):
+
+* **Build Profiles**:
+  * `preview`: Compiles an installable standalone Android APK (`buildType: "apk"`) with internal distribution and updates bound to the `preview` channel.
+  * `production`: Compiles an optimized Android App Bundle (`buildType: "app-bundle"`) for Google Play Store distribution bound to the `production` channel.
+  * `development`: Development client build with debug gradle flags.
+
+* **Building the APK Manually**:
+  ```powershell
+  # Compile a standalone Android APK via EAS Cloud:
+  eas build --platform android --profile preview
+  ```
+
+* **Automated Cloud Build via GitHub Actions**:
+  * Pushing a Git tag (`git tag v0.1.0 && git push origin v0.1.0`) triggers [`.github/workflows/build-apk.yml`](file:///d:/workspace_programming/mobile_ea/derived-arbitage/.github/workflows/build-apk.yml).
+  * The workflow builds the APK on EAS Cloud, downloads the resulting `.apk` artifact, and publishes a GitHub Release with the file attached for direct mobile download.
+
+---
+
+### 12. Over-The-Air (OTA) Updates & In-App Dynamic Reloading
+
+Over-The-Air (OTA) updates allow pushing hotfixes, UI improvements, and algorithmic refinements directly to users' phones without building a new APK or reinstalling the app:
+
+* **Engine Architecture**:
+  * Managed by `expo-updates` with `"runtimeVersion": { "policy": "appVersion" }`.
+  * Checks for updates automatically on app launch and whenever the app transitions into the foreground ([`src/hooks/useOTAUpdate.ts`](file:///d:/workspace_programming/mobile_ea/derived-arbitage/src/hooks/useOTAUpdate.ts)).
+  * In-app bottom-sheet modal ([`src/components/UpdateModal.tsx`](file:///d:/workspace_programming/mobile_ea/derived-arbitage/src/components/UpdateModal.tsx)) alerts users to fresh bundles with instant "Update Now" hot-reloading.
+
+* **Publishing an OTA Update**:
+  ```powershell
+  # Push updates to the preview channel:
+  eas update --channel preview --message "Fixed telemetry and updated settings"
+
+  # Push updates to production:
+  eas update --channel production --message "Release v0.1.1 improvements"
+  ```
+
+* **Automated OTA via GitHub Actions**:
+  * Every push to `master` triggers [`.github/workflows/ota-update.yml`](file:///d:/workspace_programming/mobile_ea/derived-arbitage/.github/workflows/ota-update.yml).
+  * The workflow authenticates via `EXPO_TOKEN` stored in GitHub Secrets and pushes the bundle to both `production` and `preview` channels automatically.
+
+---
+
+### 13. Calibrated Icon & Launcher Standards (Rule 15 & Rule 19)
+
+All launcher, app icon, and in-app brand assets are generated via [`scripts/generate_app_icons.py`](file:///d:/workspace_programming/mobile_ea/derived-arbitage/scripts/generate_app_icons.py) adhering strictly to Rule 15 and Rule 19:
+
+* **Android Adaptive Launcher Foreground** (`assets/android-icon-foreground.png`): Centered on a `512x512` canvas with a target icon height of `96px` (`bbox: ~80x96px`), providing `~72%` clean breathing room so Samsung One UI squircle masks and Android launcher cutouts never crop or zoom into the icon.
+* **Android Adaptive Launcher Background** (`assets/android-icon-background.png`): Solid `#080808` canvas (`512x512`).
+* **Android Adaptive Launcher Monochrome** (`assets/android-icon-monochrome.png`): `512x512` monochrome silhouette.
+* **In-App Brand Icon / App Store Icon** (`assets/icon.png`): `1024x1024` canvas with `800px` prominent brand symbol so in-app usages remain sharp, bold, and readable.
+* **Splash Screen** (`assets/icon.png` / `assets/splash.png`): Configured in `app.json` via the `expo-splash-screen` plugin using the authentic brand icon on a `#080808` background.
+* **Component In-App Sizing Standards**:
+  * Header brand logo: `24x24` (`borderRadius: 5px`)
+  * Auth screens logo: `28x28`
+  * In-app update modal logo: `50x50` inside a `68x68` container (`borderRadius: 18px`, image `borderRadius: 12px`).
+
+---
+
+### 14. Unified Single-Body Settings & Profile Architecture
+
+The Settings screen ([`src/screens/ProfileScreen.tsx`](file:///d:/workspace_programming/mobile_ea/derived-arbitage/src/screens/ProfileScreen.tsx)) is consolidated into one unified, scrollable body container:
+
+1. **Header Profile Card**: In-app cybernetic brand icon, display name, handle tag, and status.
+2. **Trader Profile (Direct Inline Inputs)**: Inline text inputs for Display Name, Trader Tag, Strategy Style, Preferred Basket, and Bio.
+3. **Server Bridge & Network Configuration**: VPS Bridge API Base URL input with real-time "Test & Discover" connectivity probes.
+4. **Execution & Telemetry Preferences**: Inline toggle switches for Execution Audio Chimes, Haptic Feedback, and High-Precision Telemetry.
+5. **Over-The-Air Updates Hub**: Displays current app version (`0.1.0`), runtime version policy, update channel, and an interactive "Check for Updates" trigger with real-time status feedback.
+6. **Single-Body Collapsible Accordions**: Expandable accordions directly inside the body for Privacy Policy, Terms of Service, Risk of Trading, Disclaimer, and System Audit Logs without full-screen modal interruptions.
+7. **Action Footer**: Prominent "Save Settings" button (persists to `AsyncStorage`) and "Reset to Defaults".
+
 
 
 

@@ -31,6 +31,8 @@ import { ControllerScreen } from './src/screens/ControllerScreen';
 import { ProfilerScreen } from './src/screens/ProfilerScreen';
 import { ActivityScreen } from './src/screens/ActivityScreen';
 import { ProfileScreen } from './src/screens/ProfileScreen';
+import { useOTAUpdate } from './src/hooks/useOTAUpdate';
+import { UpdateModal } from './src/components/UpdateModal';
 import {
   ControllerIcon,
   HomeIcon,
@@ -110,6 +112,7 @@ const TAB_DEFS: Array<{
 ];
 
 export default function App() {
+  const ota = useOTAUpdate();
   const [activeTab, setActiveTab] = useState<TabId>('home');
   const [state, setState] = useState<ControllerState>(OFFLINE_FALLBACK_STATE);
   const [loading, setLoading] = useState(false);
@@ -373,7 +376,7 @@ export default function App() {
             />
           )}
 
-          {activeTab === 'profile' && <ProfileScreen state={state} />}
+          {activeTab === 'profile' && <ProfileScreen state={state} ota={ota} />}
         </View>
 
         {/* Floating Pill Tab Navigation Bar with Animated Sliding Indicator (Rule 15 & Reference Design) */}
@@ -441,9 +444,9 @@ export default function App() {
             >
               <View style={styles.splashIconContainer}>
                 <Image
-                  source={require('./assets/robot_hero.jpg')}
+                  source={require('./assets/icon.png')}
                   style={styles.splashIcon}
-                  resizeMode="cover"
+                  resizeMode="contain"
                 />
               </View>
               <Text style={styles.splashTitle}>FALCON EA</Text>
@@ -456,6 +459,14 @@ export default function App() {
             </Animated.View>
           </Animated.View>
         )}
+        {/* In-App Over-The-Air (OTA) Update Modal (Rule 15/19 Calibrated) */}
+        <UpdateModal
+          visible={ota.isUpdateAvailable}
+          isDownloading={ota.isDownloading}
+          onUpdate={ota.applyUpdate}
+          onDismiss={ota.dismissUpdate}
+          accent={colors.orange}
+        />
       </SafeAreaView>
     </SafeAreaProvider>
   );

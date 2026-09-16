@@ -6,27 +6,50 @@
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
     "icon": "./assets/icon.png",
-    "splash": {
-      "image": "./assets/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#080808"
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "enabled": true,
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0,
+      "url": "https://u.expo.dev/d69ad00b-dd16-447c-8f12-e23da3917403"
     },
     "android": {
-      "package": "com.personal.derivedarbitrage",
+      "package": "com.thulanesigasa.derivedarbitrage",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#080808"
-      }
+        "backgroundColor": "#080808",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
     },
     "ios": {
       "supportsTablet": true,
-      "icon": "./assets/icon.png"
+      "bundleIdentifier": "com.thulanesigasa.derivedarbitrage"
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
+    "plugins": [
+      "expo-updates",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/icon.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#080808"
+        }
+      ],
+      "expo-status-bar"
+    ],
     "extra": {
-      "demoOnly": true
-    }
+      "eas": {
+        "projectId": "d69ad00b-dd16-447c-8f12-e23da3917403"
+      }
+    },
+    "owner": "thulanesigasa0"
   }
 }
+
