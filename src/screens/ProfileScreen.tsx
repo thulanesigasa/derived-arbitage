@@ -3,6 +3,8 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -218,13 +220,18 @@ export function ProfileScreen({ state, ota }: ProfileScreenProps) {
   };
 
   return (
-    <View style={styles.screenRoot}>
+    <KeyboardAvoidingView
+      style={styles.screenRoot}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
       <AppHeader eyebrow="PREFERENCES & SYSTEM" title="Settings" />
 
       <ScrollView
         style={styles.root}
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
       >
         {/* Success Notice Feedback */}
         {saveSuccessNotice && (
@@ -691,7 +698,7 @@ export function ProfileScreen({ state, ota }: ProfileScreenProps) {
           <Text style={styles.aboutVersion}>Falcon FX SMC Engine · v0.1.0</Text>
         </View>
       </ScrollView>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -707,7 +714,7 @@ const styles = StyleSheet.create({
   content: {
     paddingHorizontal: 18,
     paddingTop: 16,
-    paddingBottom: 110,
+    paddingBottom: 140,
   },
 
   successBanner: {
