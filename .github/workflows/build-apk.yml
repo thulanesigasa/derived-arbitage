@@ -65,6 +65,8 @@ jobs:
             > build-output.json
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          CI: 1
+
 
       # 7. Extract APK download URL and resolve release tag
       - name: Extract APK URL and Release Tag
