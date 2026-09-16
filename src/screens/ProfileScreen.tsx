@@ -20,6 +20,7 @@ import {
   ChevronRightIcon,
   DocumentTextIcon,
   InfoCircleIcon,
+  ProfileIcon,
   SettingsSlidersIcon,
   ShieldIcon,
   TerminalLogIcon,
@@ -31,12 +32,13 @@ import type { OTAUpdateState } from '../hooks/useOTAUpdate';
 
 const colors = {
   bg: '#080808',        // 60% Dominant Background
-  panel: '#161616',     // 30% Panel / Surface
-  panelAlt: '#1E1E1E',
-  border: '#282828',
-  borderLight: '#383838',
+  surface: '#121212',   // 30% Panel / Input Surface
+  surfaceAlt: '#181818',
+  border: '#222222',
+  borderSubtle: 'rgba(255, 255, 255, 0.06)',
   text: '#FFFFFF',
-  muted: '#9A9A9A',
+  textMuted: '#9A9A9A',
+  textDim: '#666666',
   orange: '#FF6B00',    // 10% Accent
   orangeDark: '#2D1405',
 };
@@ -82,11 +84,13 @@ interface ProfileScreenProps {
 }
 
 /**
- * ProfileScreen — Unified Single-Body Settings
+ * ProfileScreen — Seamless Single-Body Architecture
  *
- * Implements Rule 1 (60-30-10 palette), Rule 2 & 4 (SVGs), Rule 15 & 19 (Calibrated Logo).
- * Consolidates all user profile inputs, server bridge config, app preferences,
- * OTA updates check, and expandable legal/audit sections under ONE unified, scrollable body.
+ * Designed to flow naturally as part of the body of the application:
+ * - Zero nested card boxes or segmented container divs
+ * - Clean section dividers directly on the screen body
+ * - Inputs, switches, and expandable disclosures integrated into the unified scroll view
+ * - Strict adherence to the 60-30-10 palette and SVG iconography standards
  */
 export function ProfileScreen({ state, ota }: ProfileScreenProps) {
   const [profile, setProfile] = useState<UserProfile>(DEFAULT_PROFILE);
@@ -97,7 +101,7 @@ export function ProfileScreen({ state, ota }: ProfileScreenProps) {
   const [saving, setSaving] = useState(false);
   const [saveSuccessNotice, setSaveSuccessNotice] = useState(false);
 
-  // Accordion open/close state for in-body disclosure
+  // In-body accordion state
   const [openAccordion, setOpenAccordion] = useState<AccordionKey>(null);
 
   const toggleAccordion = (key: AccordionKey) => {
@@ -128,7 +132,7 @@ export function ProfileScreen({ state, ota }: ProfileScreenProps) {
           }
         }
       } catch {
-        // Continue with defaults
+        // Fallback to defaults
       }
     })();
   }, []);
@@ -222,460 +226,454 @@ export function ProfileScreen({ state, ota }: ProfileScreenProps) {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        {/* Success Notice Banner */}
+        {/* Success Notice Feedback */}
         {saveSuccessNotice && (
           <View style={styles.successBanner}>
             <Text style={styles.successBannerText}>Settings saved successfully</Text>
           </View>
         )}
 
-        {/* 1. Header Profile Identity Card */}
-        <View style={styles.profileCard}>
-          <View style={styles.avatarRow}>
-            <View style={styles.avatarContainer}>
-              <Image
-                source={require('../../assets/icon.png')}
-                style={styles.avatarImage}
-                resizeMode="contain"
-              />
-            </View>
-            <View style={styles.profileInfo}>
-              <Text style={styles.profileName}>{profile.displayName}</Text>
-              <Text style={styles.profileTag}>{profile.traderTag}</Text>
-              <Text style={styles.profileStyle}>{profile.tradingStyle}</Text>
-            </View>
+        {/* 1. Header Profile Identity (Directly on Body) */}
+        <View style={styles.profileHeader}>
+          <View style={styles.avatarWrap}>
+            <Image
+              source={require('../../assets/icon.png')}
+              style={styles.avatarImage}
+              resizeMode="contain"
+            />
           </View>
+          <Text style={styles.profileName}>{profile.displayName}</Text>
+          <Text style={styles.profileTag}>{profile.traderTag}</Text>
+          <Text style={styles.profileStyle}>{profile.tradingStyle}</Text>
           {profile.bio ? <Text style={styles.profileBio}>{profile.bio}</Text> : null}
         </View>
 
-        {/* 2. Trader Profile Information (Direct Inline in Body) */}
-        <View style={styles.section}>
-          <Text style={styles.sectionHeader}>TRADER PROFILE</Text>
-          <View style={styles.cardGroup}>
-            <View style={styles.inputRow}>
-              <Text style={styles.fieldLabel}>DISPLAY NAME</Text>
-              <TextInput
-                style={styles.textInput}
-                value={profile.displayName}
-                onChangeText={(text) => setProfile((p) => ({ ...p, displayName: text }))}
-                placeholder="Falcon Trader"
-                placeholderTextColor={colors.muted}
-              />
-            </View>
+        <View style={styles.sectionDivider} />
 
-            <View style={styles.divider} />
+        {/* 2. Trader Profile Details (Directly on Body) */}
+        <View style={styles.sectionBlock}>
+          <View style={styles.sectionHeaderRow}>
+            <ProfileIcon size={18} color={colors.orange} />
+            <Text style={styles.sectionTitle}>Trader Details</Text>
+          </View>
 
-            <View style={styles.inputRow}>
-              <Text style={styles.fieldLabel}>TRADER TAG</Text>
-              <TextInput
-                style={styles.textInput}
-                value={profile.traderTag}
-                onChangeText={(text) => setProfile((p) => ({ ...p, traderTag: text }))}
-                placeholder="@synthetics_pro"
-                placeholderTextColor={colors.muted}
-                autoCapitalize="none"
-              />
-            </View>
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>DISPLAY NAME</Text>
+            <TextInput
+              style={styles.textInput}
+              value={profile.displayName}
+              onChangeText={(text) => setProfile((p) => ({ ...p, displayName: text }))}
+              placeholder="Falcon Trader"
+              placeholderTextColor={colors.textDim}
+            />
+          </View>
 
-            <View style={styles.divider} />
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>TRADER TAG</Text>
+            <TextInput
+              style={styles.textInput}
+              value={profile.traderTag}
+              onChangeText={(text) => setProfile((p) => ({ ...p, traderTag: text }))}
+              placeholder="@synthetics_pro"
+              placeholderTextColor={colors.textDim}
+              autoCapitalize="none"
+            />
+          </View>
 
-            <View style={styles.inputRow}>
-              <Text style={styles.fieldLabel}>TRADING STRATEGY</Text>
-              <TextInput
-                style={styles.textInput}
-                value={profile.tradingStyle}
-                onChangeText={(text) => setProfile((p) => ({ ...p, tradingStyle: text }))}
-                placeholder="Falcon FX · SMC Arbitrage"
-                placeholderTextColor={colors.muted}
-              />
-            </View>
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>TRADING STRATEGY</Text>
+            <TextInput
+              style={styles.textInput}
+              value={profile.tradingStyle}
+              onChangeText={(text) => setProfile((p) => ({ ...p, tradingStyle: text }))}
+              placeholder="Falcon FX · SMC Arbitrage"
+              placeholderTextColor={colors.textDim}
+            />
+          </View>
 
-            <View style={styles.divider} />
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>PREFERRED SYNTHETICS BASKET</Text>
+            <TextInput
+              style={styles.textInput}
+              value={profile.preferredBasket}
+              onChangeText={(text) => setProfile((p) => ({ ...p, preferredBasket: text }))}
+              placeholder="Volatility 75, Boom/Crash 1000"
+              placeholderTextColor={colors.textDim}
+            />
+          </View>
 
-            <View style={styles.inputRow}>
-              <Text style={styles.fieldLabel}>PREFERRED SYNTHETICS BASKET</Text>
-              <TextInput
-                style={styles.textInput}
-                value={profile.preferredBasket}
-                onChangeText={(text) => setProfile((p) => ({ ...p, preferredBasket: text }))}
-                placeholder="Volatility 75, Boom/Crash 1000"
-                placeholderTextColor={colors.muted}
-              />
-            </View>
-
-            <View style={styles.divider} />
-
-            <View style={styles.inputRow}>
-              <Text style={styles.fieldLabel}>STRATEGY BIO & NOTES</Text>
-              <TextInput
-                style={[styles.textInput, styles.bioInput]}
-                value={profile.bio}
-                onChangeText={(text) => setProfile((p) => ({ ...p, bio: text }))}
-                placeholder="Algorithmic risk boundaries and notes..."
-                placeholderTextColor={colors.muted}
-                multiline
-                numberOfLines={3}
-              />
-            </View>
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>STRATEGY BIO & NOTES</Text>
+            <TextInput
+              style={[styles.textInput, styles.bioInput]}
+              value={profile.bio}
+              onChangeText={(text) => setProfile((p) => ({ ...p, bio: text }))}
+              placeholder="Algorithmic risk limits, session rules..."
+              placeholderTextColor={colors.textDim}
+              multiline
+              numberOfLines={3}
+            />
           </View>
         </View>
 
-        {/* 3. Server Bridge & Network Configuration (Direct Inline in Body) */}
-        <View style={styles.section}>
-          <Text style={styles.sectionHeader}>SERVER BRIDGE CONNECTION</Text>
-          <View style={styles.cardGroup}>
-            <View style={styles.inputRow}>
-              <Text style={styles.fieldLabel}>VPS BRIDGE API URL</Text>
-              <TextInput
-                style={styles.textInput}
-                value={bridgeUrl}
-                onChangeText={setBridgeUrl}
-                placeholder="http://192.168.1.50:3001"
-                placeholderTextColor={colors.muted}
-                autoCapitalize="none"
-                keyboardType="url"
-              />
-            </View>
+        <View style={styles.sectionDivider} />
 
-            <View style={styles.bridgeActionRow}>
-              <Pressable
-                style={({ pressed }) => [styles.bridgeBtn, pressed && styles.pressedBtn]}
-                onPress={() => void handleTestBridge()}
-                disabled={testingBridge}
-              >
-                {testingBridge ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : (
-                  <>
-                    <ArrowPathIcon size={16} color="#FFFFFF" />
-                    <Text style={styles.bridgeBtnText}>Test & Discover</Text>
-                  </>
-                )}
-              </Pressable>
-            </View>
-
-            {bridgeStatus ? (
-              <View style={styles.bridgeStatusBox}>
-                <Text style={styles.bridgeStatusText}>{bridgeStatus}</Text>
-              </View>
-            ) : null}
+        {/* 3. Server Bridge & Network Host (Directly on Body) */}
+        <View style={styles.sectionBlock}>
+          <View style={styles.sectionHeaderRow}>
+            <ArrowPathIcon size={18} color={colors.orange} />
+            <Text style={styles.sectionTitle}>Server Bridge Connection</Text>
           </View>
-        </View>
 
-        {/* 4. App & Execution Preferences (Inline Switches) */}
-        <View style={styles.section}>
-          <Text style={styles.sectionHeader}>EXECUTION & TELEMETRY PREFERENCES</Text>
-          <View style={styles.cardGroup}>
-            <View style={styles.settingRow}>
-              <View style={styles.settingTextCol}>
-                <View style={styles.settingLabelRow}>
-                  <BellAlertIcon size={18} color={colors.orange} />
-                  <Text style={styles.settingTitle}>Execution Audio Chime</Text>
-                </View>
-                <Text style={styles.settingSubtitle}>Audible tone upon automated SMC order placement</Text>
-              </View>
-              <ToggleSwitch
-                value={settings.soundAlerts}
-                onValueChange={(val) => setSettings((s) => ({ ...s, soundAlerts: val }))}
-                accessibilityLabel="Toggle sound alerts"
-              />
-            </View>
-
-            <View style={styles.divider} />
-
-            <View style={styles.settingRow}>
-              <View style={styles.settingTextCol}>
-                <View style={styles.settingLabelRow}>
-                  <SettingsSlidersIcon size={18} color={colors.orange} />
-                  <Text style={styles.settingTitle}>Haptic Feedback</Text>
-                </View>
-                <Text style={styles.settingSubtitle}>Tactile vibration on risk limits and state transitions</Text>
-              </View>
-              <ToggleSwitch
-                value={settings.hapticFeedback}
-                onValueChange={(val) => setSettings((s) => ({ ...s, hapticFeedback: val }))}
-                accessibilityLabel="Toggle haptic feedback"
-              />
-            </View>
-
-            <View style={styles.divider} />
-
-            <View style={styles.settingRow}>
-              <View style={styles.settingTextCol}>
-                <View style={styles.settingLabelRow}>
-                  <ShieldIcon size={18} color={colors.orange} />
-                  <Text style={styles.settingTitle}>High-Precision Telemetry</Text>
-                </View>
-                <Text style={styles.settingSubtitle}>Real-time streaming tick data across all synthetic instruments</Text>
-              </View>
-              <ToggleSwitch
-                value={settings.highPrecisionQuotes}
-                onValueChange={(val) => setSettings((s) => ({ ...s, highPrecisionQuotes: val }))}
-                accessibilityLabel="Toggle high-precision telemetry"
-              />
-            </View>
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>VPS BRIDGE API URL</Text>
+            <TextInput
+              style={styles.textInput}
+              value={bridgeUrl}
+              onChangeText={setBridgeUrl}
+              placeholder="http://192.168.1.50:3001"
+              placeholderTextColor={colors.textDim}
+              autoCapitalize="none"
+              keyboardType="url"
+            />
           </View>
-        </View>
 
-        {/* 5. Over-The-Air (OTA) Updates & Build Info */}
-        <View style={styles.section}>
-          <Text style={styles.sectionHeader}>OVER-THE-AIR (OTA) UPDATES</Text>
-          <View style={styles.cardGroup}>
-            <View style={styles.otaRow}>
-              <View style={styles.otaMetaCol}>
-                <Text style={styles.otaMetaLabel}>CURRENT VERSION</Text>
-                <Text style={styles.otaMetaValue}>v0.1.0 · Build 2026.09.16</Text>
-              </View>
-              <View style={styles.otaMetaCol}>
-                <Text style={styles.otaMetaLabel}>RUNTIME POLICY</Text>
-                <Text style={styles.otaMetaValue}>appVersion (0.1.0)</Text>
-              </View>
-            </View>
-
-            <View style={styles.divider} />
-
-            <View style={styles.otaActionRow}>
-              <Pressable
-                style={({ pressed }) => [styles.checkUpdateBtn, pressed && styles.pressedBtn]}
-                onPress={() => ota?.checkForUpdate(true)}
-                disabled={ota?.isCheckingForUpdate}
-              >
-                {ota?.isCheckingForUpdate ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : (
-                  <>
-                    <ArrowPathIcon size={16} color="#FFFFFF" />
-                    <Text style={styles.checkUpdateBtnText}>Check for Updates</Text>
-                  </>
-                )}
-              </Pressable>
-              {ota?.checkStatusMessage ? (
-                <Text style={styles.otaStatusText}>{ota.checkStatusMessage}</Text>
-              ) : (
-                <Text style={styles.otaStatusText}>
-                  {ota?.lastCheckedTime ? `Checked today at ${ota.lastCheckedTime}` : 'Tap to check EAS cloud'}
-                </Text>
-              )}
-            </View>
-          </View>
-        </View>
-
-        {/* 6. Legal, Compliance & System Logs (Single-Body Collapsible Accordions) */}
-        <View style={styles.section}>
-          <Text style={styles.sectionHeader}>LEGAL, RISK & SYSTEM LOGS</Text>
-          <View style={styles.cardGroup}>
-            {/* Accordion 1: Privacy Policy */}
-            <Pressable
-              style={styles.accordionHeader}
-              onPress={() => toggleAccordion('privacy')}
-              accessibilityRole="button"
-            >
-              <View style={styles.accordionHeaderLeft}>
-                <DocumentTextIcon size={18} color={colors.orange} />
-                <View style={styles.accordionTitleCol}>
-                  <Text style={styles.accordionTitle}>Privacy Policy</Text>
-                  <Text style={styles.accordionSubtitle}>Local sandboxed storage, encryption, no analytics</Text>
-                </View>
-              </View>
-              {openAccordion === 'privacy' ? (
-                <ChevronDownIcon size={18} color={colors.orange} />
-              ) : (
-                <ChevronRightIcon size={18} color={colors.muted} />
-              )}
-            </Pressable>
-            {openAccordion === 'privacy' && (
-              <View style={styles.accordionBody}>
-                <Text style={styles.legalHeading}>1. Local Storage Policy</Text>
-                <Text style={styles.legalBody}>
-                  Derived Arbitrage stores all user profile parameters, trading preferences, and layout keys exclusively on your device using encrypted sandboxed storage (AsyncStorage). We do not collect, store, or transmit your personal details to any centralized databases.
-                </Text>
-                <Text style={styles.legalHeading}>2. Ephemeral Telemetry</Text>
-                <Text style={styles.legalBody}>
-                  Tick data, market profiles, and account balance telemetry communicated between your local VPS bridge and mobile controller utilize HTTPS and authenticated WebSocket streams protected by Bearer JWT tokens. Telemetry is purely ephemeral and processed in real time.
-                </Text>
-              </View>
-            )}
-
-            <View style={styles.divider} />
-
-            {/* Accordion 2: Terms of Service */}
-            <Pressable
-              style={styles.accordionHeader}
-              onPress={() => toggleAccordion('terms')}
-              accessibilityRole="button"
-            >
-              <View style={styles.accordionHeaderLeft}>
-                <DocumentTextIcon size={18} color={colors.orange} />
-                <View style={styles.accordionTitleCol}>
-                  <Text style={styles.accordionTitle}>Terms of Service</Text>
-                  <Text style={styles.accordionSubtitle}>Software license, usage boundaries, user responsibility</Text>
-                </View>
-              </View>
-              {openAccordion === 'terms' ? (
-                <ChevronDownIcon size={18} color={colors.orange} />
-              ) : (
-                <ChevronRightIcon size={18} color={colors.muted} />
-              )}
-            </Pressable>
-            {openAccordion === 'terms' && (
-              <View style={styles.accordionBody}>
-                <Text style={styles.legalHeading}>1. Acceptance of Terms</Text>
-                <Text style={styles.legalBody}>
-                  By utilizing Derived Arbitrage, you agree to these Terms of Service. The software is provided for personal monitoring, statistical analysis, and algorithmic risk management on synthetic indices.
-                </Text>
-                <Text style={styles.legalHeading}>2. Operational Responsibility</Text>
-                <Text style={styles.legalBody}>
-                  You maintain sole and absolute responsibility for all trading activities, order placement decisions, lot sizing adjustments, risk parameter configurations, and financial margin management executed on your broker accounts.
-                </Text>
-              </View>
-            )}
-
-            <View style={styles.divider} />
-
-            {/* Accordion 3: Risk of Trading */}
-            <Pressable
-              style={styles.accordionHeader}
-              onPress={() => toggleAccordion('risk')}
-              accessibilityRole="button"
-            >
-              <View style={styles.accordionHeaderLeft}>
-                <WarningTriangleIcon size={18} color={colors.orange} />
-                <View style={styles.accordionTitleCol}>
-                  <Text style={styles.accordionTitle}>Risk of Trading</Text>
-                  <Text style={styles.accordionSubtitle}>Synthetic volatility, high leverage hazard, guardrails</Text>
-                </View>
-              </View>
-              {openAccordion === 'risk' ? (
-                <ChevronDownIcon size={18} color={colors.orange} />
-              ) : (
-                <ChevronRightIcon size={18} color={colors.muted} />
-              )}
-            </Pressable>
-            {openAccordion === 'risk' && (
-              <View style={styles.accordionBody}>
-                <Text style={styles.legalHeading}>1. Synthetic Indices Mechanics</Text>
-                <Text style={styles.legalBody}>
-                  Synthetic indices (Volatility, Step, Boom, Crash) operate 24/7 utilizing pseudorandom algorithms to simulate volatility. They do not correlate to real-world macroeconomic fundamentals and can experience rapid, unpredictable price shifts.
-                </Text>
-                <Text style={styles.legalHeading}>2. Leverage Warning</Text>
-                <Text style={styles.legalBody}>
-                  Trading synthetic derivative contracts with financial leverage amplifies both potential profits and substantial losses. Do not trade with capital you cannot afford to lose.
-                </Text>
-              </View>
-            )}
-
-            <View style={styles.divider} />
-
-            {/* Accordion 4: Disclaimer */}
-            <Pressable
-              style={styles.accordionHeader}
-              onPress={() => toggleAccordion('disclaimer')}
-              accessibilityRole="button"
-            >
-              <View style={styles.accordionHeaderLeft}>
-                <InfoCircleIcon size={18} color={colors.orange} />
-                <View style={styles.accordionTitleCol}>
-                  <Text style={styles.accordionTitle}>Disclaimer</Text>
-                  <Text style={styles.accordionSubtitle}>Independent utility, no financial advice, regulatory terms</Text>
-                </View>
-              </View>
-              {openAccordion === 'disclaimer' ? (
-                <ChevronDownIcon size={18} color={colors.orange} />
-              ) : (
-                <ChevronRightIcon size={18} color={colors.muted} />
-              )}
-            </Pressable>
-            {openAccordion === 'disclaimer' && (
-              <View style={styles.accordionBody}>
-                <Text style={styles.legalHeading}>1. Independent Software Tool</Text>
-                <Text style={styles.legalBody}>
-                  Derived Arbitrage is an independent open-source utility designed for algorithm monitoring and telemetry visualization. It is not affiliated with, endorsed by, or operated by MetaQuotes Ltd or Deriv Group Ltd.
-                </Text>
-                <Text style={styles.legalHeading}>2. No Financial Advice</Text>
-                <Text style={styles.legalBody}>
-                  All contents, automated signal structures, order block analyses, and Fair Value Gap calculations displayed within this application are strictly for analytical and educational purposes.
-                </Text>
-              </View>
-            )}
-
-            <View style={styles.divider} />
-
-            {/* Accordion 5: System & Audit Logs */}
-            <Pressable
-              style={styles.accordionHeader}
-              onPress={() => toggleAccordion('logs')}
-              accessibilityRole="button"
-            >
-              <View style={styles.accordionHeaderLeft}>
-                <TerminalLogIcon size={18} color={colors.orange} />
-                <View style={styles.accordionTitleCol}>
-                  <Text style={styles.accordionTitle}>System & Audit Logs</Text>
-                  <Text style={styles.accordionSubtitle}>
-                    {state?.activity?.length
-                      ? `${state.activity.length} recorded controller events`
-                      : 'Chronological controller logs'}
-                  </Text>
-                </View>
-              </View>
-              {openAccordion === 'logs' ? (
-                <ChevronDownIcon size={18} color={colors.orange} />
-              ) : (
-                <ChevronRightIcon size={18} color={colors.muted} />
-              )}
-            </Pressable>
-            {openAccordion === 'logs' && (
-              <View style={styles.accordionBody}>
-                {!state?.activity || state.activity.length === 0 ? (
-                  <Text style={styles.emptyLogText}>No controller events recorded yet.</Text>
-                ) : (
-                  state.activity.map((item, idx) => {
-                    const isLast = idx === state.activity.length - 1;
-                    return (
-                      <View
-                        key={item.id}
-                        style={[styles.logItemRow, !isLast && styles.logBorder]}
-                      >
-                        <View
-                          style={[
-                            styles.logMark,
-                            {
-                              backgroundColor:
-                                item.kind === 'danger' || item.kind === 'success'
-                                  ? colors.orange
-                                  : colors.muted,
-                            },
-                          ]}
-                        />
-                        <View style={styles.logTextWrap}>
-                          <Text style={styles.logMessage}>{item.message}</Text>
-                          <Text style={styles.logTime}>
-                            {new Date(item.at).toLocaleTimeString([], {
-                              hour: '2-digit',
-                              minute: '2-digit',
-                              second: '2-digit',
-                            })}
-                          </Text>
-                        </View>
-                      </View>
-                    );
-                  })
-                )}
-              </View>
-            )}
-          </View>
-        </View>
-
-        {/* 7. Action Footer (Save & Reset) */}
-        <View style={styles.actionFooter}>
           <Pressable
-            style={({ pressed }) => [styles.saveAllBtn, pressed && styles.pressedBtn]}
+            style={({ pressed }) => [styles.bridgeActionBtn, pressed && styles.pressedBtn]}
+            onPress={() => void handleTestBridge()}
+            disabled={testingBridge}
+          >
+            {testingBridge ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <>
+                <ArrowPathIcon size={16} color="#FFFFFF" />
+                <Text style={styles.bridgeActionBtnText}>Test & Discover Bridge</Text>
+              </>
+            )}
+          </Pressable>
+
+          {bridgeStatus ? (
+            <Text style={styles.bridgeStatusMessage}>{bridgeStatus}</Text>
+          ) : null}
+        </View>
+
+        <View style={styles.sectionDivider} />
+
+        {/* 4. Execution & Telemetry Preferences (Directly on Body) */}
+        <View style={styles.sectionBlock}>
+          <View style={styles.sectionHeaderRow}>
+            <SettingsSlidersIcon size={18} color={colors.orange} />
+            <Text style={styles.sectionTitle}>Preferences & Telemetry</Text>
+          </View>
+
+          <View style={styles.toggleRow}>
+            <View style={styles.toggleTextWrap}>
+              <View style={styles.toggleLabelRow}>
+                <BellAlertIcon size={17} color={colors.orange} />
+                <Text style={styles.toggleTitle}>Execution Audio Chime</Text>
+              </View>
+              <Text style={styles.toggleSubtitle}>Audible chime on automated order fills</Text>
+            </View>
+            <ToggleSwitch
+              value={settings.soundAlerts}
+              onValueChange={(val) => setSettings((s) => ({ ...s, soundAlerts: val }))}
+              accessibilityLabel="Toggle sound alerts"
+            />
+          </View>
+
+          <View style={styles.innerDivider} />
+
+          <View style={styles.toggleRow}>
+            <View style={styles.toggleTextWrap}>
+              <View style={styles.toggleLabelRow}>
+                <SettingsSlidersIcon size={17} color={colors.orange} />
+                <Text style={styles.toggleTitle}>Haptic Feedback</Text>
+              </View>
+              <Text style={styles.toggleSubtitle}>Tactile vibration on risk triggers and locks</Text>
+            </View>
+            <ToggleSwitch
+              value={settings.hapticFeedback}
+              onValueChange={(val) => setSettings((s) => ({ ...s, hapticFeedback: val }))}
+              accessibilityLabel="Toggle haptic feedback"
+            />
+          </View>
+
+          <View style={styles.innerDivider} />
+
+          <View style={styles.toggleRow}>
+            <View style={styles.toggleTextWrap}>
+              <View style={styles.toggleLabelRow}>
+                <ShieldIcon size={17} color={colors.orange} />
+                <Text style={styles.toggleTitle}>High-Precision Telemetry</Text>
+              </View>
+              <Text style={styles.toggleSubtitle}>Real-time streaming tick data across all instruments</Text>
+            </View>
+            <ToggleSwitch
+              value={settings.highPrecisionQuotes}
+              onValueChange={(val) => setSettings((s) => ({ ...s, highPrecisionQuotes: val }))}
+              accessibilityLabel="Toggle high-precision telemetry"
+            />
+          </View>
+        </View>
+
+        <View style={styles.sectionDivider} />
+
+        {/* 5. Over-The-Air (OTA) Updates (Directly on Body) */}
+        <View style={styles.sectionBlock}>
+          <View style={styles.sectionHeaderRow}>
+            <ArrowPathIcon size={18} color={colors.orange} />
+            <Text style={styles.sectionTitle}>Over-The-Air (OTA) Updates</Text>
+          </View>
+
+          <View style={styles.otaMetaRow}>
+            <View style={styles.otaMetaItem}>
+              <Text style={styles.otaMetaLabel}>VERSION</Text>
+              <Text style={styles.otaMetaValue}>v0.1.0 · Build 2026.09.16</Text>
+            </View>
+            <View style={styles.otaMetaItem}>
+              <Text style={styles.otaMetaLabel}>RUNTIME</Text>
+              <Text style={styles.otaMetaValue}>appVersion (0.1.0)</Text>
+            </View>
+          </View>
+
+          <Pressable
+            style={({ pressed }) => [styles.checkUpdateBtn, pressed && styles.pressedBtn]}
+            onPress={() => ota?.checkForUpdate(true)}
+            disabled={ota?.isCheckingForUpdate}
+          >
+            {ota?.isCheckingForUpdate ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <>
+                <ArrowPathIcon size={16} color="#FFFFFF" />
+                <Text style={styles.checkUpdateBtnText}>Check for Updates</Text>
+              </>
+            )}
+          </Pressable>
+
+          <Text style={styles.otaStatusText}>
+            {ota?.checkStatusMessage || (ota?.lastCheckedTime ? `Checked at ${ota.lastCheckedTime}` : 'Pings EAS cloud for latest bundle')}
+          </Text>
+        </View>
+
+        <View style={styles.sectionDivider} />
+
+        {/* 6. Disclosures & System Audit Logs (Directly on Body) */}
+        <View style={styles.sectionBlock}>
+          <View style={styles.sectionHeaderRow}>
+            <ShieldIcon size={18} color={colors.orange} />
+            <Text style={styles.sectionTitle}>Disclosures & System Audit</Text>
+          </View>
+
+          {/* Disclosure 1: Privacy Policy */}
+          <Pressable
+            style={styles.disclosureRow}
+            onPress={() => toggleAccordion('privacy')}
+            accessibilityRole="button"
+          >
+            <View style={styles.disclosureRowLeft}>
+              <DocumentTextIcon size={18} color={colors.orange} />
+              <View style={styles.disclosureTextCol}>
+                <Text style={styles.disclosureTitle}>Privacy Policy</Text>
+                <Text style={styles.disclosureSub}>Local sandboxed storage, encrypted tokens, zero tracking</Text>
+              </View>
+            </View>
+            {openAccordion === 'privacy' ? (
+              <ChevronDownIcon size={18} color={colors.orange} />
+            ) : (
+              <ChevronRightIcon size={18} color={colors.textMuted} />
+            )}
+          </Pressable>
+          {openAccordion === 'privacy' && (
+            <View style={styles.disclosureContent}>
+              <Text style={styles.legalHeading}>1. Local Device Storage</Text>
+              <Text style={styles.legalBody}>
+                Derived Arbitrage stores all user profile parameters, trading preferences, and layout keys exclusively on your device using encrypted sandboxed storage (AsyncStorage). We do not collect, store, or transmit your personal details to any centralized databases.
+              </Text>
+              <Text style={styles.legalHeading}>2. Real-Time Telemetry</Text>
+              <Text style={styles.legalBody}>
+                Tick data, market profiles, and account balance telemetry communicated between your local VPS bridge and mobile controller utilize HTTPS and authenticated WebSocket streams protected by Bearer JWT tokens. Telemetry is purely ephemeral and processed in real time.
+              </Text>
+            </View>
+          )}
+
+          <View style={styles.innerDivider} />
+
+          {/* Disclosure 2: Terms of Service */}
+          <Pressable
+            style={styles.disclosureRow}
+            onPress={() => toggleAccordion('terms')}
+            accessibilityRole="button"
+          >
+            <View style={styles.disclosureRowLeft}>
+              <DocumentTextIcon size={18} color={colors.orange} />
+              <View style={styles.disclosureTextCol}>
+                <Text style={styles.disclosureTitle}>Terms of Service</Text>
+                <Text style={styles.disclosureSub}>Software license, usage boundaries, user operational responsibility</Text>
+              </View>
+            </View>
+            {openAccordion === 'terms' ? (
+              <ChevronDownIcon size={18} color={colors.orange} />
+            ) : (
+              <ChevronRightIcon size={18} color={colors.textMuted} />
+            )}
+          </Pressable>
+          {openAccordion === 'terms' && (
+            <View style={styles.disclosureContent}>
+              <Text style={styles.legalHeading}>1. Acceptance of Terms</Text>
+              <Text style={styles.legalBody}>
+                By utilizing Derived Arbitrage, you agree to these Terms of Service. The software is provided for personal monitoring, statistical analysis, and algorithmic risk management on synthetic indices.
+              </Text>
+              <Text style={styles.legalHeading}>2. User Operational Responsibility</Text>
+              <Text style={styles.legalBody}>
+                You maintain sole and absolute responsibility for all trading activities, order placement decisions, lot sizing adjustments, risk parameter configurations, and financial margin management executed on your broker accounts.
+              </Text>
+            </View>
+          )}
+
+          <View style={styles.innerDivider} />
+
+          {/* Disclosure 3: Risk of Trading */}
+          <Pressable
+            style={styles.disclosureRow}
+            onPress={() => toggleAccordion('risk')}
+            accessibilityRole="button"
+          >
+            <View style={styles.disclosureRowLeft}>
+              <WarningTriangleIcon size={18} color={colors.orange} />
+              <View style={styles.disclosureTextCol}>
+                <Text style={styles.disclosureTitle}>Risk of Trading</Text>
+                <Text style={styles.disclosureSub}>Synthetic volatility, leverage hazards, loss warnings</Text>
+              </View>
+            </View>
+            {openAccordion === 'risk' ? (
+              <ChevronDownIcon size={18} color={colors.orange} />
+            ) : (
+              <ChevronRightIcon size={18} color={colors.textMuted} />
+            )}
+          </Pressable>
+          {openAccordion === 'risk' && (
+            <View style={styles.disclosureContent}>
+              <Text style={styles.legalHeading}>1. Synthetic Indices Mechanics</Text>
+              <Text style={styles.legalBody}>
+                Synthetic indices operate 24/7 utilizing pseudorandom algorithms to simulate market volatility. They do not correlate to real-world macroeconomic fundamentals and can experience rapid, unpredictable price shifts.
+              </Text>
+              <Text style={styles.legalHeading}>2. Leverage Hazard</Text>
+              <Text style={styles.legalBody}>
+                Trading derivative contracts with financial leverage amplifies both potential profits and substantial losses. Do not trade with money you cannot afford to lose.
+              </Text>
+            </View>
+          )}
+
+          <View style={styles.innerDivider} />
+
+          {/* Disclosure 4: Disclaimer */}
+          <Pressable
+            style={styles.disclosureRow}
+            onPress={() => toggleAccordion('disclaimer')}
+            accessibilityRole="button"
+          >
+            <View style={styles.disclosureRowLeft}>
+              <InfoCircleIcon size={18} color={colors.orange} />
+              <View style={styles.disclosureTextCol}>
+                <Text style={styles.disclosureTitle}>Disclaimer</Text>
+                <Text style={styles.disclosureSub}>Independent utility, no financial advice, regulatory terms</Text>
+              </View>
+            </View>
+            {openAccordion === 'disclaimer' ? (
+              <ChevronDownIcon size={18} color={colors.orange} />
+            ) : (
+              <ChevronRightIcon size={18} color={colors.textMuted} />
+            )}
+          </Pressable>
+          {openAccordion === 'disclaimer' && (
+            <View style={styles.disclosureContent}>
+              <Text style={styles.legalHeading}>1. Independent Software Tool</Text>
+              <Text style={styles.legalBody}>
+                Derived Arbitrage is an independent open-source utility designed for algorithm monitoring and telemetry visualization. It is not affiliated with, endorsed by, or operated by MetaQuotes Ltd or Deriv Group Ltd.
+              </Text>
+              <Text style={styles.legalHeading}>2. No Financial Advice</Text>
+              <Text style={styles.legalBody}>
+                All contents, automated signal structures, order block analyses, and Fair Value Gap calculations displayed within this application are strictly for analytical and educational purposes.
+              </Text>
+            </View>
+          )}
+
+          <View style={styles.innerDivider} />
+
+          {/* Disclosure 5: System & Audit Logs */}
+          <Pressable
+            style={styles.disclosureRow}
+            onPress={() => toggleAccordion('logs')}
+            accessibilityRole="button"
+          >
+            <View style={styles.disclosureRowLeft}>
+              <TerminalLogIcon size={18} color={colors.orange} />
+              <View style={styles.disclosureTextCol}>
+                <Text style={styles.disclosureTitle}>System & Audit Logs</Text>
+                <Text style={styles.disclosureSub}>
+                  {state?.activity?.length ? `${state.activity.length} recorded controller events` : 'Chronological controller logs'}
+                </Text>
+              </View>
+            </View>
+            {openAccordion === 'logs' ? (
+              <ChevronDownIcon size={18} color={colors.orange} />
+            ) : (
+              <ChevronRightIcon size={18} color={colors.textMuted} />
+            )}
+          </Pressable>
+          {openAccordion === 'logs' && (
+            <View style={styles.disclosureContent}>
+              {!state?.activity || state.activity.length === 0 ? (
+                <Text style={styles.emptyLogText}>No controller events recorded yet.</Text>
+              ) : (
+                state.activity.map((item, idx) => {
+                  const isLast = idx === state.activity.length - 1;
+                  return (
+                    <View key={item.id} style={[styles.logItemRow, !isLast && styles.logBorder]}>
+                      <View
+                        style={[
+                          styles.logMark,
+                          {
+                            backgroundColor:
+                              item.kind === 'danger' || item.kind === 'success'
+                                ? colors.orange
+                                : colors.textMuted,
+                          },
+                        ]}
+                      />
+                      <View style={styles.logTextWrap}>
+                        <Text style={styles.logMessage}>{item.message}</Text>
+                        <Text style={styles.logTime}>
+                          {new Date(item.at).toLocaleTimeString([], {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            second: '2-digit',
+                          })}
+                        </Text>
+                      </View>
+                    </View>
+                  );
+                })
+              )}
+            </View>
+          )}
+        </View>
+
+        <View style={styles.sectionDivider} />
+
+        {/* 7. Action Buttons (Directly on Body) */}
+        <View style={styles.actionBlock}>
+          <Pressable
+            style={({ pressed }) => [styles.saveBtn, pressed && styles.pressedBtn]}
             onPress={() => void handleSaveAll()}
             disabled={saving}
           >
             {saving ? (
               <ActivityIndicator size="small" color="#FFFFFF" />
             ) : (
-              <Text style={styles.saveAllBtnText}>Save Settings</Text>
+              <Text style={styles.saveBtnText}>Save Settings</Text>
             )}
           </Pressable>
 
@@ -687,10 +685,10 @@ export function ProfileScreen({ state, ota }: ProfileScreenProps) {
           </Pressable>
         </View>
 
-        {/* About App Footer */}
-        <View style={styles.aboutCard}>
+        {/* Footer info */}
+        <View style={styles.aboutFooter}>
           <Text style={styles.aboutAppName}>DERIVED ARBITRAGE</Text>
-          <Text style={styles.aboutVersion}>EAS Cloud · Falcon FX SMC Engine</Text>
+          <Text style={styles.aboutVersion}>Falcon FX SMC Engine · v0.1.0</Text>
         </View>
       </ScrollView>
     </View>
@@ -698,9 +696,19 @@ export function ProfileScreen({ state, ota }: ProfileScreenProps) {
 }
 
 const styles = StyleSheet.create({
-  screenRoot: { flex: 1, backgroundColor: colors.bg },
-  root: { flex: 1, backgroundColor: colors.bg },
-  content: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 120, gap: 20 },
+  screenRoot: {
+    flex: 1,
+    backgroundColor: colors.bg,
+  },
+  root: {
+    flex: 1,
+    backgroundColor: colors.bg,
+  },
+  content: {
+    paddingHorizontal: 18,
+    paddingTop: 16,
+    paddingBottom: 110,
+  },
 
   successBanner: {
     backgroundColor: colors.orangeDark,
@@ -710,6 +718,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 16,
     alignItems: 'center',
+    marginBottom: 16,
   },
   successBannerText: {
     color: colors.orange,
@@ -718,254 +727,238 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
   },
 
-  // 1. Profile Identity Card
-  profileCard: {
-    backgroundColor: colors.panel,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: 20,
-    padding: 20,
-    gap: 14,
-  },
-  avatarRow: {
-    flexDirection: 'row',
+  // 1. Profile Header directly on body
+  profileHeader: {
     alignItems: 'center',
-    gap: 16,
+    paddingVertical: 8,
   },
-  avatarContainer: {
-    width: 64,
-    height: 64,
-    borderRadius: 20,
+  avatarWrap: {
+    width: 72,
+    height: 72,
+    borderRadius: 24,
     borderWidth: 2,
     borderColor: colors.orange,
-    backgroundColor: '#080808',
-    overflow: 'hidden',
+    backgroundColor: '#050505',
     alignItems: 'center',
     justifyContent: 'center',
+    marginBottom: 12,
+    overflow: 'hidden',
   },
   avatarImage: {
     width: '100%',
     height: '100%',
   },
-  profileInfo: {
-    flex: 1,
-    gap: 3,
-  },
   profileName: {
-    color: colors.text,
-    fontSize: 18,
+    fontSize: 21,
     fontWeight: '800',
-    letterSpacing: -0.3,
+    color: colors.text,
+    letterSpacing: -0.4,
+    marginBottom: 2,
   },
   profileTag: {
-    color: colors.orange,
-    fontSize: 13,
+    fontSize: 13.5,
     fontWeight: '700',
+    color: colors.orange,
     letterSpacing: 0.2,
+    marginBottom: 4,
   },
   profileStyle: {
-    color: colors.muted,
     fontSize: 12,
     fontWeight: '500',
-    marginTop: 2,
+    color: colors.textMuted,
+    marginBottom: 6,
   },
   profileBio: {
-    color: colors.muted,
-    fontSize: 13,
+    fontSize: 12.5,
+    color: colors.textDim,
+    textAlign: 'center',
+    paddingHorizontal: 24,
     lineHeight: 18,
   },
 
-  // Section Blocks
-  section: {
-    gap: 8,
+  // Section Dividers directly on body
+  sectionDivider: {
+    height: 1,
+    backgroundColor: colors.borderSubtle,
+    marginVertical: 20,
   },
-  sectionHeader: {
-    color: colors.muted,
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 1.2,
-    paddingHorizontal: 4,
-  },
-  cardGroup: {
-    backgroundColor: colors.panel,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: 16,
-    overflow: 'hidden',
+  innerDivider: {
+    height: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    marginVertical: 4,
   },
 
-  // Input Rows (Direct Inline)
-  inputRow: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    gap: 6,
+  // Section Block
+  sectionBlock: {
+    paddingVertical: 2,
   },
-  fieldLabel: {
-    color: colors.muted,
-    fontSize: 10.5,
-    fontWeight: '800',
-    letterSpacing: 0.8,
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 16,
+  },
+  sectionTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.text,
+    letterSpacing: 0.1,
+  },
+
+  // Inputs directly on body
+  inputGroup: {
+    marginBottom: 14,
+  },
+  inputLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.textMuted,
+    letterSpacing: 0.6,
+    marginBottom: 6,
   },
   textInput: {
-    backgroundColor: '#1E1E1E',
+    backgroundColor: colors.surface,
     borderColor: colors.border,
     borderWidth: 1,
-    borderRadius: 10,
+    borderRadius: 12,
     color: colors.text,
     fontSize: 14,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     fontWeight: '500',
   },
   bioInput: {
-    height: 72,
+    height: 76,
     textAlignVertical: 'top',
   },
 
-  // Bridge Action
-  bridgeActionRow: {
-    paddingHorizontal: 16,
-    paddingBottom: 14,
-    paddingTop: 4,
-  },
-  bridgeBtn: {
+  // Bridge action
+  bridgeActionBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
     backgroundColor: colors.orange,
-    borderRadius: 10,
+    borderRadius: 12,
     paddingVertical: 12,
+    marginTop: 2,
   },
-  bridgeBtnText: {
+  bridgeActionBtnText: {
     color: '#FFFFFF',
     fontSize: 13,
     fontWeight: '700',
   },
-  bridgeStatusBox: {
-    paddingHorizontal: 16,
-    paddingBottom: 12,
-  },
-  bridgeStatusText: {
+  bridgeStatusMessage: {
     color: colors.orange,
     fontSize: 12,
     fontWeight: '600',
+    marginTop: 8,
+    textAlign: 'center',
   },
 
-  // Setting Switch Row
-  settingRow: {
+  // Toggle rows directly on body
+  toggleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    minHeight: 64,
+    paddingVertical: 10,
   },
-  settingTextCol: {
+  toggleTextWrap: {
     flex: 1,
-    paddingRight: 16,
-    gap: 4,
+    paddingRight: 14,
+    gap: 3,
   },
-  settingLabelRow: {
+  toggleLabelRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 8,
   },
-  settingTitle: {
+  toggleTitle: {
     color: colors.text,
     fontSize: 14,
-    fontWeight: '700',
+    fontWeight: '600',
   },
-  settingSubtitle: {
-    color: colors.muted,
-    fontSize: 11,
-    lineHeight: 15,
+  toggleSubtitle: {
+    color: colors.textMuted,
+    fontSize: 11.5,
+    lineHeight: 16,
   },
 
-  // OTA Card Rows
-  otaRow: {
+  // OTA rows directly on body
+  otaMetaRow: {
     flexDirection: 'row',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
     justifyContent: 'space-between',
+    marginBottom: 14,
   },
-  otaMetaCol: {
-    flex: 1,
-    gap: 4,
+  otaMetaItem: {
+    gap: 3,
   },
   otaMetaLabel: {
-    color: colors.muted,
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 0.8,
+    color: colors.textDim,
+    fontSize: 10.5,
+    fontWeight: '700',
+    letterSpacing: 0.6,
   },
   otaMetaValue: {
     color: colors.text,
     fontSize: 13,
-    fontWeight: '700',
-  },
-  otaActionRow: {
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    gap: 10,
+    fontWeight: '600',
   },
   checkUpdateBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: colors.orange,
-    borderRadius: 10,
+    backgroundColor: colors.surfaceAlt,
+    borderColor: colors.border,
+    borderWidth: 1,
+    borderRadius: 12,
     paddingVertical: 12,
   },
   checkUpdateBtnText: {
-    color: '#FFFFFF',
+    color: colors.text,
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: '600',
   },
   otaStatusText: {
-    color: colors.muted,
+    color: colors.textMuted,
     fontSize: 12,
     textAlign: 'center',
+    marginTop: 8,
   },
 
-  // Accordion Rows
-  accordionHeader: {
+  // Disclosure rows directly on body
+  disclosureRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    minHeight: 60,
+    paddingVertical: 12,
   },
-  accordionHeaderLeft: {
+  disclosureRowLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
     flex: 1,
     paddingRight: 8,
   },
-  accordionTitleCol: {
+  disclosureTextCol: {
     flex: 1,
     gap: 2,
   },
-  accordionTitle: {
+  disclosureTitle: {
     color: colors.text,
     fontSize: 14,
-    fontWeight: '700',
+    fontWeight: '600',
   },
-  accordionSubtitle: {
-    color: colors.muted,
-    fontSize: 11,
+  disclosureSub: {
+    color: colors.textMuted,
+    fontSize: 11.5,
     lineHeight: 15,
   },
-  accordionBody: {
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    backgroundColor: '#111111',
-    borderTopWidth: 1,
-    borderTopColor: '#202020',
-    gap: 8,
+  disclosureContent: {
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+    gap: 6,
   },
   legalHeading: {
     color: colors.orange,
@@ -979,18 +972,18 @@ const styles = StyleSheet.create({
     lineHeight: 17,
   },
   emptyLogText: {
-    color: colors.muted,
+    color: colors.textMuted,
     fontSize: 12,
   },
   logItemRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 10,
+    gap: 8,
     paddingVertical: 6,
   },
   logBorder: {
     borderBottomWidth: 1,
-    borderBottomColor: '#1E1E1E',
+    borderBottomColor: 'rgba(255, 255, 255, 0.04)',
   },
   logMark: {
     width: 6,
@@ -1007,35 +1000,30 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   logTime: {
-    color: colors.muted,
+    color: colors.textDim,
     fontSize: 10,
   },
 
-  divider: {
-    height: 1,
-    backgroundColor: '#222222',
-  },
-
-  // Action Footer
-  actionFooter: {
+  // Action Buttons directly on body
+  actionBlock: {
     gap: 10,
     marginTop: 4,
   },
-  saveAllBtn: {
+  saveBtn: {
     backgroundColor: colors.orange,
     borderRadius: 14,
-    paddingVertical: 15,
+    paddingVertical: 14,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  saveAllBtnText: {
+  saveBtnText: {
     color: '#FFFFFF',
     fontSize: 15,
     fontWeight: '700',
-    letterSpacing: 0.3,
+    letterSpacing: 0.2,
   },
   resetBtn: {
-    backgroundColor: '#1E1E1E',
+    backgroundColor: colors.surface,
     borderColor: colors.border,
     borderWidth: 1,
     borderRadius: 14,
@@ -1044,7 +1032,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   resetBtnText: {
-    color: colors.muted,
+    color: colors.textMuted,
     fontSize: 13,
     fontWeight: '600',
   },
@@ -1052,19 +1040,20 @@ const styles = StyleSheet.create({
     opacity: 0.8,
   },
 
-  aboutCard: {
+  // About Footer
+  aboutFooter: {
     alignItems: 'center',
-    paddingVertical: 8,
+    paddingVertical: 16,
     gap: 3,
   },
   aboutAppName: {
-    color: colors.muted,
+    color: colors.textDim,
     fontSize: 11,
     fontWeight: '800',
     letterSpacing: 1.2,
   },
   aboutVersion: {
-    color: '#555555',
+    color: '#444444',
     fontSize: 11,
   },
 });
