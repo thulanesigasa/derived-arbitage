@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -61,8 +60,19 @@ interface AppSettings {
   autoReconnect: boolean;
 }
 
+export function getInitials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return 'TS';
+  const first = parts[0] ?? '';
+  if (parts.length === 1) return first.slice(0, 2).toUpperCase();
+  const last = parts[parts.length - 1] ?? '';
+  const firstChar = first[0] ?? '';
+  const lastChar = last[0] ?? '';
+  return (firstChar + lastChar).toUpperCase() || 'TS';
+}
+
 const DEFAULT_PROFILE: UserProfile = {
-  displayName: 'Falcon Trader',
+  displayName: 'Thulane Sigasa',
   traderTag: '@synthetics_pro',
   tradingStyle: 'Falcon FX · SMC Liquidity Matrix',
 };
@@ -271,11 +281,7 @@ export function ProfileScreen({
         {/* 1. Header Profile Identity (Directly on Body) */}
         <View style={styles.profileHeader}>
           <View style={styles.avatarWrap}>
-            <Image
-              source={require('../../assets/icon.png')}
-              style={styles.avatarImage}
-              resizeMode="contain"
-            />
+            <Text style={styles.avatarInitials}>{getInitials(profile.displayName)}</Text>
           </View>
           <Text style={styles.profileName}>{profile.displayName}</Text>
           <Text style={styles.profileTag}>{profile.traderTag}</Text>
@@ -748,18 +754,19 @@ const styles = StyleSheet.create({
   avatarWrap: {
     width: 64,
     height: 64,
-    borderRadius: 18,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
+    borderRadius: 20,
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 107, 0, 0.4)',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 8,
   },
-  avatarImage: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
+  avatarInitials: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: colors.orange,
+    letterSpacing: 1,
   },
   profileName: {
     color: colors.text,
