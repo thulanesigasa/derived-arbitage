@@ -6,9 +6,7 @@
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
     "icon": "./assets/icon.png",
-    "runtimeVersion": {
-      "policy": "appVersion"
-    },
+    "runtimeVersion": "0.1.0",
     "updates": {
       "enabled": true,
       "checkAutomatically": "ON_LOAD",
@@ -24,7 +22,8 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "softwareKeyboardLayoutMode": "resize"
+      "softwareKeyboardLayoutMode": "resize",
+      "usesCleartextTraffic": true
     },
     "ios": {
       "supportsTablet": true,
@@ -53,4 +52,3 @@
     "owner": "thulanesigasa0"
   }
 }
-
