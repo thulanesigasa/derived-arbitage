@@ -723,7 +723,7 @@ To capitalize on synthetic index arbitrage discrepancies across multiple uncorre
 The Profile tab provides a streamlined user profile, application settings, and legal disclosures without technical developer clutter:
 
 * **Trader Profile & Customization**:
-  - Displays user avatar with the cybernetic robot asset (`robot_hero.jpg`), custom trader tag, and strategy methodology.
+  - Displays personalized trader initials monogram badge (dynamically computed from the user's display name), custom trader tag, and strategy methodology.
   - Interactive **Edit Profile** modal allows customization of Display Name, Trader Tag, Strategy Style, Favorite Synthetic Basket, and Trader Bio, persisted in local sandboxed storage (`AsyncStorage`).
 * **Application Preferences**:
   - **Execution Alerts**: Toggle audio notifications on automated order execution.
@@ -829,7 +829,7 @@ All launcher, app icon, and in-app brand assets are generated via [`scripts/gene
 
 The Settings screen ([`src/screens/ProfileScreen.tsx`](file:///d:/workspace_programming/mobile_ea/derived-arbitage/src/screens/ProfileScreen.tsx)) is consolidated into one unified, scrollable body container:
 
-1. **Header Profile Card**: In-app cybernetic brand icon, display name, handle tag, and status.
+1. **Header Profile Card**: Personalized trader initials monogram badge, display name, handle tag, and status.
 2. **Trader Profile (Direct Inline Inputs)**: Inline text inputs for Display Name, Trader Tag, Strategy Style, Preferred Basket, and Bio.
 3. **Execution & Telemetry Preferences**: Inline toggle switches for Execution Audio Chimes, Haptic Feedback, and High-Precision Telemetry.
 4. **Over-The-Air Updates Hub**: Displays current app version (`0.1.0`), locked runtime version (`0.1.0`), update channel, and an interactive "Check for Updates" trigger with real-time status feedback.
