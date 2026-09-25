@@ -4,11 +4,15 @@ export function normalizeBaseUrl(value: string): string {
   return value.trim().replace(/\/+$/, '');
 }
 
+export const DEFAULT_PRODUCTION_BRIDGE_URL = 'https://due-flickr-replied-encourage.trycloudflare.com';
+export const FALLBACK_VPS_IP_URL = 'http://92.4.143.117:4000';
+
 export function buildCandidateList(activeUrl: string, detectedIp?: string): string[] {
   const defaults = [
+    DEFAULT_PRODUCTION_BRIDGE_URL,
     activeUrl,
+    FALLBACK_VPS_IP_URL,
     detectedIp ? `http://${detectedIp}:4000` : null,
-    'http://10.186.129.215:4000',
     'http://localhost:4000',
     'http://127.0.0.1:4000',
     'http://10.0.2.2:4000',
@@ -24,10 +28,10 @@ describe('Network & Connection Resilience', () => {
     expect(normalizeBaseUrl('http://10.186.129.215:4000')).toBe('http://10.186.129.215:4000');
   });
 
-  it('builds candidate list prioritizing active URL and detected Wi-Fi host', () => {
+  it('builds candidate list prioritizing production Cloudflare bridge URL and VPS fallback', () => {
     const candidates = buildCandidateList('http://192.168.1.42:4000', '10.186.129.215');
-    expect(candidates[0]).toBe('http://192.168.1.42:4000');
-    expect(candidates).toContain('http://10.186.129.215:4000');
+    expect(candidates[0]).toBe(DEFAULT_PRODUCTION_BRIDGE_URL);
+    expect(candidates).toContain(FALLBACK_VPS_IP_URL);
     expect(candidates).toContain('http://localhost:4000');
     expect(candidates).toContain('http://127.0.0.1:4000');
     expect(candidates).toContain('http://10.0.2.2:4000');
@@ -124,19 +128,38 @@ describe('Network & Connection Resilience', () => {
     expect(interpolate(0.5, [0, 1], [0, segmentPillWidth])).toBe(85);
   });
 
-  it('sanitizes stale IP 192.168.1.42 and redirects to active LAN host', () => {
-    function sanitizeUrl(url: string, activeFallback = 'http://10.186.129.215:4000'): string {
+  it('sanitizes stale development IPs and redirects to production Cloudflare bridge', () => {
+    function sanitizeUrl(url: string, activeFallback = DEFAULT_PRODUCTION_BRIDGE_URL): string {
       const normalized = url.trim().replace(/\/+$/, '');
-      if (normalized.includes('192.168.1.42')) {
+      if (
+        normalized.includes('192.168.1.42') ||
+        normalized.includes('10.186.129.215') ||
+        normalized.includes('10.229.19.215')
+      ) {
         return activeFallback;
       }
       return normalized;
     }
 
-    expect(sanitizeUrl('http://192.168.1.42:4000')).toBe('http://10.186.129.215:4000');
-    expect(sanitizeUrl('http://192.168.1.42:4000/')).toBe('http://10.186.129.215:4000');
-    expect(sanitizeUrl('http://localhost:4000')).toBe('http://localhost:4000');
-    expect(sanitizeUrl('http://10.186.129.215:4000')).toBe('http://10.186.129.215:4000');
+    expect(sanitizeUrl('http://192.168.1.42:4000')).toBe(DEFAULT_PRODUCTION_BRIDGE_URL);
+    expect(sanitizeUrl('http://10.229.19.215:4000')).toBe(DEFAULT_PRODUCTION_BRIDGE_URL);
+    expect(sanitizeUrl('http://10.186.129.215:4000')).toBe(DEFAULT_PRODUCTION_BRIDGE_URL);
+    expect(sanitizeUrl(FALLBACK_VPS_IP_URL)).toBe(FALLBACK_VPS_IP_URL);
+    expect(sanitizeUrl(DEFAULT_PRODUCTION_BRIDGE_URL)).toBe(DEFAULT_PRODUCTION_BRIDGE_URL);
+  });
+
+  it('transforms HTTPS tunnel URL into secure WSS WebSocket endpoint', () => {
+    function stateSocketUrl(baseUrl: string, token?: string, apiKey = 'deriv-bridge-key'): string {
+      const wsBase = baseUrl.replace(/^http/, 'ws');
+      return token ? `${wsBase}/ws?token=${token}` : `${wsBase}/ws?apiKey=${apiKey}`;
+    }
+
+    expect(stateSocketUrl('https://due-flickr-replied-encourage.trycloudflare.com')).toBe(
+      'wss://due-flickr-replied-encourage.trycloudflare.com/ws?apiKey=deriv-bridge-key'
+    );
+    expect(stateSocketUrl('http://92.4.143.117:4000')).toBe(
+      'ws://92.4.143.117:4000/ws?apiKey=deriv-bridge-key'
+    );
   });
 
   it('maintains online status via HTTP fallback when WebSocket encounters connection error', () => {

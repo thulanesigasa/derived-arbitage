@@ -17,3 +17,6 @@ probe_symbols.mjs
 build-output.json
 .eas/
 
+
+# Agent workspace customizations
+.agents/

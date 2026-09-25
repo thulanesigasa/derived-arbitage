@@ -16,7 +16,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppHeader } from '../components/AppHeader';
 import { ToggleSwitch } from '../components/ToggleSwitch';
 import {
-  ArrowPathIcon,
   BellAlertIcon,
   CheckIcon,
   ChevronDownIcon,
@@ -31,7 +30,6 @@ import {
   TerminalLogIcon,
   WarningTriangleIcon,
 } from '../components/TabIcons';
-import { getApiBaseUrl, setApiBaseUrl, probeCandidateUrls, getState } from '../api';
 import { ALL_SYMBOLS, type ControllerState, type SymbolName } from '../types';
 
 const colors = {
@@ -121,9 +119,6 @@ export function ProfileScreen({
 
   const [profile, setProfile] = useState<UserProfile>(DEFAULT_PROFILE);
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
-  const [bridgeUrl, setBridgeUrl] = useState(() => getApiBaseUrl());
-  const [testingBridge, setTestingBridge] = useState(false);
-  const [bridgeStatus, setBridgeStatus] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveSuccessNotice, setSaveSuccessNotice] = useState(false);
 
@@ -158,24 +153,15 @@ export function ProfileScreen({
   useEffect(() => {
     void (async () => {
       try {
-        const [rawProfile, rawSettings, rawBridge] = await Promise.all([
+        const [rawProfile, rawSettings] = await Promise.all([
           AsyncStorage.getItem(USER_PROFILE_KEY),
           AsyncStorage.getItem(SETTINGS_KEY),
-          AsyncStorage.getItem('@mobile_ea_profile_config'),
         ]);
         if (rawProfile) {
           setProfile(JSON.parse(rawProfile) as UserProfile);
         }
         if (rawSettings) {
           setSettings(JSON.parse(rawSettings) as AppSettings);
-        }
-        if (rawBridge) {
-          try {
-            const parsed = JSON.parse(rawBridge) as { bridgeUrl?: string };
-            if (parsed.bridgeUrl) setBridgeUrl(parsed.bridgeUrl);
-          } catch {
-            // ignore
-          }
         }
       } catch {
         // Fallback to defaults
@@ -213,32 +199,6 @@ export function ProfileScreen({
     }
   };
 
-  const handleTestBridge = async () => {
-    setTestingBridge(true);
-    setBridgeStatus('Testing bridge connection...');
-    try {
-      setApiBaseUrl(bridgeUrl.trim());
-      await getState();
-      setBridgeStatus('Connected successfully! Bridge is live.');
-    } catch {
-      try {
-        setBridgeStatus('Probing candidate hosts...');
-        const discovered = await probeCandidateUrls();
-        if (discovered) {
-          setBridgeUrl(discovered);
-          setApiBaseUrl(discovered);
-          setBridgeStatus(`Auto-connected to host: ${discovered}`);
-        } else {
-          setBridgeStatus('Could not reach VPS bridge at this address.');
-        }
-      } catch {
-        setBridgeStatus('Connection failed. Verify server and port.');
-      }
-    } finally {
-      setTestingBridge(false);
-    }
-  };
-
   const handleSaveAll = useCallback(async () => {
     if (!profile.displayName.trim()) {
       Alert.alert('Validation Error', 'Display name cannot be empty.');
@@ -254,9 +214,7 @@ export function ProfileScreen({
       await Promise.all([
         AsyncStorage.setItem(USER_PROFILE_KEY, JSON.stringify(profile)),
         AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)),
-        AsyncStorage.setItem('@mobile_ea_profile_config', JSON.stringify({ bridgeUrl: bridgeUrl.trim() })),
       ]);
-      setApiBaseUrl(bridgeUrl.trim());
 
       setSaveSuccessNotice(true);
       setTimeout(() => setSaveSuccessNotice(false), 3000);
@@ -265,7 +223,7 @@ export function ProfileScreen({
     } finally {
       setSaving(false);
     }
-  }, [profile, settings, bridgeUrl]);
+  }, [profile, settings]);
 
   const handleResetDefaults = () => {
     Alert.alert(
@@ -511,58 +469,7 @@ export function ProfileScreen({
 
         <View style={styles.sectionDivider} />
 
-        {/* 3. Server Bridge & Network Host */}
-        <View style={styles.sectionBlock}>
-          <View style={styles.sectionHeaderRow}>
-            <ArrowPathIcon size={18} color={colors.orange} />
-            <Text style={styles.sectionTitle}>Server Bridge Connection</Text>
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>VPS BRIDGE API URL</Text>
-            <TextInput
-              style={styles.textInput}
-              value={bridgeUrl}
-              onChangeText={setBridgeUrl}
-              placeholder="http://192.168.1.50:3001"
-              placeholderTextColor={colors.textDim}
-              autoCapitalize="none"
-              keyboardType="url"
-            />
-          </View>
-
-          <Pressable
-            style={({ pressed }) => [styles.bridgeActionBtn, pressed && styles.pressedBtn]}
-            onPress={() => void handleTestBridge()}
-            disabled={testingBridge}
-          >
-            {testingBridge ? (
-              <ActivityIndicator size="small" color="#FFFFFF" />
-            ) : (
-              <>
-                <ArrowPathIcon size={16} color="#FFFFFF" />
-                <Text style={styles.bridgeActionText}>Test & Discover Bridge</Text>
-              </>
-            )}
-          </Pressable>
-
-          {bridgeStatus && (
-            <Text
-              style={[
-                styles.bridgeStatusText,
-                bridgeStatus.includes('successfully') || bridgeStatus.includes('Auto-connected')
-                  ? styles.bridgeSuccess
-                  : styles.bridgeError,
-              ]}
-            >
-              {bridgeStatus}
-            </Text>
-          )}
-        </View>
-
-        <View style={styles.sectionDivider} />
-
-        {/* 4. Execution & Telemetry Preferences */}
+        {/* 3. Execution & Telemetry Preferences */}
         <View style={styles.sectionBlock}>
           <View style={styles.sectionHeaderRow}>
             <SettingsSlidersIcon size={18} color={colors.orange} />
@@ -621,7 +528,7 @@ export function ProfileScreen({
 
         <View style={styles.sectionDivider} />
 
-        {/* 5. Legal & Disclosures (Opens Dedicated Individual Screens) */}
+        {/* 4. Legal & Disclosures (Opens Dedicated Individual Screens) */}
         <View style={styles.sectionBlock}>
           <View style={styles.sectionHeaderRow}>
             <ShieldIcon size={18} color={colors.orange} />
@@ -766,7 +673,7 @@ export function ProfileScreen({
 
         <View style={styles.sectionDivider} />
 
-        {/* 6. Action Buttons */}
+        {/* 5. Action Buttons */}
         <View style={styles.actionBlock}>
           <Pressable
             style={({ pressed }) => [styles.saveBtn, pressed && styles.pressedBtn]}
@@ -1081,33 +988,7 @@ const styles = StyleSheet.create({
     borderColor: colors.orange,
   },
 
-  bridgeActionBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: colors.surfaceAlt,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: 10,
-    paddingVertical: 12,
-  },
-  bridgeActionText: {
-    color: colors.text,
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  bridgeStatusText: {
-    fontSize: 12,
-    lineHeight: 16,
-    marginTop: 4,
-  },
-  bridgeSuccess: {
-    color: colors.orange,
-  },
-  bridgeError: {
-    color: colors.textMuted,
-  },
+
 
   toggleRow: {
     flexDirection: 'row',

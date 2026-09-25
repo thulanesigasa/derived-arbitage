@@ -10,20 +10,23 @@ import type {
   TradeJournalEntry,
 } from './types';
 
+export const DEFAULT_PRODUCTION_BRIDGE_URL = 'https://due-flickr-replied-encourage.trycloudflare.com';
+export const FALLBACK_VPS_IP_URL = 'http://92.4.143.117:4000';
+
 export function normalizeBaseUrl(value: string): string {
   return value.trim().replace(/\/$/, '');
 }
 
 function deriveApiUrl(): string {
-  // If running in a web browser, use the exact hostname serving the app
+  // If running in a web browser, use the exact hostname serving the app if remote
   if (typeof window !== 'undefined' && window.location?.hostname) {
     const webHost = window.location.hostname;
-    if (webHost && webHost !== '') {
+    if (webHost && webHost !== '' && webHost !== 'localhost' && webHost !== '127.0.0.1') {
       return `http://${webHost}:4000`;
     }
   }
 
-  // Check Expo hostUri FIRST (dynamic IP from Metro development server)
+  // Check Expo hostUri (dynamic IP from Metro development server when debugging on LAN)
   const hostUri = Constants.expoConfig?.hostUri ?? Constants.expoGoConfig?.debuggerHost;
   const host = hostUri?.replace(/^https?:\/\//, '').split(':')[0];
   if (host && host !== '127.0.0.1' && host !== 'localhost') {
@@ -34,11 +37,16 @@ function deriveApiUrl(): string {
     process?: { env?: Record<string, string> };
   };
   const configured = g.process?.env?.EXPO_PUBLIC_API_URL;
-  if (configured && !configured.includes('10.186.129.215') && !configured.includes('192.168.1.42')) {
+  if (
+    configured &&
+    !configured.includes('10.186.129.215') &&
+    !configured.includes('192.168.1.42') &&
+    !configured.includes('10.229.19.215')
+  ) {
     return normalizeBaseUrl(configured);
   }
 
-  return 'http://10.229.19.215:4000';
+  return DEFAULT_PRODUCTION_BRIDGE_URL;
 }
 
 export let API_BASE_URL = deriveApiUrl();
@@ -48,8 +56,12 @@ const urlChangeListeners = new Set<(url: string) => void>();
 export function setApiBaseUrl(url: string): void {
   let normalized = normalizeBaseUrl(url);
   // Guard against stale cached LAN IP from previous network sessions
-  if (normalized.includes('192.168.1.42') || normalized.includes('10.186.129.215')) {
-    normalized = 'http://10.229.19.215:4000';
+  if (
+    normalized.includes('192.168.1.42') ||
+    normalized.includes('10.186.129.215') ||
+    normalized.includes('10.229.19.215')
+  ) {
+    normalized = DEFAULT_PRODUCTION_BRIDGE_URL;
   }
   if (normalized !== API_BASE_URL) {
     API_BASE_URL = normalized;
@@ -104,7 +116,7 @@ export const OFFLINE_FALLBACK_STATE: ControllerState = {
       id: 'offline-init-01',
       at: new Date().toISOString(),
       kind: 'info',
-      message: 'Awaiting bridge connection. Tap SYNC or configure host in Profile.',
+      message: 'Awaiting bridge connection. Tap SYNC to retry.',
     },
   ],
 };
@@ -288,10 +300,8 @@ export const DEFAULT_PROFILER_SNAPSHOT: ProfilerApiState = {
 };
 
 export const KNOWN_HOST_CANDIDATES = [
-  'http://10.229.19.215:4000',
-  'http://10.48.71.23:4000',
-  'http://100.65.195.233:4000',
-  'http://10.48.65.119:4000',
+  DEFAULT_PRODUCTION_BRIDGE_URL,
+  FALLBACK_VPS_IP_URL,
   'http://localhost:4000',
   'http://127.0.0.1:4000',
   'http://10.0.2.2:4000',
@@ -311,13 +321,13 @@ export async function probeCandidateUrls(customCandidates?: string[]): Promise<s
 
   const candidates = Array.from(
     new Set([
+      DEFAULT_PRODUCTION_BRIDGE_URL,
+      API_BASE_URL,
+      FALLBACK_VPS_IP_URL,
       ...dynamicCandidates,
-      'http://10.229.19.215:4000',
-      'http://10.48.71.23:4000',
-      'http://100.65.195.233:4000',
       'http://localhost:4000',
       'http://127.0.0.1:4000',
-      API_BASE_URL,
+      'http://10.0.2.2:4000',
       ...(customCandidates ?? []),
       ...KNOWN_HOST_CANDIDATES,
     ].map(normalizeBaseUrl))

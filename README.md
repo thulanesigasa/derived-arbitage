@@ -80,21 +80,18 @@ If you get port conflicts, run this first:
 
 ## Network Connectivity & Connection Resilience
 
-When switching between Wi-Fi networks (e.g. home vs. office) or running on different clients (web browser, Android phone, Android emulator), IP addresses can change. The mobile controller includes multi-layer connection resilience:
+When deploying to production or running across varied network environments (Wi-Fi, LTE, cellular data, or local emulators), connection stability is critical. The mobile controller features automated, multi-tiered connectivity architecture:
 
-1. **Web Browser Automatic Host Matching**:
-   - When opened in a browser (e.g., `http://localhost:8082` or `http://10.186.129.215:8082`), the app automatically targets `http://${window.location.hostname}:4000`, avoiding stale LAN IPs.
-2. **Multi-Host Auto-Discovery (`src/api.ts`)**:
-   - Requests enforce a strict 3,500ms timeout with `AbortController` to eliminate infinite loading spinners.
-   - If the initial host is unreachable, `probeCandidateUrls()` automatically tests known candidate endpoints in parallel/sequence (`http://10.186.129.215:4000`, `http://localhost:4000`, `http://127.0.0.1:4000`, `http://10.0.2.2:4000`) and self-heals by switching to the first responding host.
-3. **Connection Recovery Screen (`App.tsx`)**:
-   - If the server bridge cannot be reached, the app displays a responsive recovery screen with:
-     - Error diagnostics and current target URL
-     - Quick-switch host chips for instant one-tap switching
-     - Custom URL input field
-     - **Launch Offline Demo** mode button, allowing complete offline inspection of the UI without network dependency.
-4. **Profile Bridge Synchronization (`ProfileScreen.tsx`)**:
-   - Setting `bridgeUrl` in Profile instantly synchronizes `API_BASE_URL` and persists across app restarts via AsyncStorage.
+1. **Hardcoded Cloudflare HTTPS Production Bridge**:
+   - The primary API endpoint is permanently hardcoded to `https://due-flickr-replied-encourage.trycloudflare.com`, establishing an encrypted, zero-trust HTTPS/WSS tunnel directly into the 24/7 cloud server bridge on port `4000`.
+   - Bypasses residential NAT, ISP firewalls, and carrier dynamic IPs with zero port forwarding required.
+2. **Direct Cloud VPS IP Fallback**:
+   - Secondary candidate is permanently bound to the dedicated Oracle Cloud Ubuntu VPS at `http://92.4.143.117:4000` (supported with `usesCleartextTraffic: true` in `app.json`).
+3. **Multi-Host Auto-Discovery & Concurrent Probing (`src/api.ts`)**:
+   - Requests enforce a strict 3,500ms timeout with `AbortController` to eliminate stalled network states.
+   - `probeCandidateUrls()` concurrently evaluates candidate endpoints (`https://due-flickr-replied-encourage.trycloudflare.com`, `http://92.4.143.117:4000`, `http://localhost:4000`, `http://127.0.0.1:4000`, `http://10.0.2.2:4000`) and seamlessly self-heals to the fastest active host.
+4. **Zero-Configuration Profile Screen**:
+   - Developer-facing bridge URL inputs and network ping triggers have been completely purged from `ProfileScreen.tsx`, eliminating cognitive overhead and providing a streamlined trader experience.
 
 ---
 
@@ -109,7 +106,7 @@ When switching between Wi-Fi networks (e.g. home vs. office) or running on diffe
 - **Continuous Hybrid Connectivity & Polling Backup**:
   - Background 3,500ms HTTP polling fallback ensures the controller stays synchronized and online even if OS-level cleartext restrictions or mobile networks drop WebSocket connections.
   - WebSocket errors trigger automated silent HTTP state re-validation instead of abruptly stranding the app in an offline loop.
-  - Global `setApiBaseUrl` and `ProfileScreen` automatically sanitize AsyncStorage to purge stale cached LAN addresses (`192.168.1.42`) and prioritize the active Wi-Fi subnet (`10.186.129.215:4000`).
+  - Global `setApiBaseUrl` automatically sanitizes AsyncStorage to purge stale cached LAN addresses and prioritize the hardcoded production Cloudflare bridge (`https://due-flickr-replied-encourage.trycloudflare.com`).
 - **Bridge Synchronizing Notice & Tactile SYNC**:
   - When awaiting connection, an inline notice displays the target bridge URL along with a tactile `SYNC` action for instant manual polling.
 - **Active Robot Instance Card**:
@@ -144,7 +141,7 @@ When switching between Wi-Fi networks (e.g. home vs. office) or running on diffe
   - Completely eliminates blocking full-screen loading spinners (`Connecting to Deriv API... just loads forever`).
 - **Resilient Network Timeouts & Stale IP Guard**:
   - Replaces raw untimed fetch calls with `getProfilerStatus()` in `src/api.ts`, backed by a 3,500ms `AbortController` timeout threshold.
-  - Automatically filters out stale/cached LAN host candidates (such as `192.168.1.42`) and defaults to the active Wi-Fi subnet (`10.186.129.215:4000`).
+  - Automatically filters out stale development host candidates and defaults to the production Cloudflare bridge (`https://due-flickr-replied-encourage.trycloudflare.com`).
   - Subscribes to runtime `onApiBaseUrlChange` events to dynamically re-synchronize when candidate probes or settings update.
 - **Inline Error Banner & Tactile Retry**:
   - If network or Deriv bridge is temporarily unreachable, an inline non-blocking banner indicates the error and provides a tactile `RETRY` button while preserving full access to symbol cards and structure modals.
@@ -279,7 +276,7 @@ derived_arbitage/
 │       ├── RiskEngine.mqh         # Independent native risk engine ($15 floor, $0.40 loss lock)
 │       └── BridgeClient.mqh       # MQL5 WebRequest HTTP client for server bridge communication
 ├── src/
-│   ├── api.ts                     # Mobile ↔ server REST/WS client with Bearer JWT injection
+│   ├── api.ts                     # Mobile <-> server REST/WS client with Bearer JWT injection
 │   ├── types.ts                   # Shared types (ControllerState, StrategySignal, Gate, Auth…)
 │   ├── components/
 │   │   ├── AppHeader.tsx          # Rule 15 App Bar respecting OS status bar chrome
@@ -307,7 +304,7 @@ derived_arbitage/
     │   ├── deriv/                 # Phase 2: Deriv WebSocket integration
     │   │   ├── derivClient.ts     # WS client, auth, reconnect, tick subs
     │   │   ├── tickStore.ts       # Rolling tick buffer, spread stats
-    │   │   ├── symbolMap.ts       # Display name ↔ Deriv API code mapping
+    │   │   ├── symbolMap.ts       # Display name <-> Deriv API code mapping
     │   │   └── marketProfiler.ts  # Symbol profiling, affordability check, onTick emitter
     │   ├── strategy/              # Phase 3: Strategy Engine (Falcon FX / SMC Signals)
     │   │   ├── candleAggregator.ts# M1/M5 candle reconstruction + dynamic ATR
@@ -567,10 +564,8 @@ When you want your EA and bridge server running 24 hours a day without keeping y
      - Open MT5, login to Deriv Demo, add WebRequest `http://localhost:4000`, and attach `FalconEA.mq5`.
 5. **Connect Mobile Controller to Cloud VPS**:
    - Open the mobile app on your phone.
-   - In the **Profile** tab:
-     - Set **BRIDGE URL** to `http://<YOUR_AWS_PUBLIC_IP>:4000`.
-     - Set **API KEY** to `falcon-vps-key-2026`.
-     - Tap **TEST BRIDGE PING**. Once connected, your phone monitors the 24/7 cloud robot anywhere in the world!
+   - The app immediately and automatically connects to the hardcoded production Cloudflare tunnel bridge (`https://due-flickr-replied-encourage.trycloudflare.com`) with fallback to the direct VPS IP (`http://92.4.143.117:4000`).
+   - No manual server IP configuration or port input is required in the Profile tab! Your phone monitors the 24/7 cloud robot anywhere in the world seamlessly.
 
 ---
 
@@ -817,11 +812,10 @@ The Settings screen ([`src/screens/ProfileScreen.tsx`](file:///d:/workspace_prog
 
 1. **Header Profile Card**: In-app cybernetic brand icon, display name, handle tag, and status.
 2. **Trader Profile (Direct Inline Inputs)**: Inline text inputs for Display Name, Trader Tag, Strategy Style, Preferred Basket, and Bio.
-3. **Server Bridge & Network Configuration**: VPS Bridge API Base URL input with real-time "Test & Discover" connectivity probes.
-4. **Execution & Telemetry Preferences**: Inline toggle switches for Execution Audio Chimes, Haptic Feedback, and High-Precision Telemetry.
-5. **Over-The-Air Updates Hub**: Displays current app version (`0.1.0`), runtime version policy, update channel, and an interactive "Check for Updates" trigger with real-time status feedback.
-6. **Single-Body Collapsible Accordions**: Expandable accordions directly inside the body for Privacy Policy, Terms of Service, Risk of Trading, Disclaimer, and System Audit Logs without full-screen modal interruptions.
-7. **Action Footer**: Prominent "Save Settings" button (persists to `AsyncStorage`) and "Reset to Defaults".
+3. **Execution & Telemetry Preferences**: Inline toggle switches for Execution Audio Chimes, Haptic Feedback, and High-Precision Telemetry.
+4. **Over-The-Air Updates Hub**: Displays current app version (`0.1.0`), locked runtime version (`0.1.0`), update channel, and an interactive "Check for Updates" trigger with real-time status feedback.
+5. **Single-Body Collapsible Accordions**: Expandable accordions directly inside the body for Privacy Policy, Terms of Service, Risk of Trading, Disclaimer, and System Audit Logs without full-screen modal interruptions.
+6. **Action Footer**: Prominent "Save Settings" button (persists to `AsyncStorage`) and "Reset to Defaults".
 
 
 
