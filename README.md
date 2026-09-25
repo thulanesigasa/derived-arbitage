@@ -267,8 +267,12 @@ derived_arbitage/
 │   ├── adaptive-icon.png          # 1024x1024 Android adaptive icon with safe-zone padding
 │   ├── splash.png                 # High-resolution splash screen image on #080808 background
 │   └── favicon.png                # Web favicon derived from robot_hero
+├── automate.md                    # Single-command VPS EA hot-reload & compilation guide
 ├── scripts/
-│   └── generate_icons.ps1         # Asset generation utility for icon, adaptive icon, splash, and favicon
+│   ├── generate_app_icons.py      # Rule 15/19 calibrated asset generation
+│   ├── generate_icons.ps1         # Asset generation utility for icon, adaptive icon, splash, and favicon
+│   ├── update_ea.ps1              # Windows local PC MetaEditor compiler & synchronizer
+│   └── update_ea.sh               # Linux Wine MetaEditor compiler & synchronizer
 ├── mql5/                          # Phase 4: Native MetaTrader 5 Expert Advisor & Risk Engine
 │   ├── Experts/
 │   │   └── FalconEA.mq5           # Falcon FX & SMC Execution EA with timer & tick hooks
@@ -582,7 +586,22 @@ To permit bridge communication:
    - `http://localhost:4000`
    - `http://127.0.0.1:4000`
 5. Click **OK**.
-6. The HUD will immediately transition to `ONLINE (CONNECTED)` with live round-trip latency (`Ping: 1~3ms`) and live heartbeats.
+6. The HUD will immediately transition to `ONLINE (CONNECTED)` with live round-trip latency (`Ping: 0~2ms`) and live heartbeats.
+
+#### Automated FalconEA Hot-Reload & Synchronization
+
+To easily apply code updates and recompile `FalconEA` on the Ubuntu Linux VPS without manual file management:
+
+1. **One-Liner (Run in VPS terminal)**:
+   ```bash
+   cd ~/derived-arbitage && git pull && cp mql5/Experts/FalconEA.mq5 "/home/ubuntu/mt5/drive_c/Program Files/MetaTrader 5/MQL5/Experts/" && cp mql5/Include/*.mqh "/home/ubuntu/mt5/drive_c/Program Files/MetaTrader 5/MQL5/Include/" && cd "/home/ubuntu/mt5/drive_c/Program Files/MetaTrader 5" && WINEPREFIX=/home/ubuntu/mt5 wine MetaEditor64.exe /compile:"MQL5\\Experts\\FalconEA.mq5" /log
+   ```
+2. **Bundled Script**:
+   ```bash
+   bash scripts/update_ea.sh
+   ```
+3. **Hot-Reload Behavior**: MetaTrader 5 automatically detects when `FalconEA.ex5` is overwritten on disk and seamlessly hot-reloads the EA on the active chart on the next market tick without requiring chart or terminal restarts.
+4. For comprehensive pipeline details and Windows PowerShell alternatives, see [`automate.md`](file:///d:/workspace_programming/mobile_ea/derived-arbitage/automate.md).
 
 #### Understanding HUD Circuit Breaker Status: `[NORMAL / UNLOCKED]`
 In earlier versions, the HUD displayed `[ACTIVE / PROTECTED]` next to Equity Floor and Daily Loss Lock.
