@@ -50,10 +50,12 @@ A personal Android controller for a Deriv MT5 EA trading Volatility, Boom, Crash
 ![SMC](https://img.shields.io/badge/SMC-Trend_Alignment-22C55E?style=flat-square)
 ![Deriv WS](https://img.shields.io/badge/Deriv_WS-Historical_M1_Seeding-FF6B00?style=flat-square)
 
-- **Pre-Seeded Historical M1 Candles**: MarketProfiler automatically requests 50 historical 1-minute candles (	icks_history: candles, granularity: 60, count: 50) from Deriv WebSocket API for all active instruments upon connection. This guarantees CandleAggregator, ATR, and SMCDetector have full multi-bar history immediately on boot, eliminating 30-50 minute startup starvation.
-- **Immediate Anchor Execution**: FalconEngine includes SMC Trend Alignment (SMC_TREND_ALIGNMENT), SMC Range Expansion (SMC_RANGE_EXPANSION), and Momentum Anchor setups to ensure a qualifying directional trade is identified on the very first incoming tick when automation is started.
-- **Calibrated Account Equity Floor**: BasketEngine minEquityUsd is dynamically calibrated to the account risk policy floor (.00 for micro accounts) instead of a hardcoded  threshold, allowing  accounts to trade and recover seamlessly without premature equity floor termination.
-- **Multi-Layer Recovery Flow**: When price moves in direction of trend, the basket closes on target (.50 profit) and immediately recycles into the next trade. On adverse price movement, Martingale adds recovery layers (1.8x lot multiplier at 8-pip step intervals) and closes all open layers in net profit once target is reached.
+- **Pre-Seeded Historical M1 Candles**: MarketProfiler automatically requests 50 historical 1-minute candles (`ticks_history: candles`, granularity: 60, count: 50) from Deriv WebSocket API for all active instruments upon connection. This guarantees CandleAggregator, ATR, and SMCDetector have full multi-bar history immediately on boot, eliminating 30-50 minute startup starvation.
+- **Resilient Deriv WS Endpoint Pinning**: Pinned `wss://api.derivws.com/trading/v1/options/ws/public` with browser origin/user-agent headers to eliminate Cloudflare 520 connection drops and ensure unbroken live tick telemetry.
+- **Crash 300 Index API Normalization**: Automatically maps `CRASH300` to `CRASH300N` in Deriv WebSocket history and tick subscriptions, resolving `Invalid symbol` rejections.
+- **Immediate Anchor Execution**: FalconEngine includes SMC Trend Alignment (`SMC_TREND_ALIGNMENT`), SMC Range Expansion (`SMC_RANGE_EXPANSION`), and Momentum Anchor setups to ensure a qualifying directional trade is identified on the very first incoming tick when automation is started.
+- **Calibrated Account Equity Floor**: BasketEngine `minEquityUsd` is dynamically calibrated to the account risk policy floor ($15.00 for micro accounts) instead of a hardcoded $500 threshold, allowing $20 accounts to trade and recover seamlessly without premature equity floor termination.
+- **Multi-Layer Recovery Flow**: When price moves in direction of trend, the basket closes on target ($1.50 profit) and immediately recycles into the next trade. On adverse price movement, Martingale adds recovery layers (1.8x lot multiplier at 8-pip step intervals) and closes all open layers in net profit once target is reached.
 
 ## Mobile Development Standards (Rule 15)
 

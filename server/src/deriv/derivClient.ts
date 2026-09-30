@@ -40,8 +40,6 @@ export class DerivClient {
     const defaultCandidates = [
       process.env.DERIV_WS_URL,
       'wss://api.derivws.com/trading/v1/options/ws/public',
-      `wss://ws.derivws.com/websockets/v3?app_id=${appId || '1089'}`,
-      `wss://ws.binaryws.com/websockets/v3?app_id=${appId || '1089'}`,
     ].filter((u): u is string => Boolean(u));
 
     this.candidateUrls = wsUrl ? [wsUrl] : defaultCandidates;
@@ -65,7 +63,12 @@ export class DerivClient {
 
     const url = this.currentWsUrl;
     console.log(`[DerivClient] Connecting -> ${url}`);
-    this.ws = new WebSocket(url);
+    this.ws = new WebSocket(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Origin': 'https://app.deriv.com',
+      },
+    });
     this.ws.on('open',    ()  => { void this.handleOpen(); });
     this.ws.on('message', (d) => { this.handleMessage(d.toString()); });
     this.ws.on('error',   (e) => {
