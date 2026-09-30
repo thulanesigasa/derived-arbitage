@@ -1,4 +1,4 @@
-import type { SymbolProfile, ProfilerApiState } from '../../../src/types.js';
+import type { SymbolProfile, ProfilerApiState, Candle } from '../../../src/types.js';
 import { DerivClient } from './derivClient.js';
 import { TickStore } from './tickStore.js';
 import { SYMBOL_MAP } from './symbolMap.js';
@@ -24,6 +24,7 @@ export class MarketProfiler {
   private unsubscribers:    Array<() => void> = [];
   private refreshTimer:     ReturnType<typeof setInterval> | null = null;
   private tickListeners:    Array<(symbolCode: string, quote: number, epoch: number, ask?: number, bid?: number) => void> = [];
+  private candleListeners:  Array<(symbolCode: string, candles: Candle[]) => void> = [];
 
   constructor(appId: string, token: string | null) {
     this.client = new DerivClient(appId, token);
@@ -34,6 +35,14 @@ export class MarketProfiler {
     this.tickListeners.push(listener);
     return () => {
       this.tickListeners = this.tickListeners.filter((l) => l !== listener);
+    };
+  }
+
+  /** Registers a listener invoked when historical candle batches are fetched. */
+  onCandles(listener: (symbolCode: string, candles: Candle[]) => void): () => void {
+    this.candleListeners.push(listener);
+    return () => {
+      this.candleListeners = this.candleListeners.filter((l) => l !== listener);
     };
   }
 
@@ -51,10 +60,61 @@ export class MarketProfiler {
     });
 
     await this.refreshActiveSymbols();
+    await this.seedAllHistoricalCandles();
     this.subscribeAllTicks();
 
     // Re-fetch symbol list every 5 minutes to pick up price / pip updates
     this.refreshTimer = setInterval(() => { void this.refreshActiveSymbols(); }, 5 * 60_000);
+  }
+
+  /** Fetches historical M1 candles from Deriv WS API to pre-seed strategy engine */
+  async fetchHistoricalCandles(symbolCode: string, count = 50): Promise<Candle[]> {
+    if (!this.client.connected) return [];
+    try {
+      const resp = await this.client.send({
+        ticks_history: symbolCode,
+        style: 'candles',
+        granularity: 60,
+        count,
+        end: 'latest',
+      });
+      const rawCandles = resp['candles'] as Array<{
+        open: number | string;
+        high: number | string;
+        low: number | string;
+        close: number | string;
+        epoch: number;
+      }> | undefined;
+
+      if (Array.isArray(rawCandles) && rawCandles.length > 0) {
+        return rawCandles.map((c) => ({
+          timestamp: c.epoch * 1000,
+          open: Number(c.open),
+          high: Number(c.high),
+          low: Number(c.low),
+          close: Number(c.close),
+          volume: 1,
+        }));
+      }
+    } catch (err) {
+      console.warn(`[MarketProfiler] Failed to fetch historical candles for ${symbolCode}:`, err instanceof Error ? err.message : err);
+    }
+    return [];
+  }
+
+  async seedAllHistoricalCandles(): Promise<void> {
+    for (const sym of SYMBOL_MAP) {
+      try {
+        const candles = await this.fetchHistoricalCandles(sym.code, 50);
+        if (candles.length > 0) {
+          for (const listener of this.candleListeners) {
+            listener(sym.code, candles);
+          }
+        }
+      } catch (err) {
+        console.warn(`[MarketProfiler] Error seeding candles for ${sym.code}:`, err instanceof Error ? err.message : err);
+      }
+    }
   }
 
   /** Fetch active_symbols from Deriv API and update the internal map. */

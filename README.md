@@ -5,7 +5,7 @@
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6?style=flat-square&logo=typescript)
 ![EAS Build](https://img.shields.io/badge/EAS_Build-Preview_APK-FF6B00?style=flat-square)
 ![OTA Updates](https://img.shields.io/badge/EAS_Updates-Active-0EA5E9?style=flat-square)
-![Tests](https://img.shields.io/badge/Tests-65%20Passed-22C55E?style=flat-square)
+![Tests](https://img.shields.io/badge/Tests-67%20Passed-22C55E?style=flat-square)
 
 A personal Android controller for a Deriv MT5 EA trading Volatility, Boom, Crash, and Step synthetic indices. This project is structured in validated phases — no live trading until every gate passes.
 
@@ -43,6 +43,17 @@ A personal Android controller for a Deriv MT5 EA trading Volatility, Boom, Crash
 | Crash 100 Index | Crash | `CRASH300` |
 
 ---
+
+## Instant Martingale Execution & Historical Candle Seeding
+
+![Execution](https://img.shields.io/badge/Execution-Instant_Martingale-0EA5E9?style=flat-square)
+![SMC](https://img.shields.io/badge/SMC-Trend_Alignment-22C55E?style=flat-square)
+![Deriv WS](https://img.shields.io/badge/Deriv_WS-Historical_M1_Seeding-FF6B00?style=flat-square)
+
+- **Pre-Seeded Historical M1 Candles**: MarketProfiler automatically requests 50 historical 1-minute candles (	icks_history: candles, granularity: 60, count: 50) from Deriv WebSocket API for all active instruments upon connection. This guarantees CandleAggregator, ATR, and SMCDetector have full multi-bar history immediately on boot, eliminating 30-50 minute startup starvation.
+- **Immediate Anchor Execution**: FalconEngine includes SMC Trend Alignment (SMC_TREND_ALIGNMENT), SMC Range Expansion (SMC_RANGE_EXPANSION), and Momentum Anchor setups to ensure a qualifying directional trade is identified on the very first incoming tick when automation is started.
+- **Calibrated Account Equity Floor**: BasketEngine minEquityUsd is dynamically calibrated to the account risk policy floor (.00 for micro accounts) instead of a hardcoded  threshold, allowing  accounts to trade and recover seamlessly without premature equity floor termination.
+- **Multi-Layer Recovery Flow**: When price moves in direction of trend, the basket closes on target (.50 profit) and immediately recycles into the next trade. On adverse price movement, Martingale adds recovery layers (1.8x lot multiplier at 8-pip step intervals) and closes all open layers in net profit once target is reached.
 
 ## Mobile Development Standards (Rule 15)
 

@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 ﻿import type {
   Candle,
   ControllerState,
@@ -168,7 +169,7 @@ export class ExecutionEngine {
         lotMultiplier: 1.8,
         maxLayers: 6,
         layerStepPips: 8,
-        minEquityUsd: Math.max(state.riskPolicy.absoluteEquityFloor, DEFAULT_BASKET_CONFIG.minEquityUsd),
+        minEquityUsd: state.riskPolicy.absoluteEquityFloor ?? DEFAULT_BASKET_CONFIG.minEquityUsd,
       }
     );
   }
@@ -193,7 +194,7 @@ export class ExecutionEngine {
     if (cmd.type === 'BASKET_OPEN_LAYER') {
       this.store.mutate((s) => {
         const layerLabel = cmd.layerIndex === 0 ? 'ANCHOR' : `RECOVERY L${cmd.layerIndex}`;
-        log(s, 'info', `[BASKET] ${layerLabel} on ${cmd.symbol} \u2014 ${cmd.direction} ${cmd.lots?.toFixed(2)} lots`);
+        log(s, 'info', `[BASKET] ${layerLabel} on ${cmd.symbol} — ${cmd.direction} ${cmd.lots?.toFixed(2)} lots`);
       });
       if (bridge && bridge.isConnected()) {
         bridge.queueCommand({
@@ -207,7 +208,7 @@ export class ExecutionEngine {
       }
     } else if (cmd.type === 'BASKET_CLOSE_ALL') {
       this.store.mutate((s) => {
-        log(s, 'success', `[BASKET] Profit target reached on ${cmd.symbol} \u2014 queuing BASKET_CLOSE_ALL`);
+        log(s, 'success', `[BASKET] Profit target reached on ${cmd.symbol} — queuing BASKET_CLOSE_ALL`);
       });
       if (bridge && bridge.isConnected()) {
         bridge.queueCommand({

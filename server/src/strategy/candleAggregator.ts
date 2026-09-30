@@ -91,6 +91,11 @@ export class CandleAggregator {
    * Injects completed candles (used for initial warm-up or testing).
    */
   seedCandles(symbolCode: string, candles: Candle[]): void {
+    if (!candles || candles.length === 0) return;
+    if (candles.length >= 10) {
+      this.candles.set(symbolCode, candles.slice(-MAX_CANDLES));
+      return;
+    }
     const history = this.candles.get(symbolCode) ?? [];
     history.push(...candles);
     if (history.length > MAX_CANDLES) {

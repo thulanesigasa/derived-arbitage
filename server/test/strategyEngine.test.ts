@@ -114,6 +114,21 @@ describe('FalconEngine', () => {
     expect(signal?.rrRatio).toBeGreaterThanOrEqual(2.5);
     expect(signal?.riskUsd).toBe(0.10);
   });
+
+  it('detects SMC trend alignment anchor setup for immediate Martingale entry', () => {
+    const candles: Candle[] = [
+      { timestamp: 1000, open: 100, high: 105, low: 95, close: 104, volume: 5 },
+      { timestamp: 2000, open: 104, high: 108, low: 102, close: 107, volume: 5 },
+      { timestamp: 3000, open: 107, high: 115, low: 106, close: 112, volume: 5 },
+      { timestamp: 4000, open: 112, high: 114, low: 109, close: 111, volume: 5 },
+      { timestamp: 5000, open: 111, high: 113, low: 108, close: 110, volume: 5 },
+      { timestamp: 6000, open: 110, high: 122, low: 109, close: 120, volume: 5 },
+    ];
+
+    const signal = FalconEngine.evaluate('Step Index', 'STEP', candles, 2.0, 115);
+    expect(signal).not.toBeNull();
+    expect(signal?.rrRatio).toBeGreaterThanOrEqual(2.5);
+  });
 });
 
 describe('ExecutionEngine', () => {

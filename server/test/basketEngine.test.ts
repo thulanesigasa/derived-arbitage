@@ -103,4 +103,20 @@ describe('BasketEngine', () => {
     expect(commands).toHaveLength(2);
     expect(commands[1]!.type).toBe('BASKET_CLOSE_ALL');
   });
+
+  it('allows trading on a $20 micro account with calibrated default minEquityUsd ($15.0)', () => {
+    const commands: BasketCommand[] = [];
+    const engine = new BasketEngine((cmd) => commands.push(cmd));
+
+    engine.openBasket('Step Index', 'BUY', 1000);
+    // Tick with $20 equity: should NOT trigger equity floor breach (15.0)
+    engine.onTick('Step Index', 1000.5, 20.0);
+
+    const basket = engine.getBasket('Step Index');
+    expect(basket?.isActive).toBe(true);
+
+    // Tick with equity dropping below $15.0 floor: triggers floor breach
+    engine.onTick('Step Index', 995, 14.9);
+    expect(engine.getBasket('Step Index')).toBeUndefined();
+  });
 });

@@ -28,7 +28,7 @@ export const DEFAULT_BASKET_CONFIG: BasketConfig = {
   lotMultiplier: 1.8,
   maxLayers: 6,
   layerStepPips: 8,
-  minEquityUsd: 500,
+  minEquityUsd: 15.0, // Calibrated to account equity floor (allows micro accounts to trade safely)
 };
 
 // ─── State ───────────────────────────────────────────────────────────────────
