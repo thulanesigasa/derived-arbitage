@@ -26,9 +26,19 @@ $MT5Dir = if ($env:MT5_DIR -and (Test-Path $env:MT5_DIR)) {
 
 if ($MT5Dir) {
     $MetaEditorExe = Join-Path $MT5Dir "metaeditor64.exe"
-    $ExpertsDir = Join-Path $MT5Dir "MQL5\Experts"
-    $IncludeDir = Join-Path $MT5Dir "MQL5\Include"
+    
+    # Auto-detect writable MQL5 directory (AppData Terminal roaming or Program Files)
+    $AppDataMQL5 = Get-ChildItem -Path "$env:APPDATA\MetaQuotes\Terminal\*\MQL5" -Directory -ErrorAction SilentlyContinue | Select-Object -First 1
+    $TargetMQL5 = if ($AppDataMQL5 -and (Test-Path $AppDataMQL5.FullName)) {
+        $AppDataMQL5.FullName
+    } else {
+        Join-Path $MT5Dir "MQL5"
+    }
 
+    $ExpertsDir = Join-Path $TargetMQL5 "Experts"
+    $IncludeDir = Join-Path $TargetMQL5 "Include"
+
+    Write-Host "Target MQL5 path: $TargetMQL5" -ForegroundColor Gray
     Write-Host "=== [3/4] Copying MQL5 source files ===" -ForegroundColor Cyan
     if (-not (Test-Path $ExpertsDir)) { New-Item -ItemType Directory -Path $ExpertsDir -Force | Out-Null }
     if (-not (Test-Path $IncludeDir)) { New-Item -ItemType Directory -Path $IncludeDir -Force | Out-Null }
@@ -40,8 +50,9 @@ if ($MT5Dir) {
     $Mq5File = Join-Path $ExpertsDir "FalconEA.mq5"
     $LogFile = Join-Path $ExpertsDir "FalconEA.log"
 
-    & $MetaEditorExe /compile:"$Mq5File" /log:"$LogFile"
+    Start-Process -FilePath $MetaEditorExe -ArgumentList "/compile:`"$Mq5File`" /log:`"$LogFile`"" -Wait
 
+    Start-Sleep -Seconds 1
     if (Test-Path $LogFile) {
         Write-Host "--- Compilation Log ---" -ForegroundColor Yellow
         Get-Content $LogFile
