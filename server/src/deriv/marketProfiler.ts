@@ -70,9 +70,10 @@ export class MarketProfiler {
   /** Fetches historical M1 candles from Deriv WS API to pre-seed strategy engine */
   async fetchHistoricalCandles(symbolCode: string, count = 50): Promise<Candle[]> {
     if (!this.client.connected) return [];
+    const apiCode = symbolCode === 'CRASH300' ? 'CRASH300N' : symbolCode;
     try {
       const resp = await this.client.send({
-        ticks_history: symbolCode,
+        ticks_history: apiCode,
         style: 'candles',
         granularity: 60,
         count,
@@ -206,7 +207,8 @@ export class MarketProfiler {
     this.unsubscribers = [];
 
     for (const sym of SYMBOL_MAP) {
-      const unsub = this.client.subscribeTicks(sym.code, (msg) => {
+      const apiCode = sym.code === 'CRASH300' ? 'CRASH300N' : sym.code;
+      const unsub = this.client.subscribeTicks(apiCode, (msg) => {
         const tick = msg['tick'] as {
           epoch:     number;
           ask?:      number;
