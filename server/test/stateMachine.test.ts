@@ -69,15 +69,16 @@ describe('risk guard', () => {
     expect(assessNewTrade(state, { risk: 0.1, marginUsagePercent: 10 })).toEqual({ allowed: true, reasons: [] });
   });
 
-  it('blocks hard-risk, margin, position, daily, weekly and equity-floor violations', () => {
+  it('blocks hard-risk, margin, position and equity-floor violations (daily/weekly locks disabled for Martingale)', () => {
     const state = createInitialState();
     state.status = 'running';
     state.equity = 15.1;
-    state.dailyPnl = -0.4;
-    state.weeklyPnl = -1;
+    state.dailyPnl = -0.4;  // no longer triggers lock
+    state.weeklyPnl = -1;   // no longer triggers lock
     state.positions.push({ id: 'sim-1', symbol: 'Step Index', side: 'SELL', risk: 0.1, marginUsed: 1, unrealizedPnl: 0, openedAt: new Date().toISOString(), simulated: true });
     const result = assessNewTrade(state, { risk: 0.21, marginUsagePercent: 21 });
     expect(result.allowed).toBe(false);
-    expect(result.reasons.length).toBeGreaterThanOrEqual(6);
+    // Remaining guards: hard-risk, margin, max-positions, equity-floor breach on trade
+    expect(result.reasons.length).toBeGreaterThanOrEqual(4);
   });
 });

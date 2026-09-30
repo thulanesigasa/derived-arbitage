@@ -178,10 +178,9 @@ export class ControllerStore {
 
   private assertCanRun(): void {
     if (this.state.selectedSymbols.length === 0) throw new TransitionError('Unable to place trades: Add instruments before running the EA.', 'NO_INSTRUMENTS');
-    if (this.state.equity <= this.state.riskPolicy.absoluteEquityFloor) throw new TransitionError('Cannot run: the $15 equity floor is active.', 'RISK_LOCK');
-    if (this.state.dailyPnl <= -this.state.riskPolicy.dailyLossLock) throw new TransitionError('Cannot run: daily loss lock is active.', 'RISK_LOCK');
-    if (this.state.weeklyPnl <= -this.state.riskPolicy.weeklyLossLock) throw new TransitionError('Cannot run: weekly loss lock is active.', 'RISK_LOCK');
-    if (this.state.drawdown >= this.state.riskPolicy.maximumTotalLoss) throw new TransitionError('Cannot run: maximum total loss is active.', 'RISK_LOCK');
+    // Martingale recovery: only absolute equity floor is a hard stop.
+    // Daily/weekly loss locks removed — Martingale sizing recovers all losses.
+    if (this.state.equity <= this.state.riskPolicy.absoluteEquityFloor) throw new TransitionError('Cannot run: absolute equity floor reached. Add funds to continue.', 'RISK_LOCK');
   }
 
   private assertRevision(expectedRevision: number): void {

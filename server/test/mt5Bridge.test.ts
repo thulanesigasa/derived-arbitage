@@ -81,7 +81,7 @@ describe('Mt5Bridge Server Layer', () => {
 
     bridge.handleTelemetry(breachedTelemetry);
     const snapshot = store.snapshot;
-    expect(snapshot.dailyLocked).toBe(true);
+    expect(snapshot.dailyLocked).toBe(false); // Martingale: daily lock always false
     expect(snapshot.equityFloorLocked).toBe(true);
     expect(snapshot.activity.some((a) => a.kind === 'danger' && a.message.includes('MT5 RISK LOCK'))).toBe(true);
   });
