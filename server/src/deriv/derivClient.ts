@@ -12,6 +12,7 @@ interface Pending {
 /**
  * Authenticated Deriv WebSocket client.
  *
+ * - Multi-candidate self-healing failover (api.derivws.com, ws.derivws.com, ws.binaryws.com).
  * - Correlates request/response pairs via req_id.
  * - Automatically re-subscribes tick streams after reconnect.
  * - Exponential backoff on disconnect (max 30 s).
@@ -28,15 +29,29 @@ export class DerivClient {
   private _connected       = false;
   private _authorized      = false;
   private connListeners    = new Set<(c: boolean) => void>();
+  private candidateUrls:   string[];
+  private currentUrlIndex  = 0;
 
   constructor(
     private readonly appId: string,
     private readonly token: string | null,
-    private readonly wsUrl = `wss://ws.derivws.com/websockets/v3?app_id=${appId || '1089'}`,
-  ) {}
+    wsUrl?: string,
+  ) {
+    const defaultCandidates = [
+      process.env.DERIV_WS_URL,
+      'wss://api.derivws.com/trading/v1/options/ws/public',
+      `wss://ws.derivws.com/websockets/v3?app_id=${appId || '1089'}`,
+      `wss://ws.binaryws.com/websockets/v3?app_id=${appId || '1089'}`,
+    ].filter((u): u is string => Boolean(u));
+
+    this.candidateUrls = wsUrl ? [wsUrl] : defaultCandidates;
+  }
 
   get connected()  { return this._connected; }
   get authorized() { return this._authorized; }
+  get currentWsUrl(): string {
+    return this.candidateUrls[this.currentUrlIndex % this.candidateUrls.length]!;
+  }
 
   /** Register a listener that fires whenever the connection state changes. */
   onConnectionChange(listener: (connected: boolean) => void): () => void {
@@ -48,11 +63,17 @@ export class DerivClient {
     if (this.disposed) return;
     if (this.ws?.readyState === WebSocket.OPEN) return;
 
-    console.log(`[DerivClient] Connecting → ${this.wsUrl}`);
-    this.ws = new WebSocket(this.wsUrl);
+    const url = this.currentWsUrl;
+    console.log(`[DerivClient] Connecting -> ${url}`);
+    this.ws = new WebSocket(url);
     this.ws.on('open',    ()  => { void this.handleOpen(); });
     this.ws.on('message', (d) => { this.handleMessage(d.toString()); });
-    this.ws.on('error',   (e) => { console.error('[DerivClient] Error:', e.message); });
+    this.ws.on('error',   (e) => {
+      console.error(`[DerivClient] Error on ${url}:`, e.message);
+      if (this.candidateUrls.length > 1) {
+        this.currentUrlIndex = (this.currentUrlIndex + 1) % this.candidateUrls.length;
+      }
+    });
     this.ws.on('close',   ()  => { this.handleClose(); });
   }
 
@@ -60,10 +81,10 @@ export class DerivClient {
     this.reconnectDelay = 2_000;
     this._connected = true;
     this.connListeners.forEach((l) => l(true));
-    console.log('[DerivClient] Connected');
+    console.log(`[DerivClient] Connected successfully to ${this.currentWsUrl}`);
 
     // Only send authorize on v3 WebSocket endpoints with non-PAT tokens
-    if (this.token && !this.token.startsWith('pat_') && !this.wsUrl.includes('/ws/public')) {
+    if (this.token && !this.token.startsWith('pat_') && !this.currentWsUrl.includes('/ws/public')) {
       try {
         const resp = await this.send({ authorize: this.token });
         if (resp['error']) throw new Error((resp['error'] as { message: string }).message);
@@ -97,7 +118,7 @@ export class DerivClient {
     this.pending.clear();
 
     if (this.disposed) return;
-    console.log(`[DerivClient] Disconnected — reconnecting in ${this.reconnectDelay}ms`);
+    console.log(`[DerivClient] Disconnected - reconnecting in ${this.reconnectDelay}ms`);
     this.reconnectTimer = setTimeout(() => {
       this.reconnectDelay = Math.min(this.reconnectDelay * 1.5, 30_000);
       this.connect();
