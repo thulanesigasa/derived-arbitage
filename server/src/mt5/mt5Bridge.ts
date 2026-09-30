@@ -134,6 +134,7 @@ export class Mt5Bridge {
       const incomingSymbols = new Set(incomingPositions.map((p) => p.symbol));
 
       for (const prev of previousPositions) {
+        if (prev.simulated) continue; // Keep simulated paper trades intact
         const stillOpen = incomingTickets.has(prev.id) || incomingSymbols.has(prev.symbol);
         if (!stillOpen) {
           const outcome = (prev.unrealizedPnl ?? 0) > 0 ? 'TP_HIT' : ((prev.unrealizedPnl ?? 0) < 0 ? 'SL_HIT' : 'MANUAL_CLOSE');
@@ -153,7 +154,7 @@ export class Mt5Bridge {
       }
 
       // Synchronize controller positions with live MT5 positions
-      state.positions = incomingPositions.map((mt5Pos) => {
+      const livePositions = incomingPositions.map((mt5Pos) => {
         const existing = previousPositions.find(
           (p) => p.id === String(mt5Pos.ticket) || p.symbol === mt5Pos.symbol
         );
@@ -178,6 +179,13 @@ export class Mt5Bridge {
         }
         return position;
       });
+
+      // Preserve active simulated positions that have not been replaced by a live MT5 position
+      const activeSimulated = previousPositions.filter(
+        (p) => p.simulated && !incomingPositions.some((mt5Pos) => mt5Pos.symbol === p.symbol)
+      );
+
+      state.positions = [...livePositions, ...activeSimulated];
 
       if (payload.balance > 0 && payload.margin > 0) {
         state.marginUsagePercent = Math.min(100, Math.round((payload.margin / payload.balance) * 100));
