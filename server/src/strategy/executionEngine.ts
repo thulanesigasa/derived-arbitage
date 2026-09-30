@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   Candle,
   ControllerState,
   SimulatedPosition,
@@ -13,6 +13,7 @@ import { ControllerStore, log } from '../stateMachine.js';
 import { CandleAggregator } from './candleAggregator.js';
 import { FalconEngine } from './falconEngine.js';
 import { SMCDetector, type SMCStructureAnalysis } from './smcDetector.js';
+import { BasketEngine, type BasketCommand, DEFAULT_BASKET_CONFIG } from './basketEngine.js';
 import { tradeJournalStore } from '../journal/tradeJournalStore.js';
 
 export class ExecutionEngine {
@@ -23,10 +24,15 @@ export class ExecutionEngine {
   private lastEntryTime = 0;
   /** Cooldown in ms between trades to prevent immediate duplicate executions */
   private readonly entryCooldownMs = 5_000;
+  /** Martingale basket manager — one basket per symbol */
+  private basketEngine: BasketEngine;
 
   constructor(store: ControllerStore, mt5Bridge?: Mt5Bridge) {
     this.store = store;
     this.mt5Bridge = mt5Bridge;
+    this.basketEngine = new BasketEngine((cmd: BasketCommand) => {
+      this.handleBasketCommand(cmd);
+    });
   }
 
   setMt5Bridge(bridge: Mt5Bridge): void {
@@ -82,6 +88,10 @@ export class ExecutionEngine {
 
     // 2. Manage open position exits & unrealized P&L for all positions on this symbol
     this.evaluatePositionsForSymbol(sym.display, quote);
+
+    // 2b. Martingale basket tick evaluation (runs regardless of automation status)
+    const tickEquity = this.store.snapshot.equity;
+    this.basketEngine.onTick(sym.display, quote, tickEquity);
 
     // 3. Evaluate new entries ONLY when automation is running
     if (state.status !== 'running') return;
@@ -140,16 +150,71 @@ export class ExecutionEngine {
       log(
         s,
         'info',
-        `[SMC ENGINE] Opened ${signal.side} on ${signal.symbol} @ ${signal.entryPrice.toFixed(2)} · SL: ${signal.stopLoss.toFixed(2)} · TP: ${signal.takeProfit.toFixed(2)} · Target: 1:${signal.rrRatio} R:R (Risk: $${signal.riskUsd})`
+        `[SMC ENGINE] Opened ${signal.side} on ${signal.symbol} @ ${signal.entryPrice.toFixed(2)} Â· SL: ${signal.stopLoss.toFixed(2)} Â· TP: ${signal.takeProfit.toFixed(2)} Â· Target: 1:${signal.rrRatio} R:R (Risk: $${signal.riskUsd})`
       );
     });
 
     // Record open trade in real-time Journal
     tradeJournalStore.recordTradeOpen(position);
 
-    // 6. Forward signal execution to MT5 terminal if bridge is actively connected
-    if (this.mt5Bridge && this.mt5Bridge.isConnected()) {
-      this.mt5Bridge.queueSignalExecution(signal);
+    // 6. Route signal through BasketEngine (it will issue BASKET_OPEN_LAYER commands)
+    this.basketEngine.openBasket(
+      signal.symbol,
+      signal.side,
+      signal.entryPrice,
+      {
+        profitTargetUsd: DEFAULT_BASKET_CONFIG.profitTargetUsd,
+        baseLots: 0.01,
+        lotMultiplier: 1.8,
+        maxLayers: 6,
+        layerStepPips: 8,
+        minEquityUsd: Math.max(state.riskPolicy.absoluteEquityFloor, DEFAULT_BASKET_CONFIG.minEquityUsd),
+      }
+    );
+  }
+
+  /** Expose basket state for API/UI consumption */
+  getBasketSnapshot() {
+    return this.basketEngine.getSnapshot();
+  }
+
+  /** Force-close basket on a symbol (emergency or manual) */
+  forceCloseBasket(symbol: SymbolName): void {
+    this.basketEngine.forceClose(symbol);
+  }
+
+  /**
+   * Translate BasketCommand into Mt5Bridge commands.
+   * Called internally every time BasketEngine emits a command.
+   */
+  private handleBasketCommand(cmd: BasketCommand): void {
+    const bridge = this.mt5Bridge;
+
+    if (cmd.type === 'BASKET_OPEN_LAYER') {
+      this.store.mutate((s) => {
+        const layerLabel = cmd.layerIndex === 0 ? 'ANCHOR' : `RECOVERY L${cmd.layerIndex}`;
+        log(s, 'info', `[BASKET] ${layerLabel} on ${cmd.symbol} \u2014 ${cmd.direction} ${cmd.lots?.toFixed(2)} lots`);
+      });
+      if (bridge && bridge.isConnected()) {
+        bridge.queueCommand({
+          type: 'EXECUTE_ORDER',
+          symbol: cmd.symbol,
+          direction: cmd.direction!,
+          lots: cmd.lots ?? 0.01,
+          stopLoss: 0,
+          takeProfit: 0,
+        });
+      }
+    } else if (cmd.type === 'BASKET_CLOSE_ALL') {
+      this.store.mutate((s) => {
+        log(s, 'success', `[BASKET] Profit target reached on ${cmd.symbol} \u2014 queuing BASKET_CLOSE_ALL`);
+      });
+      if (bridge && bridge.isConnected()) {
+        bridge.queueCommand({
+          type: 'BASKET_CLOSE_ALL',
+          symbol: cmd.symbol,
+        });
+      }
     }
   }
 
@@ -184,7 +249,7 @@ export class ExecutionEngine {
           log(
             s,
             'success',
-            `[TP HIT] Target reached on ${pos.symbol} @ ${currentPrice.toFixed(2)} · Realized +$${gain.toFixed(2)} (1:${pos.rrRatio ?? 2.5} R:R)`
+            `[TP HIT] Target reached on ${pos.symbol} @ ${currentPrice.toFixed(2)} Â· Realized +$${gain.toFixed(2)} (1:${pos.rrRatio ?? 2.5} R:R)`
           );
           continue;
         }
@@ -204,7 +269,7 @@ export class ExecutionEngine {
           log(
             s,
             'warning',
-            `[SL HIT] Stopped out on ${pos.symbol} @ ${currentPrice.toFixed(2)} · Loss -$${loss.toFixed(2)}`
+            `[SL HIT] Stopped out on ${pos.symbol} @ ${currentPrice.toFixed(2)} Â· Loss -$${loss.toFixed(2)}`
           );
           continue;
         }
@@ -219,3 +284,4 @@ export class ExecutionEngine {
     });
   }
 }
+

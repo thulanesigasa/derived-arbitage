@@ -5,7 +5,7 @@
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6?style=flat-square&logo=typescript)
 ![EAS Build](https://img.shields.io/badge/EAS_Build-Preview_APK-FF6B00?style=flat-square)
 ![OTA Updates](https://img.shields.io/badge/EAS_Updates-Active-0EA5E9?style=flat-square)
-![Tests](https://img.shields.io/badge/Tests-58%20Passed-22C55E?style=flat-square)
+![Tests](https://img.shields.io/badge/Tests-65%20Passed-22C55E?style=flat-square)
 
 A personal Android controller for a Deriv MT5 EA trading Volatility, Boom, Crash, and Step synthetic indices. This project is structured in validated phases — no live trading until every gate passes.
 
@@ -278,6 +278,7 @@ derived_arbitage/
 │   │   └── FalconEA.mq5           # Falcon FX & SMC Execution EA with timer & tick hooks
 │   └── Include/
 │       ├── RiskEngine.mqh         # Independent native risk engine ($15 floor, $0.40 loss lock)
+│       ├── BasketEngine.mqh       # Native Martingale basket executor (BASKET_OPEN_LAYER, BASKET_CLOSE_ALL)
 │       └── BridgeClient.mqh       # MQL5 WebRequest HTTP client for server bridge communication
 ├── src/
 │   ├── api.ts                     # Mobile <-> server REST/WS client with Bearer JWT injection
@@ -314,6 +315,7 @@ derived_arbitage/
     │   │   ├── candleAggregator.ts# M1/M5 candle reconstruction + dynamic ATR
     │   │   ├── smcDetector.ts     # Swing fractals, BOS, CHoCH, Fair Value Gaps
     │   │   ├── falconEngine.ts    # Falcon FX liquidity sweeps & continuation signals
+    │   │   ├── basketEngine.ts    # Martingale basket state machine, recovery layers & net P&L close
     │   │   └── executionEngine.ts # Real-time execution lifecycle, live tick P&L, TP/SL, journal hook
     │   └── mt5/                   # Phase 4: Server-side MT5 Bridge
     │       └── mt5Bridge.ts       # Telemetry ingestion, command queueing, real-time position journal sync
@@ -324,6 +326,7 @@ derived_arbitage/
         ├── tradeJournal.test.ts   # Real-time trade journal duration, P&L, and reflection synthesis tests
         ├── authBridge.test.ts     # Phase 5: JWT, API key, device binding, rate limiter tests
         └── activationGate.test.ts # Phase 6: 5-gate validation & Monte Carlo drawdown tests
+        └── basketEngine.test.ts   # Automated basket state machine & recovery layer tests
 ```
 
 ---
@@ -836,6 +839,27 @@ The Settings screen ([`src/screens/ProfileScreen.tsx`](file:///d:/workspace_prog
 5. **Single-Body Collapsible Accordions**: Expandable accordions directly inside the body for Privacy Policy, Terms of Service, Risk of Trading, Disclaimer, and System Audit Logs without full-screen modal interruptions.
 6. **Action Footer**: Prominent "Save Settings" button (persists to `AsyncStorage`) and "Reset to Defaults".
 
+---
 
+### 15. Martingale Basket Recovery Engine (Step Index & Synthetic Indices)
 
+The Martingale Basket Engine ([`server/src/strategy/basketEngine.ts`](file:///d:/workspace_programming/mobile_ea/derived-arbitage/server/src/strategy/basketEngine.ts) & [`mql5/Include/BasketEngine.mqh`](file:///d:/workspace_programming/mobile_ea/derived-arbitage/mql5/Include/BasketEngine.mqh)) provides an automated multi-layer position recovery system specifically optimized for ranging and step-like synthetic instruments such as Step Index (`stpRNG`):
+
+* **Anchor Layer Execution (`layerIndex: 0`)**:
+  - The first signal detected by the SMC / Falcon engine opens an anchor layer (`baseLots = 0.01` default) at the entry price.
+  - Generates a typed `BASKET_OPEN_LAYER` command dispatched to the MT5 bridge.
+* **Martingale Recovery Layer Sizing**:
+  - When price moves adversely by a configurable pip step (`layerStepPips = 8` pips), the engine computes the next recovery layer.
+  - Sizing formula: Lots = baseLots * (lotMultiplier ^ layerIndex) with a default multiplier of **1.8x** (e.g. `0.01` -> `0.02` -> `0.03` -> `0.06` -> `0.10` -> `0.19`).
+  - Strict safety cap: Maximum layers capped at `maxLayers = 6`.
+* **Dynamic Net Floating P&L Exit (`BASKET_CLOSE_ALL`)**:
+  - On every price tick, `BasketEngine.onTick` recalculates the cumulative net floating P&L across all active layers: NetPnL = sum(layer_i.unrealizedPnl).
+  - Once net floating P&L reaches the target profit (>= $1.50 USD default), the entire basket is closed simultaneously via `BASKET_CLOSE_ALL`.
+  - Immediate re-entry ready: Once a winning basket closes, the engine is immediately primed for the next qualified signal without artificial cooldown delays.
+* **Dual-Tier Capital Protection Invariants**:
+  - **Equity Floor Pre-Trade Guard**: If account equity falls below `minEquityUsd` (or the absolute equity floor), the engine immediately halts recovery layer additions and force-closes the basket (`EQUITY_FLOOR`).
+  - **Max Layers Adverse Move Defense**: If maximum layers (6) are exhausted and adverse drawdown exceeds 3x the profit target, the basket safely triggers `MAX_LAYERS_FORCE_CLOSE` to protect account balance.
+* **Native MQL5 BasketExecutor Integration**:
+  - `BasketEngine.mqh` tracks active slots per symbol inside MetaTrader 5 and links incoming command tickets to active layer IDs.
+  - Implements `CloseAllBySymbol` fallback guaranteeing all tickets belonging to the symbol are flattened cleanly even in high-velocity market conditions.
 

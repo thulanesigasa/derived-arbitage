@@ -1,4 +1,4 @@
-//+------------------------------------------------------------------+
+﻿//+------------------------------------------------------------------+
 //|                                                     FalconEA.mq5 |
 //|                                  Copyright 2026, Antigravity AI  |
 //|                                          https://deriv.com       |
@@ -14,6 +14,7 @@
 #include <Trade\SymbolInfo.mqh>
 #include "..\Include\RiskEngine.mqh"
 #include "..\Include\BridgeClient.mqh"
+#include "..\Include\BasketEngine.mqh"
 
 //+------------------------------------------------------------------+
 //| EA Inputs & User Configuration                                   |
@@ -214,27 +215,27 @@ void UpdateChartHUD()
 
    string hud = StringFormat(
       "==========================================================\n"
-      "   FALCON FX · SMC EXECUTION EA (%s)                      \n"
+      "   FALCON FX Â· SMC EXECUTION EA (%s)                      \n"
       "==========================================================\n"
       "  MODE: MULTI-SYMBOL MASTER (Trades all pairs from 1 chart)\n"
       "  ACCOUNT TELEMETRY:\n"
-      "    • Account: #%I64d | Server: %s\n"
-      "    • Equity: $%.2f | Balance: $%.2f | Free Margin: $%.2f\n"
-      "    • Margin Usage: %.1f%% | Peak Equity: $%.2f\n"
+      "    â€¢ Account: #%I64d | Server: %s\n"
+      "    â€¢ Equity: $%.2f | Balance: $%.2f | Free Margin: $%.2f\n"
+      "    â€¢ Margin Usage: %.1f%% | Peak Equity: $%.2f\n"
       "----------------------------------------------------------\n"
       "  INDEPENDENT RISK ENGINE (1000-LINE NATIVE SUITE):\n"
-      "    • Equity Floor ($%.2f | %.0f%%): %s ($%.2f)\n"
-      "    • Daily Loss Lock ($%.2f | %.1f%%): %s (Today: $%.2f)\n"
-      "    • Weekly P&L ($%.2f | %.1f%% Limit): $%.2f\n"
-      "    • Cumulative Drawdown ($%.2f | %.0f%% Limit): $%.2f\n"
-      "    • Loss Streak: %d / %d | Cooldown: %s\n"
-      "    • Open Positions: %d / %d\n"
+      "    â€¢ Equity Floor ($%.2f | %.0f%%): %s ($%.2f)\n"
+      "    â€¢ Daily Loss Lock ($%.2f | %.1f%%): %s (Today: $%.2f)\n"
+      "    â€¢ Weekly P&L ($%.2f | %.1f%% Limit): $%.2f\n"
+      "    â€¢ Cumulative Drawdown ($%.2f | %.0f%% Limit): $%.2f\n"
+      "    â€¢ Loss Streak: %d / %d | Cooldown: %s\n"
+      "    â€¢ Open Positions: %d / %d\n"
       "----------------------------------------------------------\n"
       "  NETWORK & BROKER STATUS:\n"
-      "    • Deriv Trade Server: %s\n"
-      "    • Bridge Connection: %s\n"
-      "    • Round-Trip Latency: %u ms | Failures: %d\n"
-      "    • Last Heartbeat: %s\n"
+      "    â€¢ Deriv Trade Server: %s\n"
+      "    â€¢ Bridge Connection: %s\n"
+      "    â€¢ Round-Trip Latency: %u ms | Failures: %d\n"
+      "    â€¢ Last Heartbeat: %s\n"
       "==========================================================\n",
       server_name,
       g_account.Login(),
@@ -449,7 +450,37 @@ void ProcessBridgeCommand(const BridgeCommand &cmd)
       return;
      }
 
-   // 4. PING
+   // 4. BASKET_CLOSE_ALL — close all martingale layers on a symbol
+   if(cmd.type == "BASKET_CLOSE_ALL")
+     {
+      string bsym = cmd.symbol;
+      string bid  = cmd.id;   // bridge reuses cmd.id as basket_id proxy
+      bool ok = g_basket.CloseAllBySymbol(bsym);
+      g_bridge.MarkCommandAsProcessed(cmd.id);
+      g_bridge.SendOrderResult(0, cmd.id, ok,
+                              ok ? "Basket closed successfully" : "Basket close had errors",
+                              0.0);
+      return;
+     }
+
+   // 5. BASKET_OPEN_LAYER — open a martingale recovery layer
+   if(cmd.type == "BASKET_OPEN_LAYER")
+     {
+      bool ok = g_basket.OpenLayer(
+         cmd.id,
+         cmd.symbol,
+         cmd.id,
+         0,
+         cmd.direction,
+         (cmd.lots > 0.0 ? cmd.lots : 0.01));
+      g_bridge.MarkCommandAsProcessed(cmd.id);
+      g_bridge.SendOrderResult(0, cmd.id, ok,
+                              ok ? "Basket layer opened" : "Basket layer failed",
+                              0.0);
+      return;
+     }
+
+   // 6. PING
    if(cmd.type == "PING")
      {
       g_bridge.MarkCommandAsProcessed(cmd.id);
@@ -525,7 +556,7 @@ void CheckAndApplyDynamicRisk(bool force = false)
 int OnInit()
   {
    Print("=================================================");
-   PrintFormat("       FALCON EA · %s BRIDGE          ", AccountInfoString(ACCOUNT_SERVER));
+   PrintFormat("       FALCON EA Â· %s BRIDGE          ", AccountInfoString(ACCOUNT_SERVER));
    Print("=================================================");
 
    // Enforce single master gateway instance across terminal charts
@@ -549,6 +580,7 @@ int OnInit()
 
    // Configure CTrade execution properties
    g_trade.SetExpertMagicNumber(InpMagicNumber);
+   g_basket.Init(InpMagicNumber, 20);
    g_trade.SetDeviationInPoints(20);
    g_trade.SetTypeFilling(ORDER_FILLING_IOC);
 
@@ -711,3 +743,4 @@ void OnTradeTransaction(const MqlTradeTransaction &trans,
      }
   }
 //+------------------------------------------------------------------+
+
