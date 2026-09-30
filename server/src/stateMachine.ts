@@ -58,6 +58,7 @@ function activity(kind: ActivityItem['kind'], message: string, now = new Date())
 
 export function log(state: ControllerState, kind: ActivityItem['kind'], message: string): void {
   state.activity = [activity(kind, message), ...state.activity].slice(0, 30);
+  console.log(`[${kind.toUpperCase()}] ${message}`);
 }
 
 export class ControllerStore {

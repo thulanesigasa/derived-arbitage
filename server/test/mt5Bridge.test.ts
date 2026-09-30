@@ -382,4 +382,45 @@ describe('Mt5Bridge Server Layer', () => {
     expect(receivedTicks).toHaveLength(4);
     expect(receivedTicks.map((t) => t.code)).toEqual(['R_100', 'R_75', 'stpRNG', 'BOOM1000']);
   });
+
+  it('preserves active simulated positions when incoming MT5 telemetry has empty openPositions', () => {
+    const store = new ControllerStore();
+    const bridge = new Mt5Bridge(store);
+
+    // Set an active simulated position in store
+    store.mutate((s) => {
+      s.positions = [
+        {
+          id: 'sim-trade-1',
+          symbol: 'Volatility 100 Index',
+          side: 'BUY',
+          risk: 0.20,
+          marginUsed: 1.0,
+          unrealizedPnl: 1.50,
+          openedAt: new Date().toISOString(),
+          simulated: true,
+          entryPrice: 620.0,
+          stopLoss: 615.0,
+          takeProfit: 632.5,
+          setupName: 'SMC_TREND_ALIGNMENT',
+        },
+      ];
+    });
+
+    // MT5 sends heartbeat with empty openPositions
+    bridge.handleTelemetry({
+      account: 9918231,
+      balance: 9500.0,
+      equity: 9500.0,
+      margin: 0,
+      freeMargin: 9500.0,
+      dailyPnlUsd: 0,
+      openPositions: [],
+    });
+
+    // Simulated position must still exist
+    expect(store.snapshot.positions).toHaveLength(1);
+    expect(store.snapshot.positions[0]!.id).toBe('sim-trade-1');
+    expect(store.snapshot.positions[0]!.simulated).toBe(true);
+  });
 });
