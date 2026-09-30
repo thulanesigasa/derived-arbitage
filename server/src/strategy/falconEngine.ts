@@ -166,6 +166,76 @@ export class FalconEngine {
       }
     }
 
+    // ───── Setup 5: SMC Trend & Momentum Alignment (Anchor for Martingale) ───────
+    if (smc.trend !== 'RANGING') {
+      const isBullish = smc.trend === 'BULLISH';
+      const slDistance = minSlDistance;
+      const sl = isBullish ? spotPrice - slDistance : spotPrice + slDistance;
+      const tp = isBullish ? spotPrice + (slDistance * this.MIN_RR) : spotPrice - (slDistance * this.MIN_RR);
+
+      return {
+        id: randomUUID(),
+        symbol,
+        symbolCode,
+        side: isBullish ? 'BUY' : 'SELL',
+        setupName: 'SMC_TREND_ALIGNMENT',
+        entryPrice: spotPrice,
+        stopLoss: sl,
+        takeProfit: tp,
+        riskUsd: this.RISK_USD,
+        rrRatio: this.MIN_RR,
+        confidence: 0.78,
+        createdAt: new Date().toISOString(),
+      };
+    }
+
+    // ───── Setup 6: SMC Range Mean-Reversion Anchor ──────────────────────────────
+    if (recentHigh && recentLow && recentHigh.price > recentLow.price) {
+      const mid = (recentHigh.price + recentLow.price) / 2;
+      const isBullish = spotPrice <= mid;
+      const slDistance = minSlDistance;
+      const sl = isBullish ? spotPrice - slDistance : spotPrice + slDistance;
+      const tp = isBullish ? spotPrice + (slDistance * this.MIN_RR) : spotPrice - (slDistance * this.MIN_RR);
+
+      return {
+        id: randomUUID(),
+        symbol,
+        symbolCode,
+        side: isBullish ? 'BUY' : 'SELL',
+        setupName: 'SMC_RANGE_EXPANSION',
+        entryPrice: spotPrice,
+        stopLoss: sl,
+        takeProfit: tp,
+        riskUsd: this.RISK_USD,
+        rrRatio: this.MIN_RR,
+        confidence: 0.75,
+        createdAt: new Date().toISOString(),
+      };
+    }
+
+    // ───── Setup 7: Fast Momentum Anchor (Immediate First Cycle Entry) ───────────
+    if (candles.length >= 2) {
+      const isBullish = spotPrice >= prev.close;
+      const slDistance = minSlDistance;
+      const sl = isBullish ? spotPrice - slDistance : spotPrice + slDistance;
+      const tp = isBullish ? spotPrice + (slDistance * this.MIN_RR) : spotPrice - (slDistance * this.MIN_RR);
+
+      return {
+        id: randomUUID(),
+        symbol,
+        symbolCode,
+        side: isBullish ? 'BUY' : 'SELL',
+        setupName: 'SMC_MOMENTUM_ANCHOR',
+        entryPrice: spotPrice,
+        stopLoss: sl,
+        takeProfit: tp,
+        riskUsd: this.RISK_USD,
+        rrRatio: this.MIN_RR,
+        confidence: 0.72,
+        createdAt: new Date().toISOString(),
+      };
+    }
+
     return null;
   }
 }

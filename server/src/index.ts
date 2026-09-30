@@ -22,7 +22,10 @@ const mt5Bridge       = new Mt5Bridge(store);
 const profiler        = new MarketProfiler(derivAppId, derivToken);
 const executionEngine = new ExecutionEngine(store, mt5Bridge);
 
-// Connect real-time tick stream to strategy execution engine (both Deriv WS and MT5 live terminal feed)
+// Connect real-time tick stream and historical candle seeding to strategy execution engine
+profiler.onCandles((symbolCode, candles) => {
+  executionEngine.getAggregator().seedCandles(symbolCode, candles);
+});
 profiler.onTick((symbolCode, quote, epoch, ask, bid) => {
   executionEngine.handleTick(symbolCode, quote, epoch, ask, bid);
 });
