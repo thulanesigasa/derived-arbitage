@@ -291,24 +291,31 @@ export default function App() {
 
   const performControl = useCallback(
     async (action: ControlAction) => {
-      if (!state || busy) return;
-      if (action === 'start' && state.selectedSymbols.length === 0) {
-        setNoInstrumentsModalVisible(true);
-        return;
-      }
+      if (busy) return;
       setBusy(true);
       setError(null);
       try {
-        const next = await sendControl(action, state.revision, requestId(action));
-        setState(next);
+        // Always fetch the latest revision first to avoid REVISION_CONFLICT
+        // when the app state is stale after a bridge restart or reconnect.
+        const fresh = await getState();
+        if (!mounted.current) return;
+        setState(fresh);
+        if (action === 'start' && fresh.selectedSymbols.length === 0) {
+          setNoInstrumentsModalVisible(true);
+          return;
+        }
+        const next = await sendControl(action, fresh.revision, requestId(action));
+        if (mounted.current) setState(next);
       } catch (caught) {
-        setError(caught instanceof Error ? caught.message : 'Control request failed.');
+        const msg = caught instanceof Error ? caught.message : 'Control request failed.';
+        setError(msg);
+        Alert.alert('Control Error', msg);
         await load(true);
       } finally {
         if (mounted.current) setBusy(false);
       }
     },
-    [busy, load, state]
+    [busy, load]
   );
 
   const setSymbolsList = useCallback(
