@@ -1,4 +1,4 @@
-export const ALL_SYMBOLS = [
+﻿export const ALL_SYMBOLS = [
   'Volatility 75 Index',
   'Volatility 100 Index',
   'Volatility 100 (1s) Index',
@@ -89,7 +89,7 @@ export interface ApiErrorShape {
   state?: ControllerState;
 }
 
-// ─── Market Profiler (Phase 2) ──────────────────────────────────────────────
+// â”€â”€â”€ Market Profiler (Phase 2) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export interface SymbolRiskConfig {
   riskPerTradeUsd:    number;
@@ -123,7 +123,7 @@ export interface ProfilerApiState {
   lastRefreshedAt:  string | null;
 }
 
-// ─── Strategy Engine (Phase 3) ──────────────────────────────────────────────
+// â”€â”€â”€ Strategy Engine (Phase 3) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export interface Candle {
   timestamp: number; // epoch ms
@@ -242,7 +242,7 @@ export interface Mt5TelemetryPayload {
 
 export interface Mt5Command {
   id: string;
-  type: 'EXECUTE_ORDER' | 'CLOSE_POSITION' | 'FLATTEN_ALL' | 'PING';
+  type: 'EXECUTE_ORDER' | 'CLOSE_POSITION' | 'FLATTEN_ALL' | 'BASKET_CLOSE_ALL' | 'PING';
   symbol?: string;
   direction?: 'BUY' | 'SELL';
   lots?: number;
@@ -266,7 +266,7 @@ export interface Mt5BridgeStatus {
   pendingCommandsCount: number;
 }
 
-// ─── Phase 4.5: Real-Time Trade Journal ─────────────────────────────────────
+// â”€â”€â”€ Phase 4.5: Real-Time Trade Journal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export type TradeOutcome = 'TP_HIT' | 'SL_HIT' | 'TRAILING_STOP' | 'MANUAL_CLOSE' | 'OPEN';
 
@@ -293,7 +293,7 @@ export interface TradeJournalEntry {
   isReal?: boolean;
 }
 
-// ─── Phase 5: Auth & Security Types ──────────────────────────────────────────
+// â”€â”€â”€ Phase 5: Auth & Security Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export interface AuthTokenResponse {
   token: string;
@@ -315,7 +315,7 @@ export interface AuthCredentials {
   deviceId: string;
 }
 
-// ─── Phase 6: Live Activation Gate Types ─────────────────────────────────────
+// â”€â”€â”€ Phase 6: Live Activation Gate Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export interface GateEvaluation {
   id: string;
@@ -345,4 +345,5 @@ export interface LiveActivationReport {
   demoPeriodDays: number;
   summary: string;
 }
+
 
