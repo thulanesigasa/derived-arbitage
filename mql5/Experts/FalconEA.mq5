@@ -69,6 +69,7 @@ input color    InpHUDColor             = clrDarkOrange;          // HUD Accent C
 CRiskEngine    g_risk;
 CBridgeClient  g_bridge;
 CTrade         g_trade;
+BasketExecutor g_basket;
 CAccountInfo   g_account;
 CPositionInfo  g_position;
 CSymbolInfo    g_symbol;

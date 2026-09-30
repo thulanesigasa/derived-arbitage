@@ -46,6 +46,7 @@ class BasketExecutor
   {
 private:
    CTrade            m_trade;
+   ulong             m_magic;
    Basket            m_baskets[MAX_BASKET_SYMBOLS];
    int               m_basket_count;
 
@@ -82,13 +83,20 @@ private:
      }
 
 public:
-   void              Init(int magic, int slippage_pts)
+   void              Init(ulong magic, int slippage_pts)
      {
+      m_magic = magic;
       m_trade.SetExpertMagicNumber(magic);
       m_trade.SetDeviationInPoints(slippage_pts);
       m_trade.SetTypeFilling(ORDER_FILLING_IOC);
       m_basket_count = 0;
-      ArrayInitialize(m_baskets, (Basket){});
+      for(int i = 0; i < MAX_BASKET_SYMBOLS; i++)
+        {
+         m_baskets[i].symbol = "";
+         m_baskets[i].active = false;
+         m_baskets[i].basket_id = "";
+         m_baskets[i].layer_count = 0;
+        }
      }
 
    //+----------------------------------------------------------------+
@@ -184,7 +192,7 @@ public:
         {
          ulong ticket = PositionGetTicket(i);
          if(PositionGetString(POSITION_SYMBOL) != symbol) continue;
-         if(PositionGetInteger(POSITION_MAGIC) != m_trade.RequestMagic()) continue;
+         if(m_magic > 0 && PositionGetInteger(POSITION_MAGIC) != m_magic) continue;
          if(!m_trade.PositionClose(ticket, 20))
            {
             PrintFormat("[BasketExecutor] CloseAllBySymbol failed ticket #%I64u: %s", ticket, m_trade.ResultComment());
