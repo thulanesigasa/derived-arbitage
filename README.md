@@ -861,7 +861,7 @@ The Settings screen ([`src/screens/ProfileScreen.tsx`](file:///d:/workspace_prog
 The Martingale Basket Engine ([`server/src/strategy/basketEngine.ts`](file:///d:/workspace_programming/mobile_ea/derived-arbitage/server/src/strategy/basketEngine.ts) & [`mql5/Include/BasketEngine.mqh`](file:///d:/workspace_programming/mobile_ea/derived-arbitage/mql5/Include/BasketEngine.mqh)) provides an automated multi-layer position recovery system specifically optimized for ranging and step-like synthetic instruments such as Step Index (`stpRNG`):
 
 * **Anchor Layer Execution (`layerIndex: 0`)**:
-  - The first signal detected by the SMC / Falcon engine opens an anchor layer (`baseLots = 0.01` default) at the entry price.
+  - The first signal detected by the SMC / Falcon engine opens an anchor layer with broker-calibrated base lots via `getSymbolMinLot()` (e.g. `0.20` for Boom/Crash/Vol 100, `0.10` for Step Index, `0.001` for Vol 75) normalized dynamically via `g_risk.NormalizeLot()` in MT5 to eliminate broker `invalid volume` (10014) rejections.
   - Generates a typed `BASKET_OPEN_LAYER` command dispatched to the MT5 bridge.
 * **Martingale Recovery Layer Sizing**:
   - When price moves adversely by a configurable pip step (`layerStepPips = 8` pips), the engine computes the next recovery layer.

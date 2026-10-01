@@ -35,3 +35,40 @@ export const CODE_TO_SYMBOL = new Map<string, DerivSymbol>(
 export const DISPLAY_TO_CODE = new Map<SymbolName, string>(
   SYMBOL_MAP.map((s) => [s.display, s.code]),
 );
+
+/**
+ * Broker-calibrated minimum volume specification for MetaTrader 5 on Deriv synthetic indices.
+ * Ensures orders dispatched to the terminal never fail with invalid volume.
+ */
+export function getSymbolMinLot(symbol: SymbolName | string): number {
+  switch (symbol) {
+    case 'Volatility 75 Index':
+    case 'R_75':
+      return 0.001;
+    case 'Volatility 100 (1s) Index':
+    case '1HZ100V':
+      return 0.10;
+    case 'Step Index':
+    case 'stpRNG':
+      return 0.10;
+    case 'Volatility 10 Index':
+    case 'R_10':
+      return 0.30;
+    case 'Volatility 50 Index':
+    case 'R_50':
+      return 0.50;
+    case 'Boom 500 Index':
+    case 'BOOM500':
+    case 'Boom 1000 Index':
+    case 'BOOM1000':
+    case 'Crash 500 Index':
+    case 'CRASH500':
+    case 'Crash 100 Index':
+    case 'CRASH300':
+    case 'CRASH100':
+    case 'Volatility 100 Index':
+    case 'R_100':
+    default:
+      return 0.20;
+  }
+}

@@ -405,11 +405,15 @@ void ProcessBridgeCommand(const BridgeCommand &cmd)
            }
         }
 
-      // Dynamic Fractional Lot Sizing Calculation
+      // Dynamic Fractional Lot Sizing Calculation & Broker Minimum Volume Normalization
       double calculated_lots = cmd.lots;
       if(calculated_lots <= 0.0)
         {
          calculated_lots = g_risk.CalculateLots(symbol, g_risk.GetConfig().default_risk_per_trade, price, sl);
+        }
+      else
+        {
+         calculated_lots = g_risk.NormalizeLot(symbol, calculated_lots);
         }
 
       // Pre-trade Invariant & Circuit Breaker Validation

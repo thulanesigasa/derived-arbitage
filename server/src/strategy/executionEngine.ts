@@ -7,7 +7,7 @@ import { randomUUID } from 'node:crypto';
   StrategySignal,
   SymbolName,
 } from '../../../src/types.js';
-import { SYMBOL_MAP } from '../deriv/symbolMap.js';
+import { SYMBOL_MAP, getSymbolMinLot } from '../deriv/symbolMap.js';
 import type { Mt5Bridge } from '../mt5/mt5Bridge.js';
 import { assessNewTrade } from '../risk.js';
 import { ControllerStore, log } from '../stateMachine.js';
@@ -158,14 +158,15 @@ export class ExecutionEngine {
     // Record open trade in real-time Journal
     tradeJournalStore.recordTradeOpen(position);
 
-    // 6. Route signal through BasketEngine (it will issue BASKET_OPEN_LAYER commands)
+    // 6. Route signal through BasketEngine with broker-accurate base lot sizing
+    const baseLots = getSymbolMinLot(signal.symbol);
     this.basketEngine.openBasket(
       signal.symbol,
       signal.side,
       signal.entryPrice,
       {
         profitTargetUsd: DEFAULT_BASKET_CONFIG.profitTargetUsd,
-        baseLots: 0.01,
+        baseLots,
         lotMultiplier: 1.8,
         maxLayers: 6,
         layerStepPips: 8,
@@ -192,16 +193,18 @@ export class ExecutionEngine {
     const bridge = this.mt5Bridge;
 
     if (cmd.type === 'BASKET_OPEN_LAYER') {
+      const minLot = getSymbolMinLot(cmd.symbol);
+      const effectiveLots = cmd.lots ?? minLot;
       this.store.mutate((s) => {
         const layerLabel = cmd.layerIndex === 0 ? 'ANCHOR' : `RECOVERY L${cmd.layerIndex}`;
-        log(s, 'info', `[BASKET] ${layerLabel} on ${cmd.symbol} — ${cmd.direction} ${cmd.lots?.toFixed(2)} lots`);
+        log(s, 'info', `[BASKET] ${layerLabel} on ${cmd.symbol} — ${cmd.direction} ${effectiveLots.toFixed(effectiveLots < 0.01 ? 3 : 2)} lots`);
       });
       if (bridge && bridge.isConnected()) {
         bridge.queueCommand({
           type: 'EXECUTE_ORDER',
           symbol: cmd.symbol,
           direction: cmd.direction!,
-          lots: cmd.lots ?? 0.01,
+          lots: effectiveLots,
           stopLoss: 0,
           takeProfit: 0,
         });
