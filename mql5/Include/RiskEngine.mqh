@@ -602,7 +602,7 @@ void CRiskEngine::SetDefaultConfig()
    m_config.hard_max_risk_per_trade    = 0.20;
    m_config.max_open_positions         = 15;
    m_config.max_margin_usage_percent   = 20.0;
-   m_config.max_spread_points          = 600.0;
+   m_config.max_spread_points          = 50000.0;
    m_config.max_consecutive_losses     = 3;
    m_config.cooldown_duration_sec      = 3600;
    m_config.max_daily_trades           = 100;
@@ -825,6 +825,7 @@ bool CRiskEngine::CheckMarginCeiling(string symbol, ENUM_ORDER_TYPE order_type, 
 //+------------------------------------------------------------------+
 bool CRiskEngine::CheckSpreadGuard(string symbol)
   {
+   if(m_config.max_spread_points <= 0.0) return true;
    double spread = m_spec.GetSpreadPoints(symbol);
    if(spread > m_config.max_spread_points)
      {
@@ -911,7 +912,7 @@ ENUM_RISK_BREACH_REASON CRiskEngine::CheckRiskLimits()
      }
 
    // 5. POST-LOSS CONSECUTIVE STREAK COOLDOWN (3 losses in a row)
-   if(m_metrics.consecutive_losses >= m_config.max_consecutive_losses && !m_metrics.cooldown_active)
+   if(m_config.max_consecutive_losses > 0 && m_metrics.consecutive_losses >= m_config.max_consecutive_losses && !m_metrics.cooldown_active)
      {
       m_metrics.cooldown_active = true;
       m_metrics.cooldown_expiry = TimeCurrent() + m_config.cooldown_duration_sec;
