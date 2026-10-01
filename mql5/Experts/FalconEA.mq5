@@ -34,7 +34,7 @@ input double   InpMaxWeeklyLossPercent = 3.0;                    // Maximum Week
 input double   InpMaxTotalLossPercent  = 10.0;                   // Maximum Total Drawdown (% of balance, e.g. 10.0%)
 input double   InpRiskPerTradePercent  = 0.2;                    // Target Risk Per Trade (% of balance, e.g. 0.2% = Hard Max Risk)
 input double   InpHardRiskTradePercent = 0.2;                    // Hard Max Risk Per Trade (% of balance, e.g. 0.2%)
-input int      InpMaxPositions         = 15;                     // Max Simultaneous Positions (15)
+input int      InpMaxPositions         = 50;                     // Max Simultaneous Positions (15)
 
 input group "=== Manual Override Limits (if Dynamic Mode = false) ==="
 input double   InpEquityFloor          = 8500.00;                // Manual Equity Floor ($)
@@ -50,6 +50,7 @@ input double   InpMaxMarginPercent     = 20.0;                   // Margin Usage
 input double   InpMaxSpreadPoints      = 50000.0;                // Max Allowable Spread in points (0 to disable)
 input int      InpMaxLossStreak        = 0;                      // Consecutive Loss Circuit Breaker (0 to disable for Martingale)
 input int      InpCooldownSec          = 3600;                   // Cooldown Period (seconds)
+input double   InpMaxTradeLoss         = 0.50;                   // Max Single Trade Loss Cut ($0.50, 0 to disable)
 
 input group "=== Active Position Defense ==="
 input bool     InpBreakEvenEnabled     = true;                   // Enable Break-Even Protection
@@ -543,6 +544,20 @@ void CheckAndApplyDynamicRisk(bool force = false)
    if(config.hard_max_risk_per_trade < 0.10) config.hard_max_risk_per_trade = 0.10;
    if(config.max_open_positions < 1) config.max_open_positions = 1;
 
+   // Preserve execution and defense settings across dynamic balance recalibration
+   config.max_spread_points          = InpMaxSpreadPoints;
+   config.max_consecutive_losses     = InpMaxLossStreak;
+   config.cooldown_duration_sec      = InpCooldownSec;
+   config.max_daily_trades           = 100;
+   config.max_trade_loss             = InpMaxTradeLoss;
+   config.require_hard_sl            = true;
+   config.break_even_enabled         = InpBreakEvenEnabled;
+   config.break_even_trigger_rr      = InpBreakEvenTriggerRR;
+   config.break_even_offset_points   = InpBreakEvenOffsetPts;
+   config.trailing_stop_enabled      = InpTrailingEnabled;
+   config.trailing_step_points       = InpTrailingStepPts;
+   config.trailing_distance_points   = InpTrailingDistPts;
+
    g_risk.UpdateConfig(config);
    g_last_scaled_balance = cur_bal;
 
@@ -624,6 +639,7 @@ int OnInit()
    config.max_consecutive_losses     = InpMaxLossStreak;
    config.cooldown_duration_sec      = InpCooldownSec;
    config.max_daily_trades           = 100;
+   config.max_trade_loss             = InpMaxTradeLoss;
    config.require_hard_sl            = true;
    config.break_even_enabled         = InpBreakEvenEnabled;
    config.break_even_trigger_rr      = InpBreakEvenTriggerRR;

@@ -79,7 +79,7 @@ const OFFLINE_FALLBACK_STATE: ControllerState = {
     hardMaxRiskPerTrade: 20,
     dailyLossLock: 100,
     weeklyLossLock: 300,
-    maxOpenPositions: 15,
+    maxOpenPositions: 50,
     maxMarginUsagePercent: 20,
   },
   dailyLocked: false,
