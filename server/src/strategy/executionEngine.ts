@@ -283,8 +283,11 @@ export class ExecutionEngine {
         pos.unrealizedPnl = normalizedPnl;
       }
 
-      const totalUnrealized = s.positions.reduce((acc, p) => acc + (p.unrealizedPnl ?? 0), 0);
-      s.equity = Math.round((s.balance + totalUnrealized) * 100) / 100;
+      // Only simulate equity from memory if MT5 bridge is not actively connected and providing live broker equity
+      if (!this.mt5Bridge || !this.mt5Bridge.isConnected()) {
+        const totalUnrealized = s.positions.reduce((acc, p) => acc + (p.unrealizedPnl ?? 0), 0);
+        s.equity = Math.round((s.balance + totalUnrealized) * 100) / 100;
+      }
     });
   }
 }

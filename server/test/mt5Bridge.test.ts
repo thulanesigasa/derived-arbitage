@@ -383,11 +383,11 @@ describe('Mt5Bridge Server Layer', () => {
     expect(receivedTicks.map((t) => t.code)).toEqual(['R_100', 'R_75', 'stpRNG', 'BOOM1000']);
   });
 
-  it('preserves active simulated positions when incoming MT5 telemetry has empty openPositions', () => {
+  it('synchronizes controller positions 1:1 with live MT5 telemetry when connected', () => {
     const store = new ControllerStore();
     const bridge = new Mt5Bridge(store);
 
-    // Set an active simulated position in store
+    // Set a prior stale simulated position in store
     store.mutate((s) => {
       s.positions = [
         {
@@ -407,7 +407,7 @@ describe('Mt5Bridge Server Layer', () => {
       ];
     });
 
-    // MT5 sends heartbeat with empty openPositions
+    // MT5 sends heartbeat with empty openPositions (no open trades on broker)
     bridge.handleTelemetry({
       account: 9918231,
       balance: 9500.0,
@@ -421,9 +421,7 @@ describe('Mt5Bridge Server Layer', () => {
       openPositions: [],
     });
 
-    // Simulated position must still exist
-    expect(store.snapshot.positions).toHaveLength(1);
-    expect(store.snapshot.positions[0]!.id).toBe('sim-trade-1');
-    expect(store.snapshot.positions[0]!.simulated).toBe(true);
+    // When connected, controller positions must strictly match MT5 openPositions
+    expect(store.snapshot.positions).toHaveLength(0);
   });
 });

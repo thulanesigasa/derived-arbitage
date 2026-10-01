@@ -180,12 +180,8 @@ export class Mt5Bridge {
         return position;
       });
 
-      // Preserve active simulated positions that have not been replaced by a live MT5 position
-      const activeSimulated = previousPositions.filter(
-        (p) => p.simulated && !incomingPositions.some((mt5Pos) => mt5Pos.symbol === p.symbol)
-      );
-
-      state.positions = [...livePositions, ...activeSimulated];
+      // Pure 1:1 MT5 synchronization: when MT5 is connected, controller positions reflect live MT5 terminal positions exactly
+      state.positions = livePositions;
 
       if (payload.balance > 0 && payload.margin > 0) {
         state.marginUsagePercent = Math.min(100, Math.round((payload.margin / payload.balance) * 100));
