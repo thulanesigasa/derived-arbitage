@@ -545,6 +545,10 @@ public:
    ENUM_RISK_BREACH_REASON    CheckRiskLimits();
    bool                       ValidateNewOrder(string symbol, ENUM_ORDER_TYPE order_type, double volume, double price, double sl, double tp, ENUM_RISK_BREACH_REASON &reject_reason);
    double                     CalculateLots(string symbol, double dollar_risk, double entry_price, double sl_price);
+   double                     NormalizeLot(string symbol, double raw_lots) { return m_spec.NormalizeLot(symbol, raw_lots); }
+   double                     GetMinLot(string symbol) { return m_spec.GetMinLot(symbol); }
+   double                     GetMaxLot(string symbol) { return m_spec.GetMaxLot(symbol); }
+   double                     GetLotStep(string symbol) { return m_spec.GetLotStep(symbol); }
    void                       EmergencyFlatten(string reason);
 
    //--- Active position defense
