@@ -47,8 +47,8 @@ input double   InpHardMaxRiskPerTrade  = 20.00;                  // Manual Hard 
 
 input group "=== Trade Risk & Execution Guardrails ==="
 input double   InpMaxMarginPercent     = 20.0;                   // Margin Usage Ceiling (%)
-input double   InpMaxSpreadPoints      = 600.0;                  // Max Allowable Spread (points)
-input int      InpMaxLossStreak        = 3;                      // Consecutive Loss Circuit Breaker
+input double   InpMaxSpreadPoints      = 50000.0;                // Max Allowable Spread in points (0 to disable)
+input int      InpMaxLossStreak        = 0;                      // Consecutive Loss Circuit Breaker (0 to disable for Martingale)
 input int      InpCooldownSec          = 3600;                   // Cooldown Period (seconds)
 
 input group "=== Active Position Defense ==="
