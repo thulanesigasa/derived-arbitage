@@ -138,7 +138,10 @@ export type SetupType =
   | 'SMC_BOS_CONTINUATION'
   | 'SMC_CHOCH_REVERSAL'
   | 'FALCON_LIQUIDITY_SWEEP'
-  | 'SMC_FVG_RETEST';
+  | 'SMC_FVG_RETEST'
+  | 'SMC_TREND_ALIGNMENT'
+  | 'SMC_RANGE_EXPANSION'
+  | 'SMC_MOMENTUM_ANCHOR';
 
 export interface StrategySignal {
   id:         string;

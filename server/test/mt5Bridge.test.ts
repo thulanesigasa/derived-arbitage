@@ -415,6 +415,9 @@ describe('Mt5Bridge Server Layer', () => {
       margin: 0,
       freeMargin: 9500.0,
       dailyPnlUsd: 0,
+      riskLocked: false,
+      equityFloorLocked: false,
+      terminalTime: new Date().toISOString(),
       openPositions: [],
     });
 
