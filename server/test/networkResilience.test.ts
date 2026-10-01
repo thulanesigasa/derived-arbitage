@@ -4,7 +4,7 @@ export function normalizeBaseUrl(value: string): string {
   return value.trim().replace(/\/+$/, '');
 }
 
-export const DEFAULT_PRODUCTION_BRIDGE_URL = 'https://due-flickr-replied-encourage.trycloudflare.com';
+export const DEFAULT_PRODUCTION_BRIDGE_URL = 'https://jewelry-clouds-karl-pvc.trycloudflare.com';
 export const FALLBACK_VPS_IP_URL = 'http://92.4.143.117:4000';
 
 export function buildCandidateList(activeUrl: string, detectedIp?: string): string[] {
@@ -154,8 +154,8 @@ describe('Network & Connection Resilience', () => {
       return token ? `${wsBase}/ws?token=${token}` : `${wsBase}/ws?apiKey=${apiKey}`;
     }
 
-    expect(stateSocketUrl('https://due-flickr-replied-encourage.trycloudflare.com')).toBe(
-      'wss://due-flickr-replied-encourage.trycloudflare.com/ws?apiKey=deriv-bridge-key'
+    expect(stateSocketUrl('https://jewelry-clouds-karl-pvc.trycloudflare.com')).toBe(
+      'wss://jewelry-clouds-karl-pvc.trycloudflare.com/ws?apiKey=deriv-bridge-key'
     );
     expect(stateSocketUrl('http://92.4.143.117:4000')).toBe(
       'ws://92.4.143.117:4000/ws?apiKey=deriv-bridge-key'
