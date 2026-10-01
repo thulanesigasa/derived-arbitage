@@ -64,6 +64,7 @@ struct RiskConfig
    int               max_consecutive_losses;     // Consecutive loss limit before cooldown (3)
    int               cooldown_duration_sec;      // Cooldown duration in seconds (3600 = 1 hr)
    int               max_daily_trades;           // Max trades allowed per day (15)
+   double            max_trade_loss;             // Maximum allowable loss on a single trade before cut ($0.50)
    bool              require_hard_sl;            // Enforce mandatory stop loss on all entries
    bool              break_even_enabled;         // Enable dynamic break-even protection
    double            break_even_trigger_rr;      // R:R threshold to trigger break-even (1.5 R)
@@ -610,6 +611,7 @@ void CRiskEngine::SetDefaultConfig()
    m_config.max_consecutive_losses     = 3;
    m_config.cooldown_duration_sec      = 3600;
    m_config.max_daily_trades           = 100;
+   m_config.max_trade_loss             = 0.50;
    m_config.require_hard_sl            = true;
    m_config.break_even_enabled         = true;
    m_config.break_even_trigger_rr      = 1.5;
@@ -1112,6 +1114,18 @@ void CRiskEngine::EmergencyFlatten(string reason)
          if(m_position.SelectByIndex(i))
            {
             ulong ticket = m_position.Ticket();
+         // 0. Single-trade hard loss cut defense ($0.50 limit)
+         if(m_config.max_trade_loss > 0.0)
+           {
+            double pos_profit = m_position.Profit() + m_position.Swap();
+            if(pos_profit <= -m_config.max_trade_loss)
+              {
+               PrintFormat("[RiskEngine] Per-trade loss cutoff triggered on ticket #%I64u (%s): Profit=$%.2f <= -$%.2f. Closing immediately.",
+                           ticket, m_position.Symbol(), pos_profit, m_config.max_trade_loss);
+               m_trade.PositionClose(ticket, 20);
+               continue;
+              }
+           }
             string sym = m_position.Symbol();
             PrintFormat("[RiskEngine] Closing position #%I64u (%s) due to emergency flatten...", ticket, sym);
 
@@ -1157,6 +1171,18 @@ void CRiskEngine::RunPositionDefense()
       if(m_position.SelectByIndex(i))
         {
          ulong ticket = m_position.Ticket();
+         // 0. Single-trade hard loss cut defense ($0.50 limit)
+         if(m_config.max_trade_loss > 0.0)
+           {
+            double pos_profit = m_position.Profit() + m_position.Swap();
+            if(pos_profit <= -m_config.max_trade_loss)
+              {
+               PrintFormat("[RiskEngine] Per-trade loss cutoff triggered on ticket #%I64u (%s): Profit=$%.2f <= -$%.2f. Closing immediately.",
+                           ticket, m_position.Symbol(), pos_profit, m_config.max_trade_loss);
+               m_trade.PositionClose(ticket, 20);
+               continue;
+              }
+           }
 
          // 1. Break-even defense
          if(m_config.break_even_enabled)

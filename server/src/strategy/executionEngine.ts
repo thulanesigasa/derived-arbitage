@@ -24,7 +24,7 @@ export class ExecutionEngine {
   private recentSignals: StrategySignal[] = [];
   private lastEntryTime = 0;
   /** Cooldown in ms between trades to prevent immediate duplicate executions */
-  private readonly entryCooldownMs = 5_000;
+  private readonly entryCooldownMs = 1_000;
   /** Martingale basket manager — one basket per symbol */
   private basketEngine: BasketEngine;
 
@@ -99,9 +99,9 @@ export class ExecutionEngine {
     if (!state.selectedSymbols.includes(sym.display)) return;
     if (state.positions.length >= state.riskPolicy.maxOpenPositions) return;
 
-    // Concurrency guard: up to 2 concurrent setups per symbol, overall capped by maxOpenPositions (15)
+    // Concurrency guard: up to 10 concurrent setups per symbol, overall capped by maxOpenPositions
     const symbolPositions = state.positions.filter((p) => p.symbol === sym.display);
-    if (symbolPositions.length >= 2) return;
+    if (symbolPositions.length >= 10) return;
 
     const now = Date.now();
     if (now - this.lastEntryTime < this.entryCooldownMs) return;

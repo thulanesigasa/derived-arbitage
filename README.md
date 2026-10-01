@@ -729,10 +729,15 @@ sequenceDiagram
 ### 8. High-Capacity Concurrent Arbitrage (15 Simultaneous Positions)
 
 To capitalize on synthetic index arbitrage discrepancies across multiple uncorrelated assets:
-* **Concurrent Capacity (`maxOpenPositions = 15`)**: The execution engine and MQL5 Risk Engine permit up to 15 concurrent open positions simultaneously (with up to 2 concurrent setups per symbol).
+* **Concurrent Capacity (`maxOpenPositions = 50`)**: The execution engine and MQL5 Risk Engine permit up to 50 concurrent open positions simultaneously (with up to 10 concurrent setups per symbol).
 * **Hard Maximum Risk Calibration ($20 / trade)**: Each trade entry is calibrated directly to the Hard Maximum Risk ($20.00 on a $10,000 balance, exactly 0.20%), ensuring maximal capital efficiency without breaching account safety rules.
 * **Portfolio Risk Harmonization**: 15 concurrent positions × $20.00 = $300.00 maximum aggregate exposure, perfectly aligned with the $300.00 Weekly Loss Lock (3.0%) and comfortably above the $8,500.00 Absolute Equity Floor (85.0%).
-* **Rapid Cooldown (5,000 ms)**: New setup evaluation cooldown is reduced to 5 seconds to support high-frequency fills across simultaneous market opportunities.
+* **Rapid Cooldown (1,000 ms)**: New setup evaluation cooldown is reduced to 1 second to support high-frequency fills across simultaneous market opportunities.
+
+### 9. Individual Trade Micro-Loss Cut & Concurrency Scaling
+* **Per-Trade Loss Cut (.50)**: Both the MT5 Expert (InpMaxTradeLoss = 0.50) and Node.js bridge monitor every open position in real time. If any single trade reaches -.40 to -.50 loss (e.g., Step Index at 0.10 lots drifting 4-5 ticks adverse), the trade is immediately cut and closed via CLOSE_POSITION. This prevents open drawdowns from accumulating, enabling the strategy to cycle through fresh setups without taking large losses.
+* **Expanded Concurrency Capacity (maxOpenPositions = 50)**: Concurrency limit is elevated to 50 simultaneous positions with up to 10 setups per symbol and a reduced 1-second cooldown, giving the automated strategy total freedom to execute and scale across all synthetic pairs (Volatility 10/25/50/75/100, Boom, Crash, and Step Index).
+* **MQL5 Dynamic Recalibration Protection**: CheckAndApplyDynamicRisk() retains max_spread_points, max_trade_loss, break-even, and trailing stop defense parameters when account balance scales, preventing spurious reason-code 7 spread rejects.
 
 ---
 

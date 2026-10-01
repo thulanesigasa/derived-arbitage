@@ -110,7 +110,7 @@ export class Mt5Bridge {
 
       // Dynamic scaling for standard/demo accounts ($1,000 - $10,000+)
       if (payload.balance >= 1000) {
-        const firstScale = state.riskPolicy.maxOpenPositions !== 15;
+        const firstScale = state.riskPolicy.maxOpenPositions !== 50;
         state.accountType = 'Standard';
         state.riskPolicy.initialBalance = payload.balance;
         state.riskPolicy.absoluteEquityFloor = Math.round(payload.balance * 0.85); // 85% equity floor ($8,500 on $10k)
@@ -119,7 +119,7 @@ export class Mt5Bridge {
         state.riskPolicy.hardMaxRiskPerTrade = Math.round(payload.balance * 0.002); // 0.2% ($20 on $10k)
         state.riskPolicy.dailyLossLock = Math.round(payload.balance * 0.01);       // 1.0% ($100 on $10k)
         state.riskPolicy.weeklyLossLock = Math.round(payload.balance * 0.03);      // 3.0% ($300 on $10k)
-        state.riskPolicy.maxOpenPositions = 15;                                    // Up to 15 concurrent positions
+        state.riskPolicy.maxOpenPositions = 50;                                    // Up to 15 concurrent positions
         if (firstScale) {
           log(state, 'info', `[MT5 BRIDGE] Adaptive Risk Policy scaled for $${payload.balance.toFixed(0)} balance: 15 max positions, $${state.riskPolicy.hardMaxRiskPerTrade} hard max risk per trade, $${state.riskPolicy.dailyLossLock} daily lock`);
         }
@@ -182,6 +182,27 @@ export class Mt5Bridge {
 
       // Pure 1:1 MT5 synchronization: when MT5 is connected, controller positions reflect live MT5 terminal positions exactly
       state.positions = livePositions;
+
+      // Strict Individual Trade Loss Cut: if any position exceeds -$0.50 loss, queue instant close
+      const MAX_TRADE_LOSS_USD = 0.50;
+      for (const pos of incomingPositions) {
+        if (pos.profitUsd <= -MAX_TRADE_LOSS_USD) {
+          const alreadyQueued = this.pendingCommands.some(
+            (c) => c.type === 'CLOSE_POSITION' && c.ticket === pos.ticket
+          );
+          if (!alreadyQueued) {
+            this.queueCommand({
+              type: 'CLOSE_POSITION',
+              ticket: pos.ticket,
+            });
+            log(
+              state,
+              'warning',
+              `[PER-TRADE LOSS CUT] Position #${pos.ticket} on ${pos.symbol} exceeded -$${MAX_TRADE_LOSS_USD.toFixed(2)} (loss: -$${Math.abs(pos.profitUsd).toFixed(2)}). Queued instant close.`
+            );
+          }
+        }
+      }
 
       if (payload.balance > 0 && payload.margin > 0) {
         state.marginUsagePercent = Math.min(100, Math.round((payload.margin / payload.balance) * 100));
