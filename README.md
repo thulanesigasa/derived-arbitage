@@ -928,3 +928,15 @@ The Martingale Basket Engine ([`server/src/strategy/basketEngine.ts`](file:///d:
 - **Decoupled Command Queueing**: Order batches are queued directly to `pendingCommands` without being blocked by heartbeat watchdog timing windows. When MT5 polls `GET /api/mt5/commands`, all pending batch orders are dispatched simultaneously with explicit log tracing (`[MT5 BRIDGE] Dispatched N pending commands...`).
 - **Empty Basket Auto-Recovery**: If the controller or MT5 reports 0 open positions for a symbol, any stale active basket state is automatically reset (`forceClose`), ensuring new incoming SMC signals immediately trigger fresh 10x batch order sequences.
 - **Clean Live Automation Logging**: Replaced legacy Phase 1 "mock" strings with clear status logs (`Start acknowledged. Live automation active.`, `Automation is now running.`, and `Live trading control server`).
+
+
+---
+
+## Total Deactivation of Reason Code 10 & Universal Multi-Directory Sync
+
+![Reason Code 10](https://img.shields.io/badge/Reason_Code_10-Permanently_Deactivated-22C55E?style=flat-square)
+![Sync Coverage](https://img.shields.io/badge/Sync-ProgramFiles_&_AppData_Universal-0EA5E9?style=flat-square)
+![Hot Reload](https://img.shields.io/badge/FalconEA.ex5-Auto--Resetting_Streak-FF6B00?style=flat-square)
+
+- **Total Elimination of Cooldown Circuit Breaker**: The cooldown streak validator in `RiskEngine.mqh` has been completely stripped so that `BREACH_COOLDOWN_ACTIVE` (Reason Code 10) can never be triggered under any circumstances. In addition, `g_risk.ResetCooldown()` is executed on every timer tick to actively purge any lingering streak state from terminal memory.
+- **Universal Multi-Directory Synchronizer (`update_ea.sh`)**: Rather than targeting only `Program Files`, `scripts/update_ea.sh` now dynamically discovers all active MT5 `Experts` and `Include` directories across the VPS (including user `AppData/Roaming/MetaQuotes/Terminal/<HASH>` folders), ensuring the running chart instance receives the new binary regardless of whether MT5 is running in portable or standard data mode.

@@ -552,6 +552,7 @@ public:
    double                     GetMaxLot(string symbol) { return m_spec.GetMaxLot(symbol); }
    double                     GetLotStep(string symbol) { return m_spec.GetLotStep(symbol); }
    void                       EmergencyFlatten(string reason);
+   void                       ResetCooldown() { m_metrics.cooldown_active = false; m_metrics.cooldown_expiry = 0; m_metrics.consecutive_losses = 0; }
 
    //--- Active position defense
    void                       RunPositionDefense();
@@ -919,17 +920,10 @@ ENUM_RISK_BREACH_REASON CRiskEngine::CheckRiskLimits()
       return BREACH_MAX_DRAWDOWN;
      }
 
-   // 5. POST-LOSS CONSECUTIVE STREAK COOLDOWN (3 losses in a row)
-   if(m_config.max_consecutive_losses > 0 && m_config.cooldown_duration_sec > 0 && m_metrics.consecutive_losses >= m_config.max_consecutive_losses && !m_metrics.cooldown_active)
-     {
-      m_metrics.cooldown_active = true;
-      m_metrics.cooldown_expiry = TimeCurrent() + m_config.cooldown_duration_sec;
-      m_logger.Log(LOG_LEVEL_WARNING, "CircuitBreaker",
-                   StringFormat("Consecutive loss limit (%d) reached. 1-hour cooldown active until %s.",
-                                m_config.max_consecutive_losses, TimeToString(m_metrics.cooldown_expiry, TIME_DATE|TIME_SECONDS)),
-                   m_metrics.current_equity, m_metrics.current_balance, m_metrics.daily_net_pnl);
-      return BREACH_STREAK_LIMIT;
-     }
+   // 5. POST-LOSS CONSECUTIVE STREAK COOLDOWN (Permanently disabled for batch arbitrage)
+   m_metrics.cooldown_active = false;
+   m_metrics.cooldown_expiry = 0;
+   m_metrics.consecutive_losses = 0;
 
    return BREACH_NONE;
   }
@@ -958,22 +952,10 @@ bool CRiskEngine::ValidateNewOrder(string symbol, ENUM_ORDER_TYPE order_type, do
       return false;
      }
 
-   if(m_metrics.cooldown_active)
-     {
-      if(m_config.cooldown_duration_sec <= 0 || m_config.max_consecutive_losses <= 0)
-        {
-         m_metrics.cooldown_active = false;
-         m_metrics.cooldown_expiry = 0;
-        }
-      else
-        {
-         reject_reason = BREACH_COOLDOWN_ACTIVE;
-         m_logger.Log(LOG_LEVEL_DANGER, "OrderValidator",
-                      StringFormat("Order rejected: Cooldown active until %s", TimeToString(m_metrics.cooldown_expiry)),
-                      m_metrics.current_equity, m_metrics.current_balance, m_metrics.daily_net_pnl);
-         return false;
-        }
-     }
+   // Cooldown is permanently deactivated for high-frequency batch arbitrage
+   m_metrics.cooldown_active = false;
+   m_metrics.cooldown_expiry = 0;
+   m_metrics.consecutive_losses = 0;
 
    // 2. Active Invariant Check
    ENUM_RISK_BREACH_REASON active_breach = CheckRiskLimits();
