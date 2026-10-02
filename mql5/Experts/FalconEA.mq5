@@ -1,4 +1,4 @@
-//+------------------------------------------------------------------+
+﻿//+------------------------------------------------------------------+
 //|                                                     FalconEA.mq5 |
 //|                                  Copyright 2026, Antigravity AI  |
 //|                                          https://deriv.com       |
@@ -549,6 +549,7 @@ void CheckAndApplyDynamicRisk(bool force = false)
    config.max_spread_points          = InpMaxSpreadPoints;
    config.max_consecutive_losses     = 0;
    config.cooldown_duration_sec      = 0;
+   g_risk.ResetCooldown();
    config.max_daily_trades           = 100;
    config.max_trade_loss             = InpMaxTradeLoss;
    config.target_trade_profit        = InpTargetTradeProfit;
@@ -640,6 +641,7 @@ int OnInit()
    config.max_spread_points          = InpMaxSpreadPoints;
    config.max_consecutive_losses     = 0;
    config.cooldown_duration_sec      = 0;
+   g_risk.ResetCooldown();
    config.max_daily_trades           = 100;
    config.max_trade_loss             = InpMaxTradeLoss;
    config.target_trade_profit        = InpTargetTradeProfit;
@@ -718,7 +720,8 @@ void OnTick()
 //+------------------------------------------------------------------+
 void OnTimer()
   {
-   // 0. Maintain real-time balance scaling
+   // 0. Maintain real-time balance scaling & ensure cooldown is always off
+   g_risk.ResetCooldown();
    CheckAndApplyDynamicRisk(false);
 
    // 1. Maintain invariant limits
