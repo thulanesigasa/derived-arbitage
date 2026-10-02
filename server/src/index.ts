@@ -317,7 +317,7 @@ sockets.on('connection', (socket) =>
 const heartbeat = setInterval(() => store.heartbeat(), 5_000);
 
 server.listen(port, host, () => {
-  console.log(`DEMO mock control server: http://localhost:${port}`);
+  console.log(`Live trading control server: http://localhost:${port}`);
   console.log(`Health:   http://localhost:${port}/health`);
   console.log(`Profiler: http://localhost:${port}/api/profiler/status`);
   console.log('Listening on the LAN. No broker or MT5 connection present.');

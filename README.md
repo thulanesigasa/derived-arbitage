@@ -915,3 +915,16 @@ The Martingale Basket Engine ([`server/src/strategy/basketEngine.ts`](file:///d:
 
 - **Bundled Precompiled FalconEA.ex5**: The 64-bit compiled executable `mql5/Experts/FalconEA.ex5` is committed directly to the repository. Running `git pull` on the Linux VPS immediately delivers the latest compiled binary without requiring Wine MetaEditor compilation.
 - **Robust `update_ea.sh` Pipeline**: `scripts/update_ea.sh` copies `FalconEA.ex5` directly into `/home/ubuntu/mt5/drive_c/Program Files/MetaTrader 5/MQL5/Experts/` during step 2. Step 3 invokes Wine MetaEditor with tolerance for Wine stub return codes (`|| true`), ensuring step 4 verification and hot-reload execute cleanly.
+
+
+---
+
+## Guaranteed MT5 Command Dispatch & Live Automation Architecture
+
+![Dispatch Buffer](https://img.shields.io/badge/Dispatch-Guaranteed_Command_Buffer-22C55E?style=flat-square)
+![Basket Reset](https://img.shields.io/badge/Basket-Zero--Position_Auto--Reset-0EA5E9?style=flat-square)
+![Live State](https://img.shields.io/badge/Status-Live_Automation_Active-FF6B00?style=flat-square)
+
+- **Decoupled Command Queueing**: Order batches are queued directly to `pendingCommands` without being blocked by heartbeat watchdog timing windows. When MT5 polls `GET /api/mt5/commands`, all pending batch orders are dispatched simultaneously with explicit log tracing (`[MT5 BRIDGE] Dispatched N pending commands...`).
+- **Empty Basket Auto-Recovery**: If the controller or MT5 reports 0 open positions for a symbol, any stale active basket state is automatically reset (`forceClose`), ensuring new incoming SMC signals immediately trigger fresh 10x batch order sequences.
+- **Clean Live Automation Logging**: Replaced legacy Phase 1 "mock" strings with clear status logs (`Start acknowledged. Live automation active.`, `Automation is now running.`, and `Live trading control server`).

@@ -165,15 +165,16 @@ export class ExecutionEngine {
       this.store.mutate((s) => {
         // Purge any stale simulated positions when live
         s.positions = s.positions.filter((p) => p.simulated !== true);
-        log(
-          s,
-          'info',
-          `[SMC ENGINE] Signal ${signal.side} on ${signal.symbol} @ ${signal.entryPrice.toFixed(2)} — dispatched batch to MetaTrader 5.`
-        );
       });
     }
 
     // 6. Route signal through BasketEngine with broker-accurate base lot sizing
+    // If controller/MT5 has 0 open positions for this symbol, reset any stale basket so fresh batch opens
+    const activePositions = state.positions.filter((p) => p.symbol === signal.symbol);
+    if (activePositions.length === 0 && this.basketEngine.getBasket(signal.symbol)?.isActive) {
+      this.basketEngine.forceClose(signal.symbol);
+    }
+
     const baseLots = getSymbolMinLot(signal.symbol);
     this.basketEngine.openBasket(
       signal.symbol,
@@ -213,9 +214,9 @@ export class ExecutionEngine {
       const BATCH_SIZE = 10; // Rule: Synchronized batch of at least 10 trades placed at the same time
       this.store.mutate((s) => {
         const layerLabel = cmd.layerIndex === 0 ? 'ANCHOR BATCH (10x)' : `RECOVERY L${cmd.layerIndex} (10x)`;
-        log(s, 'info', `[BASKET] ${layerLabel} on ${cmd.symbol} — ${cmd.direction} 10x ${effectiveLots.toFixed(effectiveLots < 0.01 ? 3 : 2)} lots`);
+        log(s, 'info', `[BASKET] ${layerLabel} on ${cmd.symbol} · ${cmd.direction} 10x ${effectiveLots.toFixed(effectiveLots < 0.01 ? 3 : 2)} lots`);
       });
-      if (bridge && bridge.isConnected()) {
+      if (bridge) {
         for (let i = 0; i < BATCH_SIZE; i++) {
           bridge.queueCommand({
             type: 'EXECUTE_ORDER',
@@ -226,12 +227,15 @@ export class ExecutionEngine {
             takeProfit: 0,
           });
         }
+        this.store.mutate((s) => {
+          log(s, 'info', `[MT5 QUEUE] Queued 10x ${cmd.direction} orders on ${cmd.symbol} to MetaTrader 5 buffer.`);
+        });
       }
     } else if (cmd.type === 'BASKET_CLOSE_ALL') {
       this.store.mutate((s) => {
-        log(s, 'success', `[BASKET] Profit target reached on ${cmd.symbol} — queuing BASKET_CLOSE_ALL`);
+        log(s, 'success', `[BASKET] Profit target reached on ${cmd.symbol} · queuing BASKET_CLOSE_ALL`);
       });
-      if (bridge && bridge.isConnected()) {
+      if (bridge) {
         bridge.queueCommand({
           type: 'BASKET_CLOSE_ALL',
           symbol: cmd.symbol,
