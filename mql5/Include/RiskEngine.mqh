@@ -1114,16 +1114,26 @@ void CRiskEngine::EmergencyFlatten(string reason)
          if(m_position.SelectByIndex(i))
            {
             ulong ticket = m_position.Ticket();
-         // 0. Single-trade hard loss cut defense ($0.50 limit)
+         // 0. Synchronized Batch loss cut defense ($0.50 limit): close all positions on this symbol simultaneously
          if(m_config.max_trade_loss > 0.0)
            {
             double pos_profit = m_position.Profit() + m_position.Swap();
             if(pos_profit <= -m_config.max_trade_loss)
               {
-               PrintFormat("[RiskEngine] Per-trade loss cutoff triggered on ticket #%I64u (%s): Profit=$%.2f <= -$%.2f. Closing immediately.",
-                           ticket, m_position.Symbol(), pos_profit, m_config.max_trade_loss);
-               m_trade.PositionClose(ticket, 20);
-               continue;
+               string cut_sym = m_position.Symbol();
+               PrintFormat("[RiskEngine] Batch trade loss cutoff reached on %s (ticket #%I64u: Profit=$%.2f <= -$%.2f). Closing all batch trades on %s simultaneously.",
+                           cut_sym, ticket, pos_profit, m_config.max_trade_loss, cut_sym);
+               for(int j = PositionsTotal() - 1; j >= 0; j--)
+                 {
+                  if(m_position.SelectByIndex(j))
+                    {
+                     if(m_position.Symbol() == cut_sym)
+                       {
+                        m_trade.PositionClose(m_position.Ticket(), 20);
+                       }
+                    }
+                 }
+               break;
               }
            }
             string sym = m_position.Symbol();
@@ -1171,16 +1181,26 @@ void CRiskEngine::RunPositionDefense()
       if(m_position.SelectByIndex(i))
         {
          ulong ticket = m_position.Ticket();
-         // 0. Single-trade hard loss cut defense ($0.50 limit)
+         // 0. Synchronized Batch loss cut defense ($0.50 limit): close all positions on this symbol simultaneously
          if(m_config.max_trade_loss > 0.0)
            {
             double pos_profit = m_position.Profit() + m_position.Swap();
             if(pos_profit <= -m_config.max_trade_loss)
               {
-               PrintFormat("[RiskEngine] Per-trade loss cutoff triggered on ticket #%I64u (%s): Profit=$%.2f <= -$%.2f. Closing immediately.",
-                           ticket, m_position.Symbol(), pos_profit, m_config.max_trade_loss);
-               m_trade.PositionClose(ticket, 20);
-               continue;
+               string cut_sym = m_position.Symbol();
+               PrintFormat("[RiskEngine] Batch trade loss cutoff reached on %s (ticket #%I64u: Profit=$%.2f <= -$%.2f). Closing all batch trades on %s simultaneously.",
+                           cut_sym, ticket, pos_profit, m_config.max_trade_loss, cut_sym);
+               for(int j = PositionsTotal() - 1; j >= 0; j--)
+                 {
+                  if(m_position.SelectByIndex(j))
+                    {
+                     if(m_position.Symbol() == cut_sym)
+                       {
+                        m_trade.PositionClose(m_position.Ticket(), 20);
+                       }
+                    }
+                 }
+               break;
               }
            }
 

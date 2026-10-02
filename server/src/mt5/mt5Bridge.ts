@@ -183,24 +183,28 @@ export class Mt5Bridge {
       // Pure 1:1 MT5 synchronization: when MT5 is connected, controller positions reflect live MT5 terminal positions exactly
       state.positions = livePositions;
 
-      // Strict Individual Trade Loss Cut: if any position exceeds -$0.50 loss, queue instant close
+      // Synchronized Group Loss Cut: if any position on symbol exceeds -$0.50 loss, close all trades on that symbol together
       const MAX_TRADE_LOSS_USD = 0.50;
+      const symbolsToClose = new Set<string>();
       for (const pos of incomingPositions) {
         if (pos.profitUsd <= -MAX_TRADE_LOSS_USD) {
-          const alreadyQueued = this.pendingCommands.some(
-            (c) => c.type === 'CLOSE_POSITION' && c.ticket === pos.ticket
+          symbolsToClose.add(pos.symbol);
+        }
+      }
+      for (const sym of symbolsToClose) {
+        const alreadyQueued = this.pendingCommands.some(
+          (c) => c.type === 'BASKET_CLOSE_ALL' && c.symbol === sym
+        );
+        if (!alreadyQueued) {
+          this.queueCommand({
+            type: 'BASKET_CLOSE_ALL',
+            symbol: sym as SymbolName,
+          });
+          log(
+            state,
+            'warning',
+            `[BATCH LOSS CUT] Symbol ${sym} trade reached -$${MAX_TRADE_LOSS_USD.toFixed(2)} loss limit. Queued BASKET_CLOSE_ALL to close all 10+ batch trades simultaneously.`
           );
-          if (!alreadyQueued) {
-            this.queueCommand({
-              type: 'CLOSE_POSITION',
-              ticket: pos.ticket,
-            });
-            log(
-              state,
-              'warning',
-              `[PER-TRADE LOSS CUT] Position #${pos.ticket} on ${pos.symbol} exceeded -$${MAX_TRADE_LOSS_USD.toFixed(2)} (loss: -$${Math.abs(pos.profitUsd).toFixed(2)}). Queued instant close.`
-            );
-          }
         }
       }
 
