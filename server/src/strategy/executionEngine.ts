@@ -124,39 +124,54 @@ export class ExecutionEngine {
       return;
     }
 
-    // 5. Open Simulated Position
-    const position: SimulatedPosition = {
-      id: signal.id,
-      symbol: signal.symbol,
-      side: signal.side,
-      risk: signal.riskUsd,
-      marginUsed: 1.0,
-      unrealizedPnl: 0,
-      openedAt: new Date().toISOString(),
-      simulated: true,
-      entryPrice: signal.entryPrice,
-      stopLoss: signal.stopLoss,
-      takeProfit: signal.takeProfit,
-      setupName: signal.setupName,
-      rrRatio: signal.rrRatio,
-    };
-
     this.lastEntryTime = now;
     this.recentSignals.unshift(signal);
     if (this.recentSignals.length > 30) this.recentSignals.pop();
 
-    this.store.mutate((s) => {
-      s.positions = [...s.positions, position];
-      s.marginUsagePercent = Math.min(s.positions.length * 2, 20);
-      log(
-        s,
-        'info',
-        `[SMC ENGINE] Opened ${signal.side} on ${signal.symbol} @ ${signal.entryPrice.toFixed(2)} Â· SL: ${signal.stopLoss.toFixed(2)} Â· TP: ${signal.takeProfit.toFixed(2)} Â· Target: 1:${signal.rrRatio} R:R (Risk: $${signal.riskUsd})`
-      );
-    });
+    const isLiveWithBridge = this.mt5Bridge && this.mt5Bridge.isConnected();
 
-    // Record open trade in real-time Journal
-    tradeJournalStore.recordTradeOpen(position);
+    // 5. Open Simulated Position ONLY if bridge is disconnected (offline demo simulation).
+    // In live mode, positions strictly mirror verified MT5 broker tickets, preventing phantom hallucinated trades.
+    if (!isLiveWithBridge) {
+      const position: SimulatedPosition = {
+        id: signal.id,
+        symbol: signal.symbol,
+        side: signal.side,
+        risk: signal.riskUsd,
+        marginUsed: 1.0,
+        unrealizedPnl: 0,
+        openedAt: new Date().toISOString(),
+        simulated: true,
+        entryPrice: signal.entryPrice,
+        stopLoss: signal.stopLoss,
+        takeProfit: signal.takeProfit,
+        setupName: signal.setupName,
+        rrRatio: signal.rrRatio,
+      };
+
+      this.store.mutate((s) => {
+        s.positions = [...s.positions, position];
+        s.marginUsagePercent = Math.min(s.positions.length * 2, 20);
+        log(
+          s,
+          'info',
+          `[SMC ENGINE] Opened ${signal.side} on ${signal.symbol} @ ${signal.entryPrice.toFixed(2)} · SL: ${signal.stopLoss.toFixed(2)} · TP: ${signal.takeProfit.toFixed(2)} · Target: 1:${signal.rrRatio} R:R (Risk: $${signal.riskUsd})`
+        );
+      });
+
+      // Record open trade in real-time Journal
+      tradeJournalStore.recordTradeOpen(position);
+    } else {
+      this.store.mutate((s) => {
+        // Purge any stale simulated positions when live
+        s.positions = s.positions.filter((p) => p.simulated !== true);
+        log(
+          s,
+          'info',
+          `[SMC ENGINE] Signal ${signal.side} on ${signal.symbol} @ ${signal.entryPrice.toFixed(2)} — dispatched batch to MetaTrader 5.`
+        );
+      });
+    }
 
     // 6. Route signal through BasketEngine with broker-accurate base lot sizing
     const baseLots = getSymbolMinLot(signal.symbol);

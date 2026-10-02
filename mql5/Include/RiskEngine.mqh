@@ -1,4 +1,4 @@
-//+------------------------------------------------------------------+
+﻿//+------------------------------------------------------------------+
 //|                                                   RiskEngine.mqh |
 //|                                  Copyright 2026, Antigravity AI  |
 //|                                          https://deriv.com       |
@@ -609,8 +609,8 @@ void CRiskEngine::SetDefaultConfig()
    m_config.max_open_positions         = 15;
    m_config.max_margin_usage_percent   = 20.0;
    m_config.max_spread_points          = 50000.0;
-   m_config.max_consecutive_losses     = 3;
-   m_config.cooldown_duration_sec      = 3600;
+   m_config.max_consecutive_losses     = 0;
+   m_config.cooldown_duration_sec      = 0;
    m_config.max_daily_trades           = 100;
    m_config.max_trade_loss             = 0.40;
    m_config.target_trade_profit        = 0.40;
@@ -920,7 +920,7 @@ ENUM_RISK_BREACH_REASON CRiskEngine::CheckRiskLimits()
      }
 
    // 5. POST-LOSS CONSECUTIVE STREAK COOLDOWN (3 losses in a row)
-   if(m_config.max_consecutive_losses > 0 && m_metrics.consecutive_losses >= m_config.max_consecutive_losses && !m_metrics.cooldown_active)
+   if(m_config.max_consecutive_losses > 0 && m_config.cooldown_duration_sec > 0 && m_metrics.consecutive_losses >= m_config.max_consecutive_losses && !m_metrics.cooldown_active)
      {
       m_metrics.cooldown_active = true;
       m_metrics.cooldown_expiry = TimeCurrent() + m_config.cooldown_duration_sec;
@@ -960,11 +960,19 @@ bool CRiskEngine::ValidateNewOrder(string symbol, ENUM_ORDER_TYPE order_type, do
 
    if(m_metrics.cooldown_active)
      {
-      reject_reason = BREACH_COOLDOWN_ACTIVE;
-      m_logger.Log(LOG_LEVEL_DANGER, "OrderValidator",
-                   StringFormat("Order rejected: Cooldown active until %s", TimeToString(m_metrics.cooldown_expiry)),
-                   m_metrics.current_equity, m_metrics.current_balance, m_metrics.daily_net_pnl);
-      return false;
+      if(m_config.cooldown_duration_sec <= 0 || m_config.max_consecutive_losses <= 0)
+        {
+         m_metrics.cooldown_active = false;
+         m_metrics.cooldown_expiry = 0;
+        }
+      else
+        {
+         reject_reason = BREACH_COOLDOWN_ACTIVE;
+         m_logger.Log(LOG_LEVEL_DANGER, "OrderValidator",
+                      StringFormat("Order rejected: Cooldown active until %s", TimeToString(m_metrics.cooldown_expiry)),
+                      m_metrics.current_equity, m_metrics.current_balance, m_metrics.daily_net_pnl);
+         return false;
+        }
      }
 
    // 2. Active Invariant Check

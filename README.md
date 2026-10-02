@@ -5,7 +5,8 @@
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6?style=flat-square&logo=typescript)
 ![EAS Build](https://img.shields.io/badge/EAS_Build-Preview_APK-FF6B00?style=flat-square)
 ![OTA Updates](https://img.shields.io/badge/EAS_Updates-Active-0EA5E9?style=flat-square)
-![Tests](https://img.shields.io/badge/Tests-68%20Passed-22C55E?style=flat-square)
+![Tests](https://img.shields.io/badge/Tests-69%20Passed-22C55E?style=flat-square)
+![Step Index](https://img.shields.io/badge/Symbol-Step_Index_Isolated-0EA5E9?style=flat-square)
 
 A personal Android controller for a Deriv MT5 EA trading Volatility, Boom, Crash, and Step synthetic indices. This project is structured in validated phases — no live trading until every gate passes.
 
@@ -889,3 +890,16 @@ The Martingale Basket Engine ([`server/src/strategy/basketEngine.ts`](file:///d:
   - `BasketEngine.mqh` tracks active slots per symbol inside MetaTrader 5 and links incoming command tickets to active layer IDs.
   - Implements `CloseAllBySymbol` fallback guaranteeing all tickets belonging to the symbol are flattened cleanly even in high-velocity market conditions.
 
+
+
+---
+
+## Step Index Isolation, Cooldown Deactivation & Phantom Elimination
+
+![Target Symbol](https://img.shields.io/badge/Instrument-Step_Index-0EA5E9?style=flat-square)
+![Risk Gate](https://img.shields.io/badge/Cooldown-Disabled_High_Frequency-22C55E?style=flat-square)
+![Telemetry Sync](https://img.shields.io/badge/Positions-1%3A1_Verified_MT5-FF6B00?style=flat-square)
+
+- **Dedicated Step Index Targeting**: Automation default configuration across `stateMachine.ts`, `src/api.ts`, and `App.tsx` is strictly locked to `['Step Index']` (`stpRNG`). The strategy engine immediately drops ticks and signals from Crash or Volatility indices, preventing rogue entries on unselected instruments.
+- **Circuit Breaker Cooldown Deactivation (`InpCooldownSec = 0`)**: For simultaneous 10-order micro-scalping (+0.40 profit target, -0.40 loss cutoff), consecutive streak cooldowns are deactivated (`InpCooldownSec = 0`, `max_consecutive_losses = 0`). This eliminates Reason Code 10 (`BREACH_COOLDOWN_ACTIVE`), which previously locked the terminal for 3600 seconds after consecutive micro-cuts.
+- **Elimination of Phantom / Hallucinated Positions**: `ExecutionEngine` decouples simulated paper trades when connected to the live MT5 bridge. Positions in the controller and mobile app strictly reflect verified MetaTrader 5 broker tickets received via telemetry, ensuring account balance, equity, and running trades match the terminal with 100% precision.

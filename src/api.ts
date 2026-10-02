@@ -95,7 +95,7 @@ export const OFFLINE_FALLBACK_STATE: ControllerState = {
   weeklyPnl: 0,
   drawdown: 0,
   marginUsagePercent: 0,
-  selectedSymbols: [...ALL_SYMBOLS],
+  selectedSymbols: ['Step Index'],
   positions: [],
   riskPolicy: {
     initialBalance: 10000,
