@@ -260,6 +260,11 @@ export class Mt5Bridge {
     const commands = [...this.pendingCommands];
     this.pendingCommands = [];
     this.status.pendingCommandsCount = 0;
+    if (commands.length > 0) {
+      this.store.mutate((s) => {
+        log(s, 'info', `[MT5 BRIDGE] Dispatched ${commands.length} pending commands to MetaTrader 5 terminal.`);
+      });
+    }
     return commands;
   }
 

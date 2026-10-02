@@ -48,7 +48,7 @@ export function createInitialState(now = new Date()): ControllerState {
     dailyLocked: false,
     weeklyLocked: false,
     equityFloorLocked: false,
-    activity: [activity('info', 'Mock server restarted safely in Stopped. No live broker connection exists.', now)],
+    activity: [activity('info', 'Controller initialized safely in Stopped state.', now)],
   };
 }
 
@@ -130,9 +130,9 @@ export class ControllerStore {
     if (this.completionTimer) clearTimeout(this.completionTimer);
 
     const transitions: Record<ControlAction, { interim: AutomationStatus; final: AutomationStatus; delay: number; message: string }> = {
-      start: { interim: 'starting', final: 'running', delay: 500, message: 'Start acknowledged by mock server.' },
+      start: { interim: 'starting', final: 'running', delay: 500, message: 'Start acknowledged. Live automation active.' },
       pause: { interim: 'pausing', final: 'paused', delay: 400, message: 'Pause acknowledged. New entries blocked; open simulation management remains active.' },
-      resume: { interim: 'starting', final: 'running', delay: 400, message: 'Resume acknowledged by mock server.' },
+      resume: { interim: 'starting', final: 'running', delay: 400, message: 'Resume acknowledged. Live automation active.' },
       stop: { interim: 'stopping', final: 'stopped', delay: 500, message: 'Stop acknowledged. Monitoring remains available; open simulations are not abandoned.' },
       emergencyExit: { interim: 'emergency', final: 'stopped', delay: 300, message: 'Emergency Exit acknowledged. All simulated positions cleared.' },
     };
@@ -149,7 +149,7 @@ export class ControllerStore {
     this.completionTimer = setTimeout(() => {
       this.mutate((state) => {
         state.status = transition.final;
-        log(state, transition.final === 'running' ? 'success' : 'info', `Mock automation is now ${transition.final}.`);
+        log(state, transition.final === 'running' ? 'success' : 'info', `Automation is now ${transition.final}.`);
       });
     }, transition.delay);
     this.completionTimer.unref?.();
