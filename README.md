@@ -903,3 +903,15 @@ The Martingale Basket Engine ([`server/src/strategy/basketEngine.ts`](file:///d:
 - **Dedicated Step Index Targeting**: Automation default configuration across `stateMachine.ts`, `src/api.ts`, and `App.tsx` is strictly locked to `['Step Index']` (`stpRNG`). The strategy engine immediately drops ticks and signals from Crash or Volatility indices, preventing rogue entries on unselected instruments.
 - **Circuit Breaker Cooldown Deactivation (`InpCooldownSec = 0`)**: For simultaneous 10-order micro-scalping (+0.40 profit target, -0.40 loss cutoff), consecutive streak cooldowns are deactivated (`InpCooldownSec = 0`, `max_consecutive_losses = 0`). This eliminates Reason Code 10 (`BREACH_COOLDOWN_ACTIVE`), which previously locked the terminal for 3600 seconds after consecutive micro-cuts.
 - **Elimination of Phantom / Hallucinated Positions**: `ExecutionEngine` decouples simulated paper trades when connected to the live MT5 bridge. Positions in the controller and mobile app strictly reflect verified MetaTrader 5 broker tickets received via telemetry, ensuring account balance, equity, and running trades match the terminal with 100% precision.
+
+
+---
+
+## Precompiled Binary Deployment & Direct MT5 Hot-Reload
+
+![EA Binary](https://img.shields.io/badge/Binary-FalconEA.ex5_Bundled-22C55E?style=flat-square)
+![Wine MetaEditor](https://img.shields.io/badge/Wine_Sync-Non--Zero_Tolerant-0EA5E9?style=flat-square)
+![Hot Reload](https://img.shields.io/badge/MT5-Automatic_Chart_Reload-FF6B00?style=flat-square)
+
+- **Bundled Precompiled FalconEA.ex5**: The 64-bit compiled executable `mql5/Experts/FalconEA.ex5` is committed directly to the repository. Running `git pull` on the Linux VPS immediately delivers the latest compiled binary without requiring Wine MetaEditor compilation.
+- **Robust `update_ea.sh` Pipeline**: `scripts/update_ea.sh` copies `FalconEA.ex5` directly into `/home/ubuntu/mt5/drive_c/Program Files/MetaTrader 5/MQL5/Experts/` during step 2. Step 3 invokes Wine MetaEditor with tolerance for Wine stub return codes (`|| true`), ensuring step 4 verification and hot-reload execute cleanly.

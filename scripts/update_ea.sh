@@ -24,6 +24,10 @@ echo "=== [2/4] Syncing MQL5 source files into MT5 directories ==="
 mkdir -p "${EXPERTS_DIR}" "${INCLUDE_DIR}"
 cp "${REPO_ROOT}/mql5/Experts/FalconEA.mq5" "${EXPERTS_DIR}/"
 cp "${REPO_ROOT}/mql5/Include/"*.mqh "${INCLUDE_DIR}/"
+if [ -f "${REPO_ROOT}/mql5/Experts/FalconEA.ex5" ]; then
+  cp "${REPO_ROOT}/mql5/Experts/FalconEA.ex5" "${EXPERTS_DIR}/"
+  echo "Copied precompiled FalconEA.ex5 to MT5 Experts directory."
+fi
 
 echo "=== [3/4] Compiling FalconEA with MetaEditor via Wine ==="
 if [ ! -f "${METAEDITOR_EXE}" ]; then
@@ -32,7 +36,7 @@ if [ ! -f "${METAEDITOR_EXE}" ]; then
 fi
 
 cd "${MT5_DIR}"
-WINEPREFIX="${MT5_PREFIX}" wine MetaEditor64.exe /compile:"MQL5\Experts\FalconEA.mq5" /log
+WINEPREFIX="${MT5_PREFIX}" wine MetaEditor64.exe /compile:"MQL5\Experts\FalconEA.mq5" /log || true
 
 echo "=== [4/4] Verifying compilation result ==="
 LOG_FILE="${EXPERTS_DIR}/FalconEA.log"

@@ -10,6 +10,7 @@ probe_symbols.mjs
 
 # MT5 Compiled binaries
 *.ex5
+!mql5/Experts/FalconEA.ex5
 
 # Build artifacts
 *.apk
