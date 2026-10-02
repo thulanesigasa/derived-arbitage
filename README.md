@@ -734,10 +734,16 @@ To capitalize on synthetic index arbitrage discrepancies across multiple uncorre
 * **Portfolio Risk Harmonization**: 15 concurrent positions × $20.00 = $300.00 maximum aggregate exposure, perfectly aligned with the $300.00 Weekly Loss Lock (3.0%) and comfortably above the $8,500.00 Absolute Equity Floor (85.0%).
 * **Rapid Cooldown (1,000 ms)**: New setup evaluation cooldown is reduced to 1 second to support high-frequency fills across simultaneous market opportunities.
 
-### 9. Individual Trade Micro-Loss Cut & Concurrency Scaling
-* **Per-Trade Loss Cut (.50)**: Both the MT5 Expert (InpMaxTradeLoss = 0.50) and Node.js bridge monitor every open position in real time. If any single trade reaches -.40 to -.50 loss (e.g., Step Index at 0.10 lots drifting 4-5 ticks adverse), the trade is immediately cut and closed via CLOSE_POSITION. This prevents open drawdowns from accumulating, enabling the strategy to cycle through fresh setups without taking large losses.
-* **Expanded Concurrency Capacity (maxOpenPositions = 50)**: Concurrency limit is elevated to 50 simultaneous positions with up to 10 setups per symbol and a reduced 1-second cooldown, giving the automated strategy total freedom to execute and scale across all synthetic pairs (Volatility 10/25/50/75/100, Boom, Crash, and Step Index).
-* **MQL5 Dynamic Recalibration Protection**: CheckAndApplyDynamicRisk() retains max_spread_points, max_trade_loss, break-even, and trailing stop defense parameters when account balance scales, preventing spurious reason-code 7 spread rejects.
+### 9. Synchronized 10+ Trade Batch Execution, +$0.40 Profit & -$0.40 Loss Group Defense
+* **Synchronized Batch Execution (10+ Trades Placed Together)**:
+  - Whenever an SMC setup, momentum anchor, or recovery layer triggers on a selected instrument (such as Step Index at 0.10 lots), the execution engine dispatches a synchronized batch of 10 orders simultaneously (`BATCH_SIZE = 10`) to MetaTrader 5 with unique tracking tickets.
+* **Simultaneous Group Profit Target (+$0.40 to +$0.50)**:
+  - Both native MT5 defense (`InpTargetTradeProfit = 0.40` in `FalconEA.mq5` / `RiskEngine.mqh`) and the Node.js bridge evaluate each position tick-by-tick. When any trade hits the +$0.40 to +$0.50 profit threshold, all 10 batch trades on that symbol close simultaneously via `BASKET_CLOSE_ALL` / symbol iteration, banking cumulative profits across the entire batch in parallel.
+* **Simultaneous Group Loss Cutoff (-$0.40)**:
+  - If any single trade in the batch drifts to -$0.40 loss (`InpMaxTradeLoss = 0.40`), all 10 batch trades on that symbol close simultaneously. This guarantees that trades never accumulate adverse floating drawdowns, allowing the strategy to immediately reset and enter clean new setups.
+* **Permanent Network Connectivity Architecture**:
+  - **Direct Static VPS IP (`http://92.4.143.117:4000`)**: The Oracle Cloud VPS runs a static IPv4 address that never changes. The mobile app's `probeCandidateUrls()` automatically falls back to this direct IP address.
+  - **Cloudflare Zero-Trust Tunnel (`https://forbes-campaigns-ripe-adoption.trycloudflare.com`)**: Provides encrypted HTTPS/WSS access. To make a Cloudflare tunnel URL 100% permanent with a custom domain, a Cloudflare Zero Trust Named Tunnel (`cloudflared tunnel run --token`) can be bound to any domain indefinitely without renewal.
 
 ---
 

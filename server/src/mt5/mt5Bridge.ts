@@ -183,15 +183,40 @@ export class Mt5Bridge {
       // Pure 1:1 MT5 synchronization: when MT5 is connected, controller positions reflect live MT5 terminal positions exactly
       state.positions = livePositions;
 
-      // Synchronized Group Loss Cut: if any position on symbol exceeds -$0.50 loss, close all trades on that symbol together
-      const MAX_TRADE_LOSS_USD = 0.50;
-      const symbolsToClose = new Set<string>();
+      // Synchronized Group Profit Target & Loss Cut Defense:
+      // Profit Target: +$0.40 - $0.50
+      // Loss Cutoff:   -$0.40
+      const TARGET_TRADE_PROFIT_USD = 0.40;
+      const MAX_TRADE_LOSS_USD = 0.40;
+      const symbolsToCloseForProfit = new Set<string>();
+      const symbolsToCloseForLoss = new Set<string>();
+
       for (const pos of incomingPositions) {
-        if (pos.profitUsd <= -MAX_TRADE_LOSS_USD) {
-          symbolsToClose.add(pos.symbol);
+        if (pos.profitUsd >= TARGET_TRADE_PROFIT_USD) {
+          symbolsToCloseForProfit.add(pos.symbol);
+        } else if (pos.profitUsd <= -MAX_TRADE_LOSS_USD) {
+          symbolsToCloseForLoss.add(pos.symbol);
         }
       }
-      for (const sym of symbolsToClose) {
+
+      for (const sym of symbolsToCloseForProfit) {
+        const alreadyQueued = this.pendingCommands.some(
+          (c) => c.type === 'BASKET_CLOSE_ALL' && c.symbol === sym
+        );
+        if (!alreadyQueued) {
+          this.queueCommand({
+            type: 'BASKET_CLOSE_ALL',
+            symbol: sym as SymbolName,
+          });
+          log(
+            state,
+            'success',
+            `[BATCH PROFIT TARGET] Symbol ${sym} trade reached +$${TARGET_TRADE_PROFIT_USD.toFixed(2)} target. Queued BASKET_CLOSE_ALL to close all 10+ batch trades simultaneously.`
+          );
+        }
+      }
+
+      for (const sym of symbolsToCloseForLoss) {
         const alreadyQueued = this.pendingCommands.some(
           (c) => c.type === 'BASKET_CLOSE_ALL' && c.symbol === sym
         );

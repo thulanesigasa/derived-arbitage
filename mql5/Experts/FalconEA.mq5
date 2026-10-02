@@ -1,4 +1,4 @@
-﻿//+------------------------------------------------------------------+
+//+------------------------------------------------------------------+
 //|                                                     FalconEA.mq5 |
 //|                                  Copyright 2026, Antigravity AI  |
 //|                                          https://deriv.com       |
@@ -50,7 +50,8 @@ input double   InpMaxMarginPercent     = 20.0;                   // Margin Usage
 input double   InpMaxSpreadPoints      = 50000.0;                // Max Allowable Spread in points (0 to disable)
 input int      InpMaxLossStreak        = 0;                      // Consecutive Loss Circuit Breaker (0 to disable for Martingale)
 input int      InpCooldownSec          = 3600;                   // Cooldown Period (seconds)
-input double   InpMaxTradeLoss         = 0.50;                   // Max Single Trade Loss Cut ($0.50, 0 to disable)
+input double   InpMaxTradeLoss         = 0.40;                   // Max Single Trade Loss Cut ($0.40, 0 to disable)
+input double   InpTargetTradeProfit    = 0.40;                   // Target Profit per Trade ($0.40 - $0.50, 0 to disable)
 
 input group "=== Active Position Defense ==="
 input bool     InpBreakEvenEnabled     = true;                   // Enable Break-Even Protection
@@ -550,6 +551,7 @@ void CheckAndApplyDynamicRisk(bool force = false)
    config.cooldown_duration_sec      = InpCooldownSec;
    config.max_daily_trades           = 100;
    config.max_trade_loss             = InpMaxTradeLoss;
+   config.target_trade_profit        = InpTargetTradeProfit;
    config.require_hard_sl            = true;
    config.break_even_enabled         = InpBreakEvenEnabled;
    config.break_even_trigger_rr      = InpBreakEvenTriggerRR;
@@ -640,6 +642,7 @@ int OnInit()
    config.cooldown_duration_sec      = InpCooldownSec;
    config.max_daily_trades           = 100;
    config.max_trade_loss             = InpMaxTradeLoss;
+   config.target_trade_profit        = InpTargetTradeProfit;
    config.require_hard_sl            = true;
    config.break_even_enabled         = InpBreakEvenEnabled;
    config.break_even_trigger_rr      = InpBreakEvenTriggerRR;
