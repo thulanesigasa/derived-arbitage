@@ -239,7 +239,7 @@ describe('ExecutionEngine', () => {
     engine.handleTick('R_75', 130, 1700000000);
 
     const commands = bridge.pollCommands();
-    expect(commands).toHaveLength(1);
+    expect(commands).toHaveLength(10);
     expect(commands[0]!.type).toBe('EXECUTE_ORDER');
     expect(commands[0]!.symbol).toBe('Volatility 75 Index');
     expect(commands[0]!.direction).toBe('BUY');

@@ -10,7 +10,7 @@ import type {
   TradeJournalEntry,
 } from './types';
 
-export const DEFAULT_PRODUCTION_BRIDGE_URL = 'https://jewelry-clouds-karl-pvc.trycloudflare.com';
+export const DEFAULT_PRODUCTION_BRIDGE_URL = 'https://forbes-campaigns-ripe-adoption.trycloudflare.com';
 export const FALLBACK_VPS_IP_URL = 'http://92.4.143.117:4000';
 
 export function normalizeBaseUrl(value: string): string {

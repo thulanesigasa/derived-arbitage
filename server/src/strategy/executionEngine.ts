@@ -195,19 +195,22 @@ export class ExecutionEngine {
     if (cmd.type === 'BASKET_OPEN_LAYER') {
       const minLot = getSymbolMinLot(cmd.symbol);
       const effectiveLots = cmd.lots ?? minLot;
+      const BATCH_SIZE = 10; // Rule: Synchronized batch of at least 10 trades placed at the same time
       this.store.mutate((s) => {
-        const layerLabel = cmd.layerIndex === 0 ? 'ANCHOR' : `RECOVERY L${cmd.layerIndex}`;
-        log(s, 'info', `[BASKET] ${layerLabel} on ${cmd.symbol} — ${cmd.direction} ${effectiveLots.toFixed(effectiveLots < 0.01 ? 3 : 2)} lots`);
+        const layerLabel = cmd.layerIndex === 0 ? 'ANCHOR BATCH (10x)' : `RECOVERY L${cmd.layerIndex} (10x)`;
+        log(s, 'info', `[BASKET] ${layerLabel} on ${cmd.symbol} — ${cmd.direction} 10x ${effectiveLots.toFixed(effectiveLots < 0.01 ? 3 : 2)} lots`);
       });
       if (bridge && bridge.isConnected()) {
-        bridge.queueCommand({
-          type: 'EXECUTE_ORDER',
-          symbol: cmd.symbol,
-          direction: cmd.direction!,
-          lots: effectiveLots,
-          stopLoss: 0,
-          takeProfit: 0,
-        });
+        for (let i = 0; i < BATCH_SIZE; i++) {
+          bridge.queueCommand({
+            type: 'EXECUTE_ORDER',
+            symbol: cmd.symbol,
+            direction: cmd.direction!,
+            lots: effectiveLots,
+            stopLoss: 0,
+            takeProfit: 0,
+          });
+        }
       }
     } else if (cmd.type === 'BASKET_CLOSE_ALL') {
       this.store.mutate((s) => {
