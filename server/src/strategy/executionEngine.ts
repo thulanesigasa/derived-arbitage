@@ -165,7 +165,7 @@ export class ExecutionEngine {
       signal.side,
       signal.entryPrice,
       {
-        profitTargetUsd: DEFAULT_BASKET_CONFIG.profitTargetUsd,
+        profitTargetUsd: 0.40,
         baseLots,
         lotMultiplier: 1.8,
         maxLayers: 6,

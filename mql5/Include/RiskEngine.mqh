@@ -65,6 +65,7 @@ struct RiskConfig
    int               cooldown_duration_sec;      // Cooldown duration in seconds (3600 = 1 hr)
    int               max_daily_trades;           // Max trades allowed per day (15)
    double            max_trade_loss;             // Maximum allowable loss on a single trade before cut ($0.50)
+   double            target_trade_profit;        // Target profit on a single trade to close batch ($0.40 - $0.50)
    bool              require_hard_sl;            // Enforce mandatory stop loss on all entries
    bool              break_even_enabled;         // Enable dynamic break-even protection
    double            break_even_trigger_rr;      // R:R threshold to trigger break-even (1.5 R)
@@ -611,7 +612,8 @@ void CRiskEngine::SetDefaultConfig()
    m_config.max_consecutive_losses     = 3;
    m_config.cooldown_duration_sec      = 3600;
    m_config.max_daily_trades           = 100;
-   m_config.max_trade_loss             = 0.50;
+   m_config.max_trade_loss             = 0.40;
+   m_config.target_trade_profit        = 0.40;
    m_config.require_hard_sl            = true;
    m_config.break_even_enabled         = true;
    m_config.break_even_trigger_rr      = 1.5;
@@ -1114,7 +1116,30 @@ void CRiskEngine::EmergencyFlatten(string reason)
          if(m_position.SelectByIndex(i))
            {
             ulong ticket = m_position.Ticket();
-         // 0. Synchronized Batch loss cut defense ($0.50 limit): close all positions on this symbol simultaneously
+         // 0a. Synchronized Batch profit target defense ($0.40 - $0.50 profit): close all batch positions on this symbol simultaneously
+         if(m_config.target_trade_profit > 0.0)
+           {
+            double pos_profit = m_position.Profit() + m_position.Swap();
+            if(pos_profit >= m_config.target_trade_profit)
+              {
+               string profit_sym = m_position.Symbol();
+               PrintFormat("[RiskEngine] Batch trade profit target reached on %s (ticket #%I64u: Profit=+$%.2f >= +$%.2f). Closing all batch trades on %s simultaneously.",
+                           profit_sym, ticket, pos_profit, m_config.target_trade_profit, profit_sym);
+               for(int j = PositionsTotal() - 1; j >= 0; j--)
+                 {
+                  if(m_position.SelectByIndex(j))
+                    {
+                     if(m_position.Symbol() == profit_sym)
+                       {
+                        m_trade.PositionClose(m_position.Ticket(), 20);
+                       }
+                    }
+                 }
+               break;
+              }
+           }
+
+         // 0b. Synchronized Batch loss cut defense (-$0.40 limit): close all batch positions on this symbol simultaneously
          if(m_config.max_trade_loss > 0.0)
            {
             double pos_profit = m_position.Profit() + m_position.Swap();
@@ -1181,7 +1206,30 @@ void CRiskEngine::RunPositionDefense()
       if(m_position.SelectByIndex(i))
         {
          ulong ticket = m_position.Ticket();
-         // 0. Synchronized Batch loss cut defense ($0.50 limit): close all positions on this symbol simultaneously
+         // 0a. Synchronized Batch profit target defense ($0.40 - $0.50 profit): close all batch positions on this symbol simultaneously
+         if(m_config.target_trade_profit > 0.0)
+           {
+            double pos_profit = m_position.Profit() + m_position.Swap();
+            if(pos_profit >= m_config.target_trade_profit)
+              {
+               string profit_sym = m_position.Symbol();
+               PrintFormat("[RiskEngine] Batch trade profit target reached on %s (ticket #%I64u: Profit=+$%.2f >= +$%.2f). Closing all batch trades on %s simultaneously.",
+                           profit_sym, ticket, pos_profit, m_config.target_trade_profit, profit_sym);
+               for(int j = PositionsTotal() - 1; j >= 0; j--)
+                 {
+                  if(m_position.SelectByIndex(j))
+                    {
+                     if(m_position.Symbol() == profit_sym)
+                       {
+                        m_trade.PositionClose(m_position.Ticket(), 20);
+                       }
+                    }
+                 }
+               break;
+              }
+           }
+
+         // 0b. Synchronized Batch loss cut defense (-$0.40 limit): close all batch positions on this symbol simultaneously
          if(m_config.max_trade_loss > 0.0)
            {
             double pos_profit = m_position.Profit() + m_position.Swap();
