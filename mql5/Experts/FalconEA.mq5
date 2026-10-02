@@ -49,7 +49,7 @@ input group "=== Trade Risk & Execution Guardrails ==="
 input double   InpMaxMarginPercent     = 20.0;                   // Margin Usage Ceiling (%)
 input double   InpMaxSpreadPoints      = 50000.0;                // Max Allowable Spread in points (0 to disable)
 input int      InpMaxLossStreak        = 0;                      // Consecutive Loss Circuit Breaker (0 to disable for Martingale)
-input int      InpCooldownSec          = 3600;                   // Cooldown Period (seconds)
+input int      InpCooldownSec          = 0;                      // Cooldown Period (0 to disable)
 input double   InpMaxTradeLoss         = 0.40;                   // Max Single Trade Loss Cut ($0.40, 0 to disable)
 input double   InpTargetTradeProfit    = 0.40;                   // Target Profit per Trade ($0.40 - $0.50, 0 to disable)
 
@@ -547,8 +547,8 @@ void CheckAndApplyDynamicRisk(bool force = false)
 
    // Preserve execution and defense settings across dynamic balance recalibration
    config.max_spread_points          = InpMaxSpreadPoints;
-   config.max_consecutive_losses     = InpMaxLossStreak;
-   config.cooldown_duration_sec      = InpCooldownSec;
+   config.max_consecutive_losses     = 0;
+   config.cooldown_duration_sec      = 0;
    config.max_daily_trades           = 100;
    config.max_trade_loss             = InpMaxTradeLoss;
    config.target_trade_profit        = InpTargetTradeProfit;
@@ -638,8 +638,8 @@ int OnInit()
    config.max_open_positions         = InpMaxPositions;
    config.max_margin_usage_percent   = InpMaxMarginPercent;
    config.max_spread_points          = InpMaxSpreadPoints;
-   config.max_consecutive_losses     = InpMaxLossStreak;
-   config.cooldown_duration_sec      = InpCooldownSec;
+   config.max_consecutive_losses     = 0;
+   config.cooldown_duration_sec      = 0;
    config.max_daily_trades           = 100;
    config.max_trade_loss             = InpMaxTradeLoss;
    config.target_trade_profit        = InpTargetTradeProfit;

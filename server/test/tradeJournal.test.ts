@@ -96,6 +96,7 @@ describe('TradeJournalStore', () => {
   it('automatically journals real trades when ExecutionEngine triggers TP or SL', () => {
     const initial = createInitialState();
     initial.status = 'running';
+    initial.selectedSymbols = ['Volatility 75 Index'];
     const store = new ControllerStore(initial);
     const engine = new ExecutionEngine(store);
 

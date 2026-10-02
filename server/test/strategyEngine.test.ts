@@ -143,6 +143,7 @@ describe('ExecutionEngine', () => {
   it('evaluates position lifecycle, updates unrealized P&L, and triggers TP hit', () => {
     const initial = createInitialState();
     initial.status = 'running';
+    initial.selectedSymbols = ['Volatility 75 Index'];
     const store = new ControllerStore(initial);
     const engine = new ExecutionEngine(store);
 
@@ -181,6 +182,7 @@ describe('ExecutionEngine', () => {
   it('closes position and records loss when Stop Loss is hit', () => {
     const initial = createInitialState();
     initial.status = 'running';
+    initial.selectedSymbols = ['Volatility 75 Index'];
     const store = new ControllerStore(initial);
     const engine = new ExecutionEngine(store);
 
@@ -208,6 +210,7 @@ describe('ExecutionEngine', () => {
   it('forwards signal execution to Mt5Bridge when bridge is connected', () => {
     const initial = createInitialState();
     initial.status = 'running';
+    initial.selectedSymbols = ['Volatility 75 Index'];
     const store = new ControllerStore(initial);
     const bridge = new Mt5Bridge(store);
     bridge.handleTelemetry({
@@ -244,5 +247,32 @@ describe('ExecutionEngine', () => {
     expect(commands[0]!.symbol).toBe('Volatility 75 Index');
     expect(commands[0]!.direction).toBe('BUY');
     expect(commands[0]!.lots).toBe(0.001); // Volatility 75 broker minimum lot
+  });
+  it('isolates trading strictly to Step Index and ignores other index signals by default', () => {
+    const initial = createInitialState();
+    initial.status = 'running';
+    expect(initial.selectedSymbols).toEqual(['Step Index']);
+    const store = new ControllerStore(initial);
+    const engine = new ExecutionEngine(store);
+
+    const candles: Candle[] = [
+      { timestamp: 1000, open: 100, high: 105, low: 95, close: 102, volume: 5 },
+      { timestamp: 2000, open: 102, high: 110, low: 100, close: 108, volume: 5 },
+      { timestamp: 3000, open: 108, high: 125, low: 107, close: 120, volume: 5 },
+      { timestamp: 4000, open: 120, high: 118, low: 112, close: 115, volume: 5 },
+      { timestamp: 5000, open: 115, high: 114, low: 108, close: 110, volume: 5 },
+      { timestamp: 6000, open: 110, high: 130, low: 109, close: 128, volume: 5 },
+    ];
+    engine.getAggregator().seedCandles('R_75', candles);
+
+    // Feed tick for Volatility 75 - should be ignored
+    engine.handleTick('R_75', 130, 1700000000);
+    expect(store.snapshot.positions).toHaveLength(0);
+
+    // Feed tick for Step Index
+    engine.getAggregator().seedCandles('stpRNG', candles);
+    engine.handleTick('stpRNG', 130, 1700000000);
+    expect(store.snapshot.positions).toHaveLength(1);
+    expect(store.snapshot.positions[0]!.symbol).toBe('Step Index');
   });
 });
