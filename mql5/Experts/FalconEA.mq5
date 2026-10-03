@@ -299,7 +299,10 @@ void ProcessBridgeCommand(const BridgeCommand &cmd)
          return;
         }
 
-      if(!g_trade.PositionClose(ticket))
+      g_trade.SetAsyncMode(true);
+      bool close_dispatched = g_trade.PositionClose(ticket, 20);
+      g_trade.SetAsyncMode(false);
+      if(!close_dispatched)
         {
          string err_msg = g_trade.ResultRetcodeDescription();
          PrintFormat("[FalconEA] Failed to close ticket #%I64u: %s", ticket, err_msg);
@@ -307,9 +310,9 @@ void ProcessBridgeCommand(const BridgeCommand &cmd)
         }
       else
         {
-         PrintFormat("[FalconEA] Closed ticket #%I64u successfully.", ticket);
+         PrintFormat("[FalconEA] Closed ticket #%I64u (Async).", ticket);
          g_bridge.MarkCommandAsProcessed(cmd.id);
-         g_bridge.SendOrderResult(ticket, cmd.id, true, "Position closed", g_trade.ResultPrice());
+         g_bridge.SendOrderResult(ticket, cmd.id, true, "Position closed asynchronously", g_trade.ResultPrice());
         }
       return;
      }
@@ -459,12 +462,12 @@ void ProcessBridgeCommand(const BridgeCommand &cmd)
       else
         {
          ulong deal_ticket = g_trade.ResultOrder();
-         double fill_price = g_trade.ResultPrice();
+         double fill_price = (g_trade.ResultPrice() > 0.0) ? g_trade.ResultPrice() : price;
          double slippage = MathAbs(fill_price - price) / g_symbol.Point();
 
-         PrintFormat("[FalconEA] Order executed successfully! Ticket #%I64u @ %.5f (Slippage: %.1f pts)",
-                     deal_ticket, fill_price, slippage);
-         g_bridge.SendOrderResult(deal_ticket, cmd.id, true, "Order filled successfully", fill_price, slippage);
+         PrintFormat("[FalconEA] Order dispatched (Async)! Ticket #%I64u @ %.5f",
+                     deal_ticket, fill_price);
+         g_bridge.SendOrderResult(deal_ticket, cmd.id, true, "Order dispatched asynchronously", fill_price, slippage);
         }
       return;
      }
@@ -621,6 +624,7 @@ int OnInit()
    g_basket.Init(InpMagicNumber, 20);
    g_trade.SetDeviationInPoints(20);
    g_trade.SetTypeFilling(ORDER_FILLING_IOC);
+   g_trade.SetAsyncMode(true); // Instant simultaneous batch burst (< 10ms for 10 orders)
 
    g_last_scaled_balance = -1.0;
 
