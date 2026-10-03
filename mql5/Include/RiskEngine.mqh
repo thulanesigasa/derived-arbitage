@@ -553,6 +553,7 @@ public:
    double                     GetLotStep(string symbol) { return m_spec.GetLotStep(symbol); }
    void                       EmergencyFlatten(string reason);
    void                       ResetCooldown() { m_metrics.cooldown_active = false; m_metrics.cooldown_expiry = 0; m_metrics.consecutive_losses = 0; }
+   void                       ResetDailyLossLock() { m_metrics.risk_locked = false; }
 
    //--- Active position defense
    void                       RunPositionDefense();
@@ -899,9 +900,9 @@ ENUM_RISK_BREACH_REASON CRiskEngine::CheckRiskLimits()
         }
       return BREACH_DAILY_LOSS_LIMIT;
      }
-   else if(m_config.max_daily_loss > 0.0 && m_metrics.risk_locked && m_metrics.daily_net_pnl > -m_config.max_daily_loss && m_metrics.current_drawdown < m_config.max_total_loss)
+   else if(m_config.max_daily_loss <= 0.0 || (m_metrics.risk_locked && m_metrics.daily_net_pnl > -m_config.max_daily_loss))
      {
-      // Self-heal: clear false lock if DayPnL is healthy and drawdown is within safe limits
+      // Self-heal: clear lock if limit is disabled (<= 0) or DayPnL is within safe limits
       m_metrics.risk_locked = false;
      }
 

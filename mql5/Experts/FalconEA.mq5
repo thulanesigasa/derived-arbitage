@@ -29,7 +29,7 @@ input group "=== Adaptive Portfolio Risk Mode ==="
 input bool     InpAutoDynamicRisk      = true;                   // Auto-scale risk dynamically to current balance
 input double   InpEquityFloorPercent   = 85.0;                   // Absolute Equity Floor (% of balance, e.g. 85%)
 input double   InpEquityFloorWarnPct   = 90.0;                   // Equity Warning Threshold (% of balance, e.g. 90%)
-input double   InpMaxDailyLossPercent  = 1.0;                    // Maximum Daily Loss (% of balance, e.g. 1.0%)
+input double   InpMaxDailyLossPercent  = 10.0;                   // Maximum Daily Loss (% of balance, e.g. 10.0% = ~$950 on $9.5k; 0 to disable)
 input double   InpMaxWeeklyLossPercent = 3.0;                    // Maximum Weekly Loss (% of balance, e.g. 3.0%)
 input double   InpMaxTotalLossPercent  = 10.0;                   // Maximum Total Drawdown (% of balance, e.g. 10.0%)
 input double   InpRiskPerTradePercent  = 0.2;                    // Target Risk Per Trade (% of balance, e.g. 0.2% = Hard Max Risk)
@@ -39,7 +39,7 @@ input int      InpMaxPositions         = 50;                     // Max Simultan
 input group "=== Manual Override Limits (if Dynamic Mode = false) ==="
 input double   InpEquityFloor          = 8500.00;                // Manual Equity Floor ($)
 input double   InpEquityFloorWarning   = 9000.00;                // Manual Warning Threshold ($)
-input double   InpMaxDailyLoss         = 100.00;                 // Manual Maximum Daily Loss ($)
+input double   InpMaxDailyLoss         = 1000.00;                // Manual Maximum Daily Loss ($1,000; 0 to disable)
 input double   InpMaxWeeklyLoss        = 300.00;                 // Manual Maximum Weekly Loss ($)
 input double   InpMaxTotalLoss         = 1000.00;                // Manual Maximum Cumulative Loss ($)
 input double   InpTargetRiskPerTrade   = 20.00;                  // Manual Target Risk per Trade ($)
@@ -510,7 +510,7 @@ void CheckAndApplyDynamicRisk(bool force = false)
       cur_bal = 10000.0; // Safe fallback baseline if terminal has not ticked yet
 
    RiskConfig config = g_risk.GetConfig();
-   bool needs_scale = force || (config.max_daily_loss <= 0.0) || (config.equity_floor <= 0.0);
+   bool needs_scale = force || (config.max_daily_loss < 500.0 && cur_bal >= 1000.0) || (config.equity_floor <= 0.0);
 
    // Re-scale if forced, unconfigured, or if balance shifted by more than 0.5%
    if(!needs_scale && g_last_scaled_balance > 0.0 && MathAbs(cur_bal - g_last_scaled_balance) / g_last_scaled_balance < 0.005)
@@ -550,6 +550,7 @@ void CheckAndApplyDynamicRisk(bool force = false)
    config.max_consecutive_losses     = 0;
    config.cooldown_duration_sec      = 0;
    g_risk.ResetCooldown();
+   g_risk.ResetDailyLossLock();
    config.max_daily_trades           = 100;
    config.max_trade_loss             = InpMaxTradeLoss;
    config.target_trade_profit        = InpTargetTradeProfit;
@@ -642,6 +643,7 @@ int OnInit()
    config.max_consecutive_losses     = 0;
    config.cooldown_duration_sec      = 0;
    g_risk.ResetCooldown();
+   g_risk.ResetDailyLossLock();
    config.max_daily_trades           = 100;
    config.max_trade_loss             = InpMaxTradeLoss;
    config.target_trade_profit        = InpTargetTradeProfit;
@@ -722,6 +724,7 @@ void OnTimer()
   {
    // 0. Maintain real-time balance scaling & ensure cooldown is always off
    g_risk.ResetCooldown();
+   g_risk.ResetDailyLossLock();
    CheckAndApplyDynamicRisk(false);
 
    // 1. Maintain invariant limits
