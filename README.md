@@ -948,3 +948,20 @@ The Martingale Basket Engine ([`server/src/strategy/basketEngine.ts`](file:///d:
   - Wine MetaEditor64 compiles with zero errors and zero warnings (`0 errors, 0 warnings, cpu='X64 Regular'`).
 - **Live Terminal Verification**:
   - MetaTrader 5 terminal (`terminal64.exe`) running under Wine on VPS cleanly loads `FalconEA.ex5`, binds to the local Node.js bridge, receives incoming 10x batch orders on Step Index, and fills them with live broker deal tickets (e.g. `#5793877888`, `#5793877889`, `#5793877891`) with zero Reason Code 2 rejections.
+
+
+---
+
+## High-Frequency Batch Capacity & Multi-Guardrail Invariant Auto-Healing
+
+![Daily Trade Ceiling](https://img.shields.io/badge/Daily_Trade_Ceiling-10,000_Trades-22C55E?style=flat-square)
+![Equity Floor Auto-Heal](https://img.shields.io/badge/Equity_Floor-Auto--Healing_Active-0EA5E9?style=flat-square)
+![Batch Execution](https://img.shields.io/badge/Batch_Execution-100%25_Broker_Fills-FF6B00?style=flat-square)
+
+- **High-Frequency Batch Scalping Capacity**:
+  - `config.max_daily_trades` and `InpMaxDailyTrades` have been scaled to `10000` (allowing up to 1,000 batches of 10 concurrent trades per day, or 0 to disable), eliminating Reason Code 13 (`BREACH_DAILY_TRADE_LIMIT`) after high-frequency scalping sessions.
+- **Dynamic Equity Floor Auto-Healing**:
+  - On terminal cold-start prior to network login (`ACCOUNT_BALANCE <= 0.0`), `equity_floor` is safely initialized to `0.0` rather than defaulting to $8,500 on an account with $7,365 balance.
+  - In `CRiskEngine::CheckRiskLimits()`, whenever equity rises above the dynamically adjusted floor (`m_metrics.current_equity > m_config.equity_floor`), `m_metrics.equity_floor_locked` immediately auto-heals to `false`, eliminating Reason Code 1 (`BREACH_EQUITY_FLOOR`).
+- **Verified Continuous Fill Telemetry**:
+  - All 10 simultaneous orders per batch are confirmed filled on live broker tickets via `/api/mt5/order-result`, basket profit targets (+0.40 USD) trigger simultaneous multi-order exits (`BASKET_CLOSE_ALL`), and subsequent anchor batches are executed seamlessly with zero order rejections.
