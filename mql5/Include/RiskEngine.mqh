@@ -577,6 +577,11 @@ public:
         }
      }
 
+   void                       ResetEquityFloorLock()
+     {
+      m_metrics.equity_floor_locked = false;
+     }
+
    void                       ResetAllRiskLocks()
      {
       m_metrics.risk_locked = false;
@@ -650,7 +655,7 @@ void CRiskEngine::SetDefaultConfig()
    m_config.max_spread_points          = 50000.0;
    m_config.max_consecutive_losses     = 0;
    m_config.cooldown_duration_sec      = 0;
-   m_config.max_daily_trades           = 500;
+   m_config.max_daily_trades           = 10000;
    m_config.max_trade_loss             = 0.40;
    m_config.target_trade_profit        = 0.40;
    m_config.require_hard_sl            = true;
@@ -908,7 +913,7 @@ ENUM_RISK_BREACH_REASON CRiskEngine::CheckRiskLimits()
         }
       return BREACH_EQUITY_FLOOR;
      }
-   else if(m_config.equity_floor > 0.0 && m_metrics.current_equity > m_config.equity_floor_warning && m_metrics.equity_floor_locked)
+   else if(m_config.equity_floor > 0.0 && m_metrics.current_equity > m_config.equity_floor && m_metrics.equity_floor_locked)
      {
       // Self-heal: clear false lock if equity is safely above warning threshold
       m_metrics.equity_floor_locked = false;
@@ -1028,7 +1033,7 @@ bool CRiskEngine::ValidateNewOrder(string symbol, ENUM_ORDER_TYPE order_type, do
      }
 
    // 4. Max Daily Trades Ceiling
-   if(m_metrics.daily_trades_count >= m_config.max_daily_trades)
+   if(m_config.max_daily_trades > 0 && m_metrics.daily_trades_count >= m_config.max_daily_trades)
      {
       reject_reason = BREACH_DAILY_TRADE_LIMIT;
       m_logger.Log(LOG_LEVEL_WARNING, "OrderValidator",

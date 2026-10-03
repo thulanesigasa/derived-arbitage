@@ -52,6 +52,7 @@ input int      InpMaxLossStreak        = 0;                      // Consecutive 
 input int      InpCooldownSec          = 0;                      // Cooldown Period (0 to disable)
 input double   InpMaxTradeLoss         = 0.40;                   // Max Single Trade Loss Cut ($0.40, 0 to disable)
 input double   InpTargetTradeProfit    = 0.40;                   // Target Profit per Trade ($0.40 - $0.50, 0 to disable)
+input int      InpMaxDailyTrades       = 10000;                  // Maximum Daily Trades (10,000 for high-frequency batch scalping; 0 to disable)
 
 input group "=== Active Position Defense ==="
 input bool     InpBreakEvenEnabled     = true;                   // Enable Break-Even Protection
@@ -552,7 +553,7 @@ void CheckAndApplyDynamicRisk(bool force = false)
    g_risk.SyncBalanceBaseline(cur_bal);
    g_risk.ResetCooldown();
    g_risk.ResetDailyLossLock();
-   config.max_daily_trades           = 100;
+   config.max_daily_trades           = (InpMaxDailyTrades > 0) ? InpMaxDailyTrades : 10000;
    config.max_trade_loss             = InpMaxTradeLoss;
    config.target_trade_profit        = InpTargetTradeProfit;
    config.require_hard_sl            = true;
@@ -613,11 +614,20 @@ int OnInit()
 
    double init_bal = AccountInfoDouble(ACCOUNT_BALANCE);
    if(init_bal <= 0.0) init_bal = AccountInfoDouble(ACCOUNT_EQUITY);
-   if(init_bal <= 0.0) init_bal = 10000.0;
 
    // Configure RiskEngine with user guardrails
    RiskConfig config;
-   if(InpAutoDynamicRisk)
+   if(init_bal <= 0.0)
+     {
+      config.equity_floor            = 0.0; // Disabled until broker connection reports real balance
+      config.equity_floor_warning    = 0.0;
+      config.max_daily_loss          = 1000.00;
+      config.max_weekly_loss         = 300.00;
+      config.max_total_loss          = 5000.00;
+      config.default_risk_per_trade  = 20.00;
+      config.hard_max_risk_per_trade = 20.00;
+     }
+   else if(InpAutoDynamicRisk)
      {
       config.equity_floor            = NormalizeDouble(init_bal * (InpEquityFloorPercent / 100.0), 2);
       config.equity_floor_warning    = NormalizeDouble(init_bal * (InpEquityFloorWarnPct / 100.0), 2);
@@ -646,7 +656,7 @@ int OnInit()
    g_risk.SyncBalanceBaseline(init_bal);
    g_risk.ResetCooldown();
    g_risk.ResetDailyLossLock();
-   config.max_daily_trades           = 100;
+   config.max_daily_trades           = (InpMaxDailyTrades > 0) ? InpMaxDailyTrades : 10000;
    config.max_trade_loss             = InpMaxTradeLoss;
    config.target_trade_profit        = InpTargetTradeProfit;
    config.require_hard_sl            = true;
@@ -731,6 +741,10 @@ void OnTimer()
    g_risk.ResetCooldown();
    g_risk.ResetDailyLossLock();
    CheckAndApplyDynamicRisk(false);
+   if(cur_bal > 0.0 && cur_bal > g_risk.GetConfig().equity_floor)
+     {
+      g_risk.ResetEquityFloorLock();
+     }
 
    // 1. Maintain invariant limits
    g_risk.CheckRiskLimits();
