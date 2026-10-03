@@ -926,3 +926,25 @@ The Martingale Basket Engine ([`server/src/strategy/basketEngine.ts`](file:///d:
 - **Multi-Dimensional Invariant Self-Healing**: `CheckRiskLimits()` now verifies both daily loss (`daily_net_pnl > -max_daily_loss`) and cumulative drawdown (`current_drawdown < max_total_loss`), clearing `risk_locked = false` immediately when metrics are healthy.
 - **Invariant Check Order in Order Validator**: `ValidateNewOrder()` now executes `CheckRiskLimits()` prior to fallback circuit breaker checks, ensuring active self-healing takes effect before any order rejection decision.
 - **Expanded Total Loss Capacity**: Recalibrated `InpMaxTotalLossPercent = 50.0` (~$3,680+ on $7,365 account) and manual override limit `InpMaxTotalLoss = 5000.00` to prevent normal market oscillations from prematurely terminating high-frequency Step Index arbitrage.
+
+
+---
+
+## Headless MetaEditor Compilation & Whitespace-Safe Synchronization Architecture
+
+![MetaEditor Compilation](https://img.shields.io/badge/MetaEditor_64-Headless_Compilation_Clean-22C55E?style=flat-square)
+![Whitespace Protection](https://img.shields.io/badge/Bash_Sync-Whitespace_Protected-0EA5E9?style=flat-square)
+![Live Execution](https://img.shields.io/badge/MT5_Fills-Zero_Reason_Code_2_Rejections-FF6B00?style=flat-square)
+
+- **Root Cause of Lingering Reason Code 2 Rejections**:
+  - In `scripts/update_ea.sh`, directory discovery pipelines utilizing `for dir in $(find ...)` previously suffered from bash word-splitting on paths containing spaces (e.g. `/home/ubuntu/mt5/drive_c/Program Files/MetaTrader 5/MQL5/Include`). This created stray `/Program` directories and prevented the updated `RiskEngine.mqh` from being written into MT5's active include directory.
+  - In `mql5/Experts/FalconEA.mq5`, line 646 inside `OnInit()` invoked `g_risk.SyncBalanceBaseline(cur_bal);` where `cur_bal` was undeclared (only `init_bal` was defined in scope), causing MetaEditor compilation to abort with `error 256: undeclared identifier 'cur_bal'`.
+  - Because compilation aborted, the MT5 terminal continued executing a legacy binary which retained stale daily loss circuit breaker checks.
+- **Whitespace-Safe Multi-Directory Sync**:
+  - `scripts/update_ea.sh` was upgraded to explicitly sync the primary MT5 directory (`${MT5_DIR}/MQL5/Experts` and `${MT5_DIR}/MQL5/Include`) first, followed by whitespace-safe `while IFS= read -r dir` streams to cover any secondary wine prefixes and user data roaming directories.
+  - Legacy word-split directories (`${MT5_PREFIX}/drive_c/Program` and `./5`) are automatically purged before each synchronization run.
+- **MQL5 Syntax Remediation**:
+  - `FalconEA.mq5` `OnInit()` now cleanly initializes baseline balance via `g_risk.SyncBalanceBaseline(init_bal);`, while runtime timer cycles utilize `cur_bal`.
+  - Wine MetaEditor64 compiles with zero errors and zero warnings (`0 errors, 0 warnings, cpu='X64 Regular'`).
+- **Live Terminal Verification**:
+  - MetaTrader 5 terminal (`terminal64.exe`) running under Wine on VPS cleanly loads `FalconEA.ex5`, binds to the local Node.js bridge, receives incoming 10x batch orders on Step Index, and fills them with live broker deal tickets (e.g. `#5793877888`, `#5793877889`, `#5793877891`) with zero Reason Code 2 rejections.

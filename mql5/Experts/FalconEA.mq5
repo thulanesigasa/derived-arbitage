@@ -643,7 +643,7 @@ int OnInit()
    config.max_spread_points          = InpMaxSpreadPoints;
    config.max_consecutive_losses     = 0;
    config.cooldown_duration_sec      = 0;
-   g_risk.SyncBalanceBaseline(cur_bal);
+   g_risk.SyncBalanceBaseline(init_bal);
    g_risk.ResetCooldown();
    g_risk.ResetDailyLossLock();
    config.max_daily_trades           = 100;
