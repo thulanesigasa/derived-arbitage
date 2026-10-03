@@ -10,7 +10,7 @@ import {
   View,
 } from 'react-native';
 import { AppHeader } from '../components/AppHeader';
-import { PauseIcon, PlayIcon, QuotesIcon, StopIcon } from '../components/TabIcons';
+import { ControllerIcon, PauseIcon, PlayIcon, StopIcon } from '../components/TabIcons';
 import { getApiBaseUrl } from '../api';
 import type { ControlAction, ControllerState } from '../types';
 
@@ -21,7 +21,7 @@ interface HomeScreenProps {
   refreshing: boolean;
   onRefresh: () => void;
   onControl: (action: ControlAction) => void;
-  onNavigateTab: (tab: 'home' | 'controller' | 'profiler' | 'activity' | 'profile') => void;
+  onNavigateTab: (tab: 'home' | 'controller' | 'profile') => void;
 }
 
 const colors = {
@@ -151,11 +151,11 @@ export function HomeScreen({
             <Text style={styles.dockButtonTextPrimary}>{primaryAction.label}</Text>
           </Pressable>
 
-          {/* Action 2: QUOTES (Deep link to Profiler tab) */}
+          {/* Action 2: CONTROL (Deep link to Controller tab) */}
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Quotes and Market Profiler"
-            onPress={() => onNavigateTab('profiler')}
+            accessibilityLabel="Trading Controls and Live Positions"
+            onPress={() => onNavigateTab('controller')}
             style={({ pressed }) => [
               styles.dockButton,
               styles.dockButtonSecondary,
@@ -163,9 +163,9 @@ export function HomeScreen({
             ]}
           >
             <View style={styles.dockIconCircleSecondary}>
-              <QuotesIcon size={18} color={colors.orange} />
+              <ControllerIcon size={18} color={colors.orange} />
             </View>
-            <Text style={styles.dockButtonTextSecondary}>QUOTES</Text>
+            <Text style={styles.dockButtonTextSecondary}>CONTROL</Text>
           </Pressable>
 
           {/* Action 3: STOP */}

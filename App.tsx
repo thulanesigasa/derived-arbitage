@@ -28,8 +28,6 @@ import {
 import { ALL_SYMBOLS, type ControlAction, type ControllerState, type SymbolName } from './src/types';
 import { HomeScreen } from './src/screens/HomeScreen';
 import { ControllerScreen } from './src/screens/ControllerScreen';
-import { ProfilerScreen } from './src/screens/ProfilerScreen';
-import { ActivityScreen } from './src/screens/ActivityScreen';
 import { ProfileScreen } from './src/screens/ProfileScreen';
 import { LegalScreen, type LegalSectionKey } from './src/screens/LegalScreen';
 import { useOTAUpdate } from './src/hooks/useOTAUpdate';
@@ -38,9 +36,7 @@ import { NoInstrumentsModal } from './src/components/NoInstrumentsModal';
 import {
   ControllerIcon,
   HomeIcon,
-  JournalIcon,
   ProfileIcon,
-  ProfilerIcon,
 } from './src/components/TabIcons';
 
 const colors = {
@@ -99,7 +95,7 @@ function requestId(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
-type TabId = 'home' | 'controller' | 'profiler' | 'activity' | 'profile';
+type TabId = 'home' | 'controller' | 'profile';
 
 const TAB_DEFS: Array<{
   id: TabId;
@@ -108,8 +104,6 @@ const TAB_DEFS: Array<{
 }> = [
   { id: 'home',       label: 'Home',     Icon: HomeIcon },
   { id: 'controller', label: 'Control',  Icon: ControllerIcon },
-  { id: 'profiler',   label: 'Profiler', Icon: ProfilerIcon },
-  { id: 'activity',   label: 'Journal',  Icon: JournalIcon },
   { id: 'profile',    label: 'Profile',  Icon: ProfileIcon },
 ];
 
@@ -171,8 +165,8 @@ export default function App() {
 
   const tabWidth = pillContainerWidth > 0 ? pillContainerWidth / TAB_DEFS.length : 0;
   const translateX = tabAnim.interpolate({
-    inputRange: [0, 1, 2, 3, 4],
-    outputRange: [0, tabWidth, tabWidth * 2, tabWidth * 3, tabWidth * 4],
+    inputRange: [0, 1, 2],
+    outputRange: [0, tabWidth, tabWidth * 2],
   });
 
   const [currentApiUrl, setCurrentApiUrl] = useState(() => getApiBaseUrl());
@@ -399,19 +393,6 @@ export default function App() {
                 />
               )}
 
-              {activeTab === 'profiler' && <ProfilerScreen />}
-
-              {activeTab === 'activity' && (
-                <ActivityScreen
-                  state={state}
-                  refreshing={refreshing}
-                  onRefresh={() => {
-                    setRefreshing(true);
-                    void load(true);
-                  }}
-                />
-              )}
-
               {activeTab === 'profile' && (
                 <ProfileScreen
                   state={state}
@@ -456,7 +437,7 @@ export default function App() {
                       onPress={() => setActiveTab(id)}
                       style={styles.tabItem}
                     >
-                      <Icon size={20} color={color} />
+                      <Icon size={16} color={color} />
                       <Text style={[styles.tabLabel, active ? styles.tabLabelActive : styles.tabLabelIdle]}>
                         {label}
                       </Text>
@@ -536,20 +517,23 @@ const styles = StyleSheet.create({
   // ─── Floating Pill Tab Bar (Rule 15: accounts for OS chrome + floating pill design) ──
   floatingNavWrapper: {
     position: 'absolute',
-    bottom: Platform.OS === 'android' ? 48 : 34,
+    bottom: Platform.OS === 'ios' ? 28 : 24,
     left: 0,
     right: 0,
-    paddingHorizontal: 16,
-    paddingTop: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    pointerEvents: 'box-none',
   },
   pillBar: {
+    width: 280,
     flexDirection: 'row',
-    height: 64,
+    height: 50,
     backgroundColor: '#161616',
-    borderRadius: 32,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: '#282828',
     alignItems: 'center',
+    justifyContent: 'space-around',
     position: 'relative',
     overflow: 'hidden',
     elevation: 8,
@@ -557,10 +541,12 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.5,
     shadowRadius: 10,
+    paddingTop: 4,
+    paddingBottom: 4,
   },
   slidingIndicator: {
     position: 'absolute',
-    bottom: 6,
+    bottom: 3,
     left: 0,
     height: 3,
     justifyContent: 'center',
@@ -568,7 +554,7 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
   sliderLine: {
-    width: 28,
+    width: 24,
     height: 3,
     borderRadius: 1.5,
     backgroundColor: colors.orange,
@@ -577,13 +563,13 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 48,
-    paddingBottom: 4,
-    gap: 3,
+    height: '100%',
+    paddingBottom: 2,
+    gap: 2,
     zIndex: 2,
   },
   tabLabel: {
-    fontSize: 10,
+    fontSize: 8.5,
     fontWeight: '700',
   },
   tabLabelActive: {
