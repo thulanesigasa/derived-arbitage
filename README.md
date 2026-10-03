@@ -940,3 +940,15 @@ The Martingale Basket Engine ([`server/src/strategy/basketEngine.ts`](file:///d:
 
 - **Total Elimination of Cooldown Circuit Breaker**: The cooldown streak validator in `RiskEngine.mqh` has been completely stripped so that `BREACH_COOLDOWN_ACTIVE` (Reason Code 10) can never be triggered under any circumstances. In addition, `g_risk.ResetCooldown()` is executed on every timer tick to actively purge any lingering streak state from terminal memory.
 - **Universal Multi-Directory Synchronizer (`update_ea.sh`)**: Rather than targeting only `Program Files`, `scripts/update_ea.sh` now dynamically discovers all active MT5 `Experts` and `Include` directories across the VPS (including user `AppData/Roaming/MetaQuotes/Terminal/<HASH>` folders), ensuring the running chart instance receives the new binary regardless of whether MT5 is running in portable or standard data mode.
+
+
+---
+
+## Daily Loss Limit Recalibration & Auto-Healing (Reason Code 2 Resolution)
+
+![Reason Code 2](https://img.shields.io/badge/Reason_Code_2-Auto--Healing_Unlocked-22C55E?style=flat-square)
+![Daily Limit](https://img.shields.io/badge/Daily_Loss_Limit-10%25_Scaled_(~$950)-0EA5E9?style=flat-square)
+![Batch Resilience](https://img.shields.io/badge/Strategy-Micro--Loss_Batch_Tolerant-FF6B00?style=flat-square)
+
+- **Calibrated Daily Loss Threshold**: For high-volume simultaneous 10-batch micro-scalping on large accounts ($9,500+), daily loss capacity has been increased from an overly sensitive $74 (1.0%) to 10% (~$950.00) in `FalconEA.mq5` (`InpMaxDailyLossPercent = 10.0`, `InpMaxDailyLoss = 1000.00`).
+- **Dynamic Lock Auto-Healing**: In `RiskEngine.mqh`, `CheckRiskLimits()` now incorporates an active self-healing clause: if daily loss limits are relaxed or disabled, or DayPnL recovers, `m_metrics.risk_locked` is immediately set to `false`. Furthermore, `g_risk.ResetDailyLossLock()` is invoked during `OnInit()` and timer ticks to prevent old cumulative session losses from paralyzing new batch execution.
