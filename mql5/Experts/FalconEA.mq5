@@ -50,7 +50,7 @@ input double   InpMaxMarginPercent     = 20.0;                   // Margin Usage
 input double   InpMaxSpreadPoints      = 50000.0;                // Max Allowable Spread in points (0 to disable)
 input int      InpMaxLossStreak        = 0;                      // Consecutive Loss Circuit Breaker (0 to disable for Martingale)
 input int      InpCooldownSec          = 0;                      // Cooldown Period (0 to disable)
-input double   InpMaxTradeLoss         = 0.40;                   // Max Single Trade Loss Cut ($0.40, 0 to disable)
+input double   InpMaxTradeLoss         = 2.00;                   // Max Single Trade Loss Cut ($2.00, 0 to disable)
 input double   InpTargetTradeProfit    = 0.40;                   // Target Profit per Trade ($0.40 - $0.50, 0 to disable)
 input int      InpMaxDailyTrades       = 10000;                  // Maximum Daily Trades (10,000 for high-frequency batch scalping; 0 to disable)
 

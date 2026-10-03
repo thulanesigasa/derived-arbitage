@@ -166,6 +166,17 @@ export class BasketEngine {
     if (layer) layer.ticket = ticket;
   }
 
+  /**
+   * Reset/clear all active baskets without dispatching close commands (e.g. on manual stop).
+   */
+  resetBaskets(): void {
+    for (const [sym, basket] of this.baskets.entries()) {
+      basket.isActive = false;
+      basket.closedAt = new Date().toISOString();
+      basket.closeReason = "MANUAL";
+    }
+  }
+
   forceClose(symbol: SymbolName): void {
     const basket = this.baskets.get(symbol);
     if (!basket?.isActive) return;

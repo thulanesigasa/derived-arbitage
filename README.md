@@ -706,13 +706,13 @@ To capitalize on synthetic index arbitrage discrepancies across multiple uncorre
 * **Portfolio Risk Harmonization**: 15 concurrent positions × $20.00 = $300.00 maximum aggregate exposure, perfectly aligned with the $300.00 Weekly Loss Lock (3.0%) and comfortably above the $8,500.00 Absolute Equity Floor (85.0%).
 * **Rapid Cooldown (1,000 ms)**: New setup evaluation cooldown is reduced to 1 second to support high-frequency fills across simultaneous market opportunities.
 
-### 9. Synchronized 10+ Trade Batch Execution, +$0.40 Profit & -$0.40 Loss Group Defense
+### 9. Synchronized 10+ Trade Batch Execution, +$0.40 Profit & -$2.00 Loss Group Defense
 * **Synchronized Batch Execution (10+ Trades Placed Together)**:
   - Whenever an SMC setup, momentum anchor, or recovery layer triggers on a selected instrument (such as Step Index at 0.10 lots), the execution engine dispatches a synchronized batch of 10 orders simultaneously (`BATCH_SIZE = 10`) to MetaTrader 5 with unique tracking tickets.
 * **Simultaneous Group Profit Target (+$0.40 to +$0.50)**:
   - Both native MT5 defense (`InpTargetTradeProfit = 0.40` in `FalconEA.mq5` / `RiskEngine.mqh`) and the Node.js bridge evaluate each position tick-by-tick. When any trade hits the +$0.40 to +$0.50 profit threshold, all 10 batch trades on that symbol close simultaneously via `BASKET_CLOSE_ALL` / symbol iteration, banking cumulative profits across the entire batch in parallel.
-* **Simultaneous Group Loss Cutoff (-$0.40)**:
-  - If any single trade in the batch drifts to -$0.40 loss (`InpMaxTradeLoss = 0.40`), all 10 batch trades on that symbol close simultaneously. This guarantees that trades never accumulate adverse floating drawdowns, allowing the strategy to immediately reset and enter clean new setups.
+* **Simultaneous Group Loss Cutoff (-$2.00)**:
+  - If any single trade in the batch drifts to -$2.00 loss (`InpMaxTradeLoss = 2.00`), all 10 batch trades on that symbol close simultaneously. This guarantees that trades never accumulate adverse floating drawdowns, allowing the strategy to immediately reset and enter clean new setups.
 * **Permanent Network Connectivity Architecture**:
   - **Direct Static VPS IP (`http://92.4.143.117:4000`)**: The Oracle Cloud VPS runs a static IPv4 address that never changes. The mobile app's `probeCandidateUrls()` automatically falls back to this direct IP address.
   - **Cloudflare Zero-Trust Tunnel (`https://forbes-campaigns-ripe-adoption.trycloudflare.com`)**: Provides encrypted HTTPS/WSS access. To make a Cloudflare tunnel URL 100% permanent with a custom domain, a Cloudflare Zero Trust Named Tunnel (`cloudflared tunnel run --token`) can be bound to any domain indefinitely without renewal.
@@ -965,3 +965,10 @@ The Martingale Basket Engine ([`server/src/strategy/basketEngine.ts`](file:///d:
   - In `CRiskEngine::CheckRiskLimits()`, whenever equity rises above the dynamically adjusted floor (`m_metrics.current_equity > m_config.equity_floor`), `m_metrics.equity_floor_locked` immediately auto-heals to `false`, eliminating Reason Code 1 (`BREACH_EQUITY_FLOOR`).
 - **Verified Continuous Fill Telemetry**:
   - All 10 simultaneous orders per batch are confirmed filled on live broker tickets via `/api/mt5/order-result`, basket profit targets (+0.40 USD) trigger simultaneous multi-order exits (`BASKET_CLOSE_ALL`), and subsequent anchor batches are executed seamlessly with zero order rejections.
+
+### 12. Strict Stop/Pause State Guard & Order Buffer Purge
+- **Zero Orders Placed When Stopped or Paused**:
+  - The strategy execution engine explicitly inspects `state.status`. When `status !== 'running'`, all order generation (both initial SMC entries and Martingale basket layer expansions) is immediately suppressed.
+- **Immediate Pending Order Purge on Stop/Pause**:
+  - Whenever the user clicks `STOP` or `PAUSE`, `executionEngine.onAutomationStopped()` is invoked immediately via `/api/control`.
+  - The MT5 bridge purges any unexecuted `EXECUTE_ORDER` commands in the queue (`clearPendingOrders()`), and all active baskets are reset (`resetBaskets()`), preventing queued orders from executing after automation has been commanded to stop.

@@ -64,7 +64,7 @@ struct RiskConfig
    int               max_consecutive_losses;     // Consecutive loss limit before cooldown (3)
    int               cooldown_duration_sec;      // Cooldown duration in seconds (3600 = 1 hr)
    int               max_daily_trades;           // Max trades allowed per day (15)
-   double            max_trade_loss;             // Maximum allowable loss on a single trade before cut ($0.50)
+   double            max_trade_loss;             // Maximum allowable loss on a single trade before cut ($2.00)
    double            target_trade_profit;        // Target profit on a single trade to close batch ($0.40 - $0.50)
    bool              require_hard_sl;            // Enforce mandatory stop loss on all entries
    bool              break_even_enabled;         // Enable dynamic break-even protection
@@ -660,7 +660,7 @@ void CRiskEngine::SetDefaultConfig()
    m_config.max_consecutive_losses     = 0;
    m_config.cooldown_duration_sec      = 0;
    m_config.max_daily_trades           = 10000;
-   m_config.max_trade_loss             = 0.40;
+   m_config.max_trade_loss             = 2.00;
    m_config.target_trade_profit        = 0.40;
    m_config.require_hard_sl            = true;
    m_config.break_even_enabled         = false;
@@ -1190,7 +1190,7 @@ void CRiskEngine::EmergencyFlatten(string reason)
               }
            }
 
-         // 0b. Synchronized Batch loss cut defense (-$0.40 limit): close all batch positions on this symbol simultaneously
+         // 0b. Synchronized Batch loss cut defense (-$2.00 limit): close all batch positions on this symbol simultaneously
          if(m_config.max_trade_loss > 0.0)
            {
             double pos_profit = m_position.Profit() + m_position.Swap();
@@ -1280,7 +1280,7 @@ void CRiskEngine::RunPositionDefense()
               }
            }
 
-         // 0b. Synchronized Batch loss cut defense (-$0.40 limit): close all batch positions on this symbol simultaneously
+         // 0b. Synchronized Batch loss cut defense (-$2.00 limit): close all batch positions on this symbol simultaneously
          if(m_config.max_trade_loss > 0.0)
            {
             double pos_profit = m_position.Profit() + m_position.Swap();

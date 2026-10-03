@@ -90,7 +90,7 @@ export class ExecutionEngine {
     // 2. Manage open position exits & unrealized P&L for all positions on this symbol
     this.evaluatePositionsForSymbol(sym.display, quote);
 
-    // 2b. Martingale basket tick evaluation (runs regardless of automation status)
+    // 2b. Martingale basket tick evaluation (evaluates TP/SL exit, but layer entries only when running)
     const tickEquity = this.store.snapshot.equity;
     this.basketEngine.onTick(sym.display, quote, tickEquity);
 
@@ -197,6 +197,16 @@ export class ExecutionEngine {
   }
 
   /** Force-close basket on a symbol (emergency or manual) */
+  /**
+   * Called when automation is stopped: purge pending execution queues and reset active baskets.
+   */
+  onAutomationStopped(): void {
+    this.basketEngine.resetBaskets();
+    if (this.mt5Bridge) {
+      this.mt5Bridge.clearPendingOrders();
+    }
+  }
+
   forceCloseBasket(symbol: SymbolName): void {
     this.basketEngine.forceClose(symbol);
   }
@@ -209,6 +219,9 @@ export class ExecutionEngine {
     const bridge = this.mt5Bridge;
 
     if (cmd.type === 'BASKET_OPEN_LAYER') {
+      if (this.store.snapshot.status !== 'running') {
+        return; // Do not place new anchor or recovery orders when automation is stopped/paused
+      }
       const minLot = getSymbolMinLot(cmd.symbol);
       const effectiveLots = cmd.lots ?? minLot;
       const BATCH_SIZE = 10; // Rule: Synchronized batch of at least 10 trades placed at the same time

@@ -185,9 +185,9 @@ export class Mt5Bridge {
 
       // Synchronized Group Profit Target & Loss Cut Defense:
       // Profit Target: +$0.40 - $0.50
-      // Loss Cutoff:   -$0.40
+      // Loss Cutoff:   -$2.00
       const TARGET_TRADE_PROFIT_USD = 0.40;
-      const MAX_TRADE_LOSS_USD = 0.40;
+      const MAX_TRADE_LOSS_USD = 2.00;
       const symbolsToCloseForProfit = new Set<string>();
       const symbolsToCloseForLoss = new Set<string>();
 
@@ -272,6 +272,20 @@ export class Mt5Bridge {
   /**
    * Drain pending commands queued for MT5 terminal polling.
    */
+  /**
+   * Clear all pending unexecuted order placement commands (e.g. on Stop or Pause).
+   */
+  clearPendingOrders(): void {
+    const prevCount = this.pendingCommands.length;
+    this.pendingCommands = this.pendingCommands.filter((c) => c.type !== 'EXECUTE_ORDER');
+    this.status.pendingCommandsCount = this.pendingCommands.length;
+    if (prevCount !== this.pendingCommands.length) {
+      this.store.mutate((s) => {
+        log(s, 'info', `[MT5 BRIDGE] Purged ${prevCount - this.pendingCommands.length} unexecuted pending order(s) on stop/pause.`);
+      });
+    }
+  }
+
   pollCommands(): Mt5Command[] {
     const commands = [...this.pendingCommands];
     this.pendingCommands = [];
