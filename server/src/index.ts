@@ -122,6 +122,9 @@ app.post('/api/control', (req, res, next) => {
     validateEnvelope(expectedRevision, requestId);
     if (action === 'emergencyExit') {
       mt5Bridge.triggerEmergencyFlatten();
+      executionEngine.onAutomationStopped();
+    } else if (action === 'stop' || action === 'pause') {
+      executionEngine.onAutomationStopped();
     }
     res.json(store.control(action, expectedRevision as number, requestId as string));
   } catch (error) { next(error); }
