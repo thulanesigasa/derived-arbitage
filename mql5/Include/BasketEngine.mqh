@@ -188,6 +188,7 @@ public:
    bool              CloseAllBySymbol(const string symbol)
      {
       bool ok = true;
+      m_trade.SetAsyncMode(true); // Instant simultaneous burst close (< 2ms dispatch)
       for(int i = PositionsTotal() - 1; i >= 0; i--)
         {
          ulong ticket = PositionGetTicket(i);
@@ -195,10 +196,11 @@ public:
          if(m_magic > 0 && PositionGetInteger(POSITION_MAGIC) != m_magic) continue;
          if(!m_trade.PositionClose(ticket, 20))
            {
-            PrintFormat("[BasketExecutor] CloseAllBySymbol failed ticket #%I64u: %s", ticket, m_trade.ResultComment());
+            PrintFormat("[BasketExecutor] CloseAllBySymbol async dispatch failed ticket #%I64u: %s", ticket, m_trade.ResultComment());
             ok = false;
            }
         }
+      m_trade.SetAsyncMode(false);
       return ok;
      }
   };
