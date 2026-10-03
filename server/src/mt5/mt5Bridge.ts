@@ -117,8 +117,8 @@ export class Mt5Bridge {
         state.riskPolicy.maximumTotalLoss = Math.round(payload.balance * 0.15);    // 15% max total loss ($1,500 on $10k)
         state.riskPolicy.defaultRiskPerTrade = Math.round(payload.balance * 0.002); // 0.2% Hard Max Risk ($20 on $10k)
         state.riskPolicy.hardMaxRiskPerTrade = Math.round(payload.balance * 0.002); // 0.2% ($20 on $10k)
-        state.riskPolicy.dailyLossLock = Math.round(payload.balance * 0.01);       // 1.0% ($100 on $10k)
-        state.riskPolicy.weeklyLossLock = Math.round(payload.balance * 0.03);      // 3.0% ($300 on $10k)
+        state.riskPolicy.dailyLossLock = 0;                                          // DISABLED — batch recovery handles drawdown via Martingale sizing
+        state.riskPolicy.weeklyLossLock = 0;                                         // DISABLED — no weekly cap for continuous batch scalping
         state.riskPolicy.maxOpenPositions = 50;                                    // Up to 15 concurrent positions
         if (firstScale) {
           log(state, 'info', `[MT5 BRIDGE] Adaptive Risk Policy scaled for $${payload.balance.toFixed(0)} balance: 15 max positions, $${state.riskPolicy.hardMaxRiskPerTrade} hard max risk per trade, $${state.riskPolicy.dailyLossLock} daily lock`);
@@ -240,12 +240,21 @@ export class Mt5Bridge {
       }
 
       if (payload.riskLocked && !state.dailyLocked) {
-        state.dailyLocked = true;
-        log(state, 'danger', `[MT5 RISK LOCK] Terminal tripped risk lock. Dispatched auto-heal command.`);
-        this.queueCommand({
-          type: 'RESET_RISK_LOCKS',
-          symbol: 'Step Index',
-        });
+        if (state.riskPolicy.dailyLossLock > 0) {
+          // Only trip DANGER alert when daily loss lock is actively configured
+          state.dailyLocked = true;
+          log(state, 'danger', `[MT5 RISK LOCK] Terminal tripped risk lock. Dispatched auto-heal command.`);
+          this.queueCommand({
+            type: 'RESET_RISK_LOCKS',
+            symbol: 'Step Index',
+          });
+        } else {
+          // Daily loss lock is disabled — silently dispatch RESET_RISK_LOCKS to clear stale lock on EA
+          this.queueCommand({
+            type: 'RESET_RISK_LOCKS',
+            symbol: 'Step Index',
+          });
+        }
       } else if (!payload.riskLocked && state.dailyLocked) {
         state.dailyLocked = false;
         log(state, 'success', `[MT5 RISK UNLOCK] Terminal cleared risk lock. Trading resumed.`);

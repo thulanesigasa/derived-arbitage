@@ -267,8 +267,8 @@ describe('Mt5Bridge Server Layer', () => {
     expect(s.riskPolicy.defaultRiskPerTrade).toBe(20.0); // 0.2% Hard Max Risk of $10,000
     expect(s.riskPolicy.hardMaxRiskPerTrade).toBe(20.0); // 0.2% of $10,000
     expect(s.riskPolicy.absoluteEquityFloor).toBe(8500.0); // 85% of $10,000
-    expect(s.riskPolicy.dailyLossLock).toBe(100.0); // 1% of $10,000
-    expect(s.riskPolicy.weeklyLossLock).toBe(300.0); // 3% of $10,000
+    expect(s.riskPolicy.dailyLossLock).toBe(0); // DISABLED — batch recovery handles drawdown via Martingale sizing
+    expect(s.riskPolicy.weeklyLossLock).toBe(0); // DISABLED — no weekly cap for continuous batch scalping
     expect(s.riskPolicy.maximumTotalLoss).toBe(1500.0); // 15% of $10,000
 
     expect(s.activity.some((a) => a.message.includes('Adaptive Risk Policy scaled for $10000'))).toBe(true);
