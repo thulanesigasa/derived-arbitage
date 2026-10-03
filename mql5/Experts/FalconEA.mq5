@@ -29,7 +29,7 @@ input group "=== Adaptive Portfolio Risk Mode ==="
 input bool     InpAutoDynamicRisk      = true;                   // Auto-scale risk dynamically to current balance
 input double   InpEquityFloorPercent   = 85.0;                   // Absolute Equity Floor (% of balance, e.g. 85%)
 input double   InpEquityFloorWarnPct   = 90.0;                   // Equity Warning Threshold (% of balance, e.g. 90%)
-input double   InpMaxDailyLossPercent  = 10.0;                   // Maximum Daily Loss (% of balance, e.g. 10.0% = ~$950 on $9.5k; 0 to disable)
+input double   InpMaxDailyLossPercent  = 0.0;                    // Maximum Daily Loss (% of balance; 0 to disable per batch recovery)
 input double   InpMaxWeeklyLossPercent = 3.0;                    // Maximum Weekly Loss (% of balance, e.g. 3.0%)
 input double   InpMaxTotalLossPercent  = 50.0;                   // Maximum Total Drawdown (% of balance, e.g. 50.0%)
 input double   InpRiskPerTradePercent  = 0.2;                    // Target Risk Per Trade (% of balance, e.g. 0.2% = Hard Max Risk)
@@ -39,7 +39,7 @@ input int      InpMaxPositions         = 50;                     // Max Simultan
 input group "=== Manual Override Limits (if Dynamic Mode = false) ==="
 input double   InpEquityFloor          = 8500.00;                // Manual Equity Floor ($)
 input double   InpEquityFloorWarning   = 9000.00;                // Manual Warning Threshold ($)
-input double   InpMaxDailyLoss         = 1000.00;                // Manual Maximum Daily Loss ($1,000; 0 to disable)
+input double   InpMaxDailyLoss         = 0.0;                    // Manual Maximum Daily Loss ($0 to disable per batch recovery)
 input double   InpMaxWeeklyLoss        = 300.00;                 // Manual Maximum Weekly Loss ($)
 input double   InpMaxTotalLoss         = 5000.00;                // Manual Maximum Cumulative Loss ($)
 input double   InpTargetRiskPerTrade   = 20.00;                  // Manual Target Risk per Trade ($)
@@ -314,6 +314,17 @@ void ProcessBridgeCommand(const BridgeCommand &cmd)
       return;
      }
 
+   // 2.5 RESET ALL RISK LOCKS
+   if(cmd.type == "RESET_RISK_LOCKS")
+     {
+      g_risk.ResetAllRiskLocks();
+      g_risk.ResetDailyLossLock();
+      g_risk.ResetEquityFloorLock();
+      g_bridge.MarkCommandAsProcessed(cmd.id);
+      Print("[FalconEA] All risk locks cleared via bridge command.");
+      return;
+     }
+
    // 3. EXECUTE NEW ORDER
    if(cmd.type == "EXECUTE_ORDER")
      {
@@ -521,7 +532,8 @@ void CheckAndApplyDynamicRisk(bool force = false)
      {
       config.equity_floor            = NormalizeDouble(cur_bal * (InpEquityFloorPercent / 100.0), 2);
       config.equity_floor_warning    = NormalizeDouble(cur_bal * (InpEquityFloorWarnPct / 100.0), 2);
-      config.max_daily_loss          = NormalizeDouble(cur_bal * (InpMaxDailyLossPercent / 100.0), 2);
+      // For high-frequency batch scalping, daily loss lock is disabled (0.0). Legacy chart input <= 1.0% auto-disabled.
+      config.max_daily_loss          = (InpMaxDailyLossPercent <= 1.0) ? 0.0 : NormalizeDouble(cur_bal * (InpMaxDailyLossPercent / 100.0), 2);
       config.max_weekly_loss         = NormalizeDouble(cur_bal * (InpMaxWeeklyLossPercent / 100.0), 2);
       config.max_total_loss          = NormalizeDouble(cur_bal * (InpMaxTotalLossPercent / 100.0), 2);
       config.default_risk_per_trade  = NormalizeDouble(cur_bal * (InpRiskPerTradePercent / 100.0), 2);
@@ -532,7 +544,7 @@ void CheckAndApplyDynamicRisk(bool force = false)
      {
       config.equity_floor            = InpEquityFloor;
       config.equity_floor_warning    = InpEquityFloorWarning;
-      config.max_daily_loss          = InpMaxDailyLoss;
+      config.max_daily_loss          = (InpMaxDailyLoss <= 1.0) ? 0.0 : InpMaxDailyLoss;
       config.max_weekly_loss         = InpMaxWeeklyLoss;
       config.max_total_loss          = InpMaxTotalLoss;
       config.default_risk_per_trade  = InpTargetRiskPerTrade;
@@ -540,8 +552,8 @@ void CheckAndApplyDynamicRisk(bool force = false)
       config.max_open_positions      = InpMaxPositions;
      }
 
-   // Safety minimums for synthetic index tick & pip sizes
-   if(config.max_daily_loss < 0.20) config.max_daily_loss = 0.20;
+   // Safety minimums for synthetic index tick & pip sizes (0.0 means disabled)
+   if(config.max_daily_loss > 0.0 && config.max_daily_loss < 0.20) config.max_daily_loss = 0.20;
    if(config.default_risk_per_trade < 0.05) config.default_risk_per_trade = 0.05;
    if(config.hard_max_risk_per_trade < 0.10) config.hard_max_risk_per_trade = 0.10;
    if(config.max_open_positions < 1) config.max_open_positions = 1;
@@ -631,7 +643,7 @@ int OnInit()
      {
       config.equity_floor            = NormalizeDouble(init_bal * (InpEquityFloorPercent / 100.0), 2);
       config.equity_floor_warning    = NormalizeDouble(init_bal * (InpEquityFloorWarnPct / 100.0), 2);
-      config.max_daily_loss          = NormalizeDouble(init_bal * (InpMaxDailyLossPercent / 100.0), 2);
+      config.max_daily_loss          = (InpMaxDailyLossPercent <= 1.0) ? 0.0 : NormalizeDouble(init_bal * (InpMaxDailyLossPercent / 100.0), 2);
       config.max_weekly_loss         = NormalizeDouble(init_bal * (InpMaxWeeklyLossPercent / 100.0), 2);
       config.max_total_loss          = NormalizeDouble(init_bal * (InpMaxTotalLossPercent / 100.0), 2);
       config.default_risk_per_trade  = NormalizeDouble(init_bal * (InpRiskPerTradePercent / 100.0), 2);
@@ -641,7 +653,7 @@ int OnInit()
      {
       config.equity_floor            = InpEquityFloor;
       config.equity_floor_warning    = InpEquityFloorWarning;
-      config.max_daily_loss          = InpMaxDailyLoss;
+      config.max_daily_loss          = (InpMaxDailyLoss <= 1.0) ? 0.0 : InpMaxDailyLoss;
       config.max_weekly_loss         = InpMaxWeeklyLoss;
       config.max_total_loss          = InpMaxTotalLoss;
       config.default_risk_per_trade  = InpTargetRiskPerTrade;
@@ -718,8 +730,17 @@ void OnDeinit(const int reason)
 //+------------------------------------------------------------------+
 void OnTick()
   {
-   // 0. Recalculate dynamic risk on tick if balance changed
+   // 0. Recalculate dynamic risk and reset locks on tick
+   double cur_bal = AccountInfoDouble(ACCOUNT_BALANCE);
+   if(cur_bal <= 0.0) cur_bal = AccountInfoDouble(ACCOUNT_EQUITY);
+   if(cur_bal > 0.0) g_risk.SyncBalanceBaseline(cur_bal);
+   g_risk.ResetCooldown();
+   g_risk.ResetDailyLossLock();
    CheckAndApplyDynamicRisk(false);
+   if(cur_bal > 0.0 && cur_bal > g_risk.GetConfig().equity_floor)
+     {
+      g_risk.ResetEquityFloorLock();
+     }
 
    // 1. Invariant check on every single incoming price tick
    g_risk.CheckRiskLimits();

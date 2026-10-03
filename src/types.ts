@@ -245,7 +245,7 @@ export interface Mt5TelemetryPayload {
 
 export interface Mt5Command {
   id: string;
-  type: 'EXECUTE_ORDER' | 'CLOSE_POSITION' | 'FLATTEN_ALL' | 'BASKET_CLOSE_ALL' | 'PING';
+  type: 'EXECUTE_ORDER' | 'CLOSE_POSITION' | 'FLATTEN_ALL' | 'BASKET_CLOSE_ALL' | 'PING' | 'RESET_RISK_LOCKS';
   symbol?: string;
   direction?: 'BUY' | 'SELL';
   lots?: number;

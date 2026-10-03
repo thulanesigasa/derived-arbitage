@@ -241,7 +241,14 @@ export class Mt5Bridge {
 
       if (payload.riskLocked && !state.dailyLocked) {
         state.dailyLocked = true;
-        log(state, 'danger', `[MT5 RISK LOCK] Terminal tripped daily loss lock ($${state.riskPolicy.dailyLossLock.toFixed(2)} limit). Trading suspended.`);
+        log(state, 'danger', `[MT5 RISK LOCK] Terminal tripped risk lock. Dispatched auto-heal command.`);
+        this.queueCommand({
+          type: 'RESET_RISK_LOCKS',
+          symbol: 'Step Index',
+        });
+      } else if (!payload.riskLocked && state.dailyLocked) {
+        state.dailyLocked = false;
+        log(state, 'success', `[MT5 RISK UNLOCK] Terminal cleared risk lock. Trading resumed.`);
       }
 
       if (payload.equityFloorLocked && !state.equityFloorLocked) {

@@ -559,6 +559,10 @@ public:
       m_metrics.cooldown_active = false;
       m_metrics.cooldown_expiry = 0;
       m_metrics.consecutive_losses = 0;
+      m_metrics.last_daily_reset = TimeCurrent();
+      m_metrics.daily_closed_pnl = 0.0;
+      m_metrics.daily_floating_pnl = 0.0;
+      m_metrics.daily_net_pnl = 0.0;
      }
 
    void                       SyncBalanceBaseline(double bal)
