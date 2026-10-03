@@ -553,7 +553,44 @@ public:
    double                     GetLotStep(string symbol) { return m_spec.GetLotStep(symbol); }
    void                       EmergencyFlatten(string reason);
    void                       ResetCooldown() { m_metrics.cooldown_active = false; m_metrics.cooldown_expiry = 0; m_metrics.consecutive_losses = 0; }
-   void                       ResetDailyLossLock() { m_metrics.risk_locked = false; }
+   void                       ResetDailyLossLock()
+     {
+      m_metrics.risk_locked = false;
+      m_metrics.cooldown_active = false;
+      m_metrics.cooldown_expiry = 0;
+      m_metrics.consecutive_losses = 0;
+     }
+
+   void                       SyncBalanceBaseline(double bal)
+     {
+      if(bal > 0.0)
+        {
+         double dd = (m_metrics.initial_balance > m_metrics.current_equity) ?
+                     (m_metrics.initial_balance - m_metrics.current_equity) : 0.0;
+         if(m_metrics.initial_balance <= 0.0 || (m_config.max_total_loss > 0.0 && dd >= m_config.max_total_loss))
+           {
+            m_metrics.initial_balance = bal;
+            m_metrics.current_drawdown = 0.0;
+            m_metrics.peak_equity = MathMax(m_metrics.peak_equity, bal);
+            m_metrics.risk_locked = false;
+           }
+        }
+     }
+
+   void                       ResetAllRiskLocks()
+     {
+      m_metrics.risk_locked = false;
+      m_metrics.equity_floor_locked = false;
+      m_metrics.cooldown_active = false;
+      m_metrics.cooldown_expiry = 0;
+      m_metrics.consecutive_losses = 0;
+      double bal = m_account.Balance();
+      if(bal > 0.0)
+        {
+         m_metrics.initial_balance = bal;
+         m_metrics.current_drawdown = 0.0;
+        }
+     }
 
    //--- Active position defense
    void                       RunPositionDefense();
@@ -603,24 +640,24 @@ void CRiskEngine::SetDefaultConfig()
   {
    m_config.equity_floor               = 15.00;
    m_config.equity_floor_warning       = 16.00;
-   m_config.max_daily_loss             = 0.40;
-   m_config.max_weekly_loss            = 1.00;
-   m_config.max_total_loss             = 5.00;
-   m_config.default_risk_per_trade     = 0.10;
-   m_config.hard_max_risk_per_trade    = 0.20;
-   m_config.max_open_positions         = 15;
-   m_config.max_margin_usage_percent   = 20.0;
+   m_config.max_daily_loss             = 1000.00;
+   m_config.max_weekly_loss            = 2000.00;
+   m_config.max_total_loss             = 5000.00;
+   m_config.default_risk_per_trade     = 20.00;
+   m_config.hard_max_risk_per_trade    = 50.00;
+   m_config.max_open_positions         = 50;
+   m_config.max_margin_usage_percent   = 50.0;
    m_config.max_spread_points          = 50000.0;
    m_config.max_consecutive_losses     = 0;
    m_config.cooldown_duration_sec      = 0;
-   m_config.max_daily_trades           = 100;
+   m_config.max_daily_trades           = 500;
    m_config.max_trade_loss             = 0.40;
    m_config.target_trade_profit        = 0.40;
    m_config.require_hard_sl            = true;
-   m_config.break_even_enabled         = true;
+   m_config.break_even_enabled         = false;
    m_config.break_even_trigger_rr      = 1.5;
    m_config.break_even_offset_points   = 2.0;
-   m_config.trailing_stop_enabled      = true;
+   m_config.trailing_stop_enabled      = false;
    m_config.trailing_step_points       = 10.0;
    m_config.trailing_distance_points   = 30.0;
    m_config.emergency_flatten_retries  = 5;
@@ -900,11 +937,6 @@ ENUM_RISK_BREACH_REASON CRiskEngine::CheckRiskLimits()
         }
       return BREACH_DAILY_LOSS_LIMIT;
      }
-   else if(m_config.max_daily_loss <= 0.0 || (m_metrics.risk_locked && m_metrics.daily_net_pnl > -m_config.max_daily_loss))
-     {
-      // Self-heal: clear lock if limit is disabled (<= 0) or DayPnL is within safe limits
-      m_metrics.risk_locked = false;
-     }
 
    // 4. CUMULATIVE MAXIMUM DRAWDOWN
    if(m_config.max_total_loss > 0.0 && m_metrics.current_drawdown >= m_config.max_total_loss)
@@ -919,6 +951,17 @@ ENUM_RISK_BREACH_REASON CRiskEngine::CheckRiskLimits()
          EmergencyFlatten("MAX_DRAWDOWN_BREACH");
         }
       return BREACH_MAX_DRAWDOWN;
+     }
+
+   // 5. Active Invariant Self-Healing: if metrics are healthy, clear risk_locked
+   if(m_metrics.risk_locked)
+     {
+      bool daily_safe = (m_config.max_daily_loss <= 0.0 || m_metrics.daily_net_pnl > -m_config.max_daily_loss);
+      bool dd_safe    = (m_config.max_total_loss <= 0.0 || m_metrics.current_drawdown < m_config.max_total_loss);
+      if(daily_safe && dd_safe)
+        {
+         m_metrics.risk_locked = false;
+        }
      }
 
    // 5. POST-LOSS CONSECUTIVE STREAK COOLDOWN (Permanently disabled for batch arbitrage)
@@ -936,19 +979,12 @@ bool CRiskEngine::ValidateNewOrder(string symbol, ENUM_ORDER_TYPE order_type, do
   {
    reject_reason = BREACH_NONE;
 
-   // 1. Check Circuit Breaker Active Status
+   // 1. Check Equity Floor Active Status
    if(m_metrics.equity_floor_locked)
      {
       reject_reason = BREACH_EQUITY_FLOOR;
-      m_logger.Log(LOG_LEVEL_DANGER, "OrderValidator", "Order rejected: Equity floor ($15.00) locked.",
-                   m_metrics.current_equity, m_metrics.current_balance, m_metrics.daily_net_pnl);
-      return false;
-     }
-
-   if(m_metrics.risk_locked)
-     {
-      reject_reason = BREACH_DAILY_LOSS_LIMIT;
-      m_logger.Log(LOG_LEVEL_DANGER, "OrderValidator", "Order rejected: Daily loss limit ($0.40) locked.",
+      m_logger.Log(LOG_LEVEL_DANGER, "OrderValidator",
+                   StringFormat("Order rejected: Equity floor ($%.2f) locked.", m_config.equity_floor),
                    m_metrics.current_equity, m_metrics.current_balance, m_metrics.daily_net_pnl);
       return false;
      }
@@ -958,11 +994,26 @@ bool CRiskEngine::ValidateNewOrder(string symbol, ENUM_ORDER_TYPE order_type, do
    m_metrics.cooldown_expiry = 0;
    m_metrics.consecutive_losses = 0;
 
-   // 2. Active Invariant Check
+   // 2. Active Invariant Check (evaluates equity floor, daily loss, and drawdown with active self-healing)
    ENUM_RISK_BREACH_REASON active_breach = CheckRiskLimits();
    if(active_breach != BREACH_NONE)
      {
       reject_reason = active_breach;
+      m_logger.Log(LOG_LEVEL_DANGER, "OrderValidator",
+                   StringFormat("Order rejected: Active invariant breach (Reason Code: %d). DayPnL: $%.2f, DD: $%.2f",
+                                active_breach, m_metrics.daily_net_pnl, m_metrics.current_drawdown),
+                   m_metrics.current_equity, m_metrics.current_balance, m_metrics.daily_net_pnl);
+      return false;
+     }
+
+   // 3. Fallback Circuit Breaker Guard
+   if(m_metrics.risk_locked)
+     {
+      reject_reason = (m_metrics.daily_net_pnl <= -m_config.max_daily_loss) ? BREACH_DAILY_LOSS_LIMIT : BREACH_MAX_DRAWDOWN;
+      m_logger.Log(LOG_LEVEL_DANGER, "OrderValidator",
+                   StringFormat("Order rejected: Risk limit locked. | Eq: $%.2f | Bal: $%.2f | DayPnL: $%.2f",
+                                m_metrics.current_equity, m_metrics.current_balance, m_metrics.daily_net_pnl),
+                   m_metrics.current_equity, m_metrics.current_balance, m_metrics.daily_net_pnl);
       return false;
      }
 

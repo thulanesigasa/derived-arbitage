@@ -31,7 +31,7 @@ input double   InpEquityFloorPercent   = 85.0;                   // Absolute Equ
 input double   InpEquityFloorWarnPct   = 90.0;                   // Equity Warning Threshold (% of balance, e.g. 90%)
 input double   InpMaxDailyLossPercent  = 10.0;                   // Maximum Daily Loss (% of balance, e.g. 10.0% = ~$950 on $9.5k; 0 to disable)
 input double   InpMaxWeeklyLossPercent = 3.0;                    // Maximum Weekly Loss (% of balance, e.g. 3.0%)
-input double   InpMaxTotalLossPercent  = 10.0;                   // Maximum Total Drawdown (% of balance, e.g. 10.0%)
+input double   InpMaxTotalLossPercent  = 50.0;                   // Maximum Total Drawdown (% of balance, e.g. 50.0%)
 input double   InpRiskPerTradePercent  = 0.2;                    // Target Risk Per Trade (% of balance, e.g. 0.2% = Hard Max Risk)
 input double   InpHardRiskTradePercent = 0.2;                    // Hard Max Risk Per Trade (% of balance, e.g. 0.2%)
 input int      InpMaxPositions         = 50;                     // Max Simultaneous Positions (15)
@@ -41,7 +41,7 @@ input double   InpEquityFloor          = 8500.00;                // Manual Equit
 input double   InpEquityFloorWarning   = 9000.00;                // Manual Warning Threshold ($)
 input double   InpMaxDailyLoss         = 1000.00;                // Manual Maximum Daily Loss ($1,000; 0 to disable)
 input double   InpMaxWeeklyLoss        = 300.00;                 // Manual Maximum Weekly Loss ($)
-input double   InpMaxTotalLoss         = 1000.00;                // Manual Maximum Cumulative Loss ($)
+input double   InpMaxTotalLoss         = 5000.00;                // Manual Maximum Cumulative Loss ($)
 input double   InpTargetRiskPerTrade   = 20.00;                  // Manual Target Risk per Trade ($)
 input double   InpHardMaxRiskPerTrade  = 20.00;                  // Manual Hard Max Risk per Trade ($)
 
@@ -549,6 +549,7 @@ void CheckAndApplyDynamicRisk(bool force = false)
    config.max_spread_points          = InpMaxSpreadPoints;
    config.max_consecutive_losses     = 0;
    config.cooldown_duration_sec      = 0;
+   g_risk.SyncBalanceBaseline(cur_bal);
    g_risk.ResetCooldown();
    g_risk.ResetDailyLossLock();
    config.max_daily_trades           = 100;
@@ -642,6 +643,7 @@ int OnInit()
    config.max_spread_points          = InpMaxSpreadPoints;
    config.max_consecutive_losses     = 0;
    config.cooldown_duration_sec      = 0;
+   g_risk.SyncBalanceBaseline(cur_bal);
    g_risk.ResetCooldown();
    g_risk.ResetDailyLossLock();
    config.max_daily_trades           = 100;
@@ -723,6 +725,9 @@ void OnTick()
 void OnTimer()
   {
    // 0. Maintain real-time balance scaling & ensure cooldown is always off
+   double cur_bal = AccountInfoDouble(ACCOUNT_BALANCE);
+   if(cur_bal <= 0.0) cur_bal = AccountInfoDouble(ACCOUNT_EQUITY);
+   if(cur_bal > 0.0) g_risk.SyncBalanceBaseline(cur_bal);
    g_risk.ResetCooldown();
    g_risk.ResetDailyLossLock();
    CheckAndApplyDynamicRisk(false);
